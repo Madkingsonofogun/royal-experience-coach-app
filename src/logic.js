@@ -1617,11 +1617,52 @@ export function adminCreateClient(store, adminUser, input) {
 export function adminUpdateClient(store, adminUser, clientId, patch) {
   requireAdmin(adminUser);
   const client = findById(store.clients, clientId, "Client");
+  if (patch.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(patch.email))) throw new Error("Enter a valid email address.");
+  if (patch.trainingDaysPerWeek !== undefined && ![2, 3, 4, 5].includes(Number(patch.trainingDaysPerWeek))) throw new Error("Training days must be 2, 3, 4, or 5.");
+  if (patch.sessionLength !== undefined && ![30, 45, 60].includes(Number(patch.sessionLength))) throw new Error("Session length must be 30, 45, or 60.");
+  if (patch.currentTrainingLevel !== undefined && !["Beginner", "Intermediate", "Advanced", "Pro"].includes(patch.currentTrainingLevel)) throw new Error("Choose a valid training level.");
+  if (patch.planOfferingId) findById(store.planOfferings, patch.planOfferingId, "Plan offering");
+  if (patch.packageId) findById(store.packages, patch.packageId, "Package");
   Object.assign(client, patch, { updatedAt: nowIso() });
   if (patch.assignedCoach || patch.coachId) client.coachId = patch.assignedCoach || patch.coachId;
   if (patch.package || patch.packageType) client.packageType = patch.package || patch.packageType;
+  if (patch.trainingDaysPerWeek !== undefined) client.trainingDaysPerWeek = Number(patch.trainingDaysPerWeek);
+  if (patch.sessionLength !== undefined) client.sessionLength = Number(patch.sessionLength);
+  if (patch.sessionsPurchased !== undefined) client.sessionsPurchased = Number(patch.sessionsPurchased || 0);
+  if (patch.sessionsUsed !== undefined) client.sessionsUsed = Number(patch.sessionsUsed || 0);
+  if (patch.sessionsRemaining !== undefined) client.sessionsRemaining = Number(patch.sessionsRemaining || 0);
+  const user = store.users.find((item) => item.role === "Client" && item.linkedId === clientId);
+  if (user) {
+    if (patch.name || patch.fullName) user.name = patch.name || patch.fullName;
+    if (patch.firstName !== undefined) user.firstName = patch.firstName;
+    if (patch.lastName !== undefined) user.lastName = patch.lastName;
+    if (patch.email !== undefined) user.email = String(patch.email || "").toLowerCase();
+    if (patch.phone !== undefined) user.phone = String(patch.phone || "");
+    if (patch.accountLocked !== undefined) user.accountLocked = Boolean(patch.accountLocked);
+    if (patch.profileLocked !== undefined) {
+      user.profileLocked = Boolean(patch.profileLocked);
+      client.profileLocked = Boolean(patch.profileLocked);
+    }
+    if (patch.status) {
+      user.accountStatus = patch.status === "Locked" ? "Active" : patch.status;
+      user.disabled = ["Suspended", "Archived"].includes(patch.status);
+      if (patch.status === "Locked") user.accountLocked = true;
+      if (patch.status === "Active") user.accountLocked = false;
+    }
+  }
   logAdminAction(store, adminUser, `Updated client ${client.name}`);
   return client;
+}
+
+export function adminArchiveMonthlyPlan(store, adminUser, planId) {
+  requireAdmin(adminUser);
+  const plan = findById(store.monthlyPlans, planId, "Monthly plan");
+  plan.status = "Archived";
+  plan.planStatus = "Archived";
+  plan.archived = true;
+  plan.updatedAt = nowIso();
+  logAdminAction(store, adminUser, `Archived monthly plan ${plan.id}`);
+  return plan;
 }
 
 export function adminArchiveClient(store, adminUser, clientId) {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   adminInterveneInChat,
   addProgressImageCoachNote,
+  adminArchiveMonthlyPlan,
   archiveProgressImage,
   adminAddExerciseToWorkoutTemplate,
   adminArchiveClient,
@@ -1011,6 +1012,78 @@ test("admin can delete a client and linked records", () => {
   assert.equal(store.clients.some((client) => client.id === "client_ada"), false);
   assert.equal(store.monthlyPlans.some((plan) => plan.clientId === "client_ada"), false);
   assert.equal(store.users.some((user) => user.linkedId === "client_ada"), false);
+});
+
+test("admin edit client popup workflow can update profile, coach, program, package, access, and plan actions", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const { coach: newCoach } = adminCreateCoach(store, admin, {
+    firstName: "Nia",
+    lastName: "Stone",
+    email: "nia@example.com",
+    phone: "5557778888",
+    pin: "7777",
+    confirmPin: "7777"
+  });
+  assert.equal(coachCanSeeClient(store, "coach_1", "client_ada"), true);
+  assert.equal(coachCanSeeClient(store, newCoach.id, "client_ada"), false);
+  const offering = adminCreatePlanOffering(store, admin, {
+    planName: "Edited Client Boxing Plan",
+    sportFocus: "Boxing",
+    goal: "Conditioning",
+    trainingLevel: "Advanced",
+    trainingDaysPerWeek: 4,
+    sessionLength: 60,
+    workoutTemplateIds: ["template_boxing_baseline"]
+  });
+  const pkg = adminCreatePackage(store, admin, {
+    packageName: "Edited Client Package",
+    planOfferingId: offering.id,
+    sessionsIncluded: 16
+  });
+  const beforeWorkoutHistory = store.monthlyPlanItems.filter((item) => item.clientId === "client_ada").length;
+  const updated = adminUpdateClient(store, admin, "client_ada", {
+    firstName: "Ada",
+    lastName: "Royal",
+    name: "Ada Royal",
+    email: "ada.royal@example.com",
+    phone: "5559990000",
+    coachId: newCoach.id,
+    goal: "Advanced boxing conditioning",
+    sportFocus: "Boxing",
+    currentTrainingLevel: "Advanced",
+    trainingDaysPerWeek: 4,
+    sessionLength: 60,
+    packageId: pkg.id,
+    packageType: pkg.packageName,
+    planOfferingId: offering.id,
+    sessionsPurchased: 16,
+    sessionsUsed: 2,
+    sessionsRemaining: 14,
+    accountLocked: true,
+    profileLocked: true
+  });
+  assert.equal(updated.name, "Ada Royal");
+  assert.equal(updated.coachId, newCoach.id);
+  assert.equal(updated.planOfferingId, offering.id);
+  assert.equal(updated.trainingDaysPerWeek, 4);
+  assert.equal(updated.sessionLength, 60);
+  assert.equal(updated.sessionsRemaining, 14);
+  assert.equal(coachCanSeeClient(store, newCoach.id, "client_ada"), true);
+  assert.equal(coachCanSeeClient(store, "coach_1", "client_ada"), false);
+  const user = store.users.find((item) => item.linkedId === "client_ada");
+  assert.equal(user.email, "ada.royal@example.com");
+  assert.equal(user.accountLocked, true);
+  assert.equal(user.profileLocked, true);
+  const draft = generateMonthlyPlanFromPlanOffering(store, admin, "client_ada", offering.id);
+  assert.equal(draft.status, "Draft");
+  const active = store.monthlyPlans.find((plan) => plan.clientId === "client_ada" && plan.status === "Active");
+  adminArchiveMonthlyPlan(store, admin, active.id);
+  assert.equal(store.monthlyPlans.find((plan) => plan.id === active.id).status, "Archived");
+  const reset = adminResetUserPin(store, admin, user.id);
+  assert.equal(reset.temporaryPin.length, 4);
+  assert.equal(store.monthlyPlanItems.filter((item) => item.clientId === "client_ada").length >= beforeWorkoutHistory, true);
+  assert.equal(store.adminAuditLog.some((entry) => entry.action.includes("Updated client Ada Royal")), true);
 });
 
 test("admin can create, edit, and archive an exercise", () => {

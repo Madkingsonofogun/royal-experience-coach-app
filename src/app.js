@@ -1,5 +1,6 @@
 import {
   adminAddExerciseToWorkoutTemplate,
+  adminArchiveMonthlyPlan,
   adminArchiveClient,
   adminArchiveExercise,
   adminArchivePlanOffering,
@@ -56,6 +57,7 @@ import {
   ensureMonthlyPlanHasWorkouts,
   getProgressImagesForUser,
   getWorkoutDetailForUser,
+  generateMonthlyPlanFromPlanOffering,
   loginBlockedMessage,
   markNotificationsRead,
   removeProfileImage,
@@ -230,6 +232,8 @@ const state = {
   selectedExerciseId: null,
   selectedAssessmentTemplateId: "assessment_template_default",
   editModal: null,
+  editModalDirty: false,
+  clientEditTab: "Profile",
   chatDraft: "",
   assessment: blankAssessment("client_ada", today),
   assessmentStep: 0,
@@ -1350,7 +1354,7 @@ function adminView() {
           <label>Notes <textarea data-admin-draft="client:notes">${d.client.notes}</textarea></label>
           <label>Injury / restriction notes <textarea data-admin-draft="client:injuryRestrictionNotes">${d.client.injuryRestrictionNotes}</textarea></label>
           <button class="primary full" id="adminCreateClient">Add New Client</button>
-          <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-delete-client="${client.id}">Delete</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
+          <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><button data-open-client-editor="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-delete-client="${client.id}">Delete</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("coaches")}" id="admin-coaches-new">
           <h3>Add Coach</h3>
@@ -1518,6 +1522,7 @@ function adminView() {
 
 function adminEditModal() {
   if (!state.editModal || state.currentUser?.role !== "Admin") return "";
+  if (state.editModal.type === "client") return clientEditModal(state.editModal.id);
   if (state.editModal.type === "exercise") return exerciseEditModal(state.editModal.id);
   if (state.editModal.type === "workout") return workoutEditModal(state.editModal.id);
   if (state.editModal.type === "offering") return planOfferingEditModal(state.editModal.id);
@@ -1525,6 +1530,132 @@ function adminEditModal() {
   if (state.editModal.type === "assessmentTemplate") return assessmentTemplateEditModal(state.editModal.id);
   if (state.editModal.type === "account") return accountReviewModal(state.editModal.id);
   return "";
+}
+
+function clientEditModal(clientId) {
+  const client = store.clients.find((item) => item.id === clientId);
+  if (!client) return "";
+  const user = store.users.find((item) => item.role === "Client" && item.linkedId === clientId);
+  const activePlan = store.monthlyPlans.find((plan) => plan.clientId === clientId && plan.status === "Active" && plan.approved);
+  const latestAssessment = store.assessments.filter((item) => item.clientId === clientId).at(-1);
+  const latestReassessment = store.assessments.filter((item) => item.clientId === clientId && item.assessmentType === "Reassessment").at(-1);
+  const tabs = ["Profile", "Coach & Access", "Program", "Package", "Workouts", "Assessments", "Notes"];
+  const tabClass = (tab) => tab === state.clientEditTab ? "client-edit-panel active-client-edit-panel" : "client-edit-panel hidden";
+  const currentPackageId = client.packageId || store.packages.find((pkg) => pkg.packageName === client.packageType)?.id || "";
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal client-edit-modal">
+        <div class="modal-head">
+          <div><p class="eyebrow">Edit Client</p><h2>${escapeHtml(client.name)}</h2><p class="muted">Save changes without leaving the Admin dashboard.</p></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="tab-row client-edit-tabs">
+          ${tabs.map((tab) => `<button class="${state.clientEditTab === tab ? "active" : ""}" data-client-edit-tab="${tab}">${tab}</button>`).join("")}
+        </div>
+        <div class="${tabClass("Profile")}">
+          <div class="form-grid">
+            ${editInput("client", "firstName", "First name", client.firstName || user?.firstName || client.name.split(" ")[0] || "")}
+            ${editInput("client", "lastName", "Last name", client.lastName || user?.lastName || client.name.split(" ").slice(1).join(" ") || "")}
+            ${editInput("client", "name", "Full name", client.name || "")}
+            ${editInput("client", "email", "Email", client.email || user?.email || "")}
+            ${editInput("client", "phone", "Phone", client.phone || user?.phone || "")}
+            ${editInput("client", "dateOfBirth", "Date of birth", client.dateOfBirth || "", "date")}
+            ${editInput("client", "emergencyContact", "Emergency contact", client.emergencyContact || "")}
+            ${editSelect("client", "status", "Status", ["Pending", "Active", "Locked", "Suspended", "Archived"], client.status || user?.accountStatus || "Active")}
+          </div>
+          <div class="admin-row avatar-row">
+            ${avatar(client.profileImageUrl || user?.profileImageUrl, client.name)}
+            <span>Profile image can still be managed from Admin Overview or the client profile controls.</span>
+          </div>
+        </div>
+        <div class="${tabClass("Coach & Access")}">
+          <div class="form-grid">
+            ${editSelect("client", "coachId", "Assigned coach", [{ value: "", label: "No coach assigned" }, ...store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => ({ value: coach.id, label: coach.name }))], client.coachId || "")}
+            ${editSelect("client", "accountLocked", "Account access", [{ value: "false", label: "Unlocked" }, { value: "true", label: "Locked" }], String(Boolean(user?.accountLocked)))}
+            ${editSelect("client", "profileLocked", "Profile editing", [{ value: "false", label: "Unlocked" }, { value: "true", label: "Locked" }], String(Boolean(client.profileLocked || user?.profileLocked)))}
+          </div>
+          <div class="modal-actions left-actions">
+            <button id="clientModalResetPin" data-client-id="${client.id}">Reset 4-digit PIN</button>
+            <button id="clientModalToggleLock" data-client-id="${client.id}">${user?.accountLocked ? "Unlock Account" : "Lock Account"}</button>
+            <button id="clientModalToggleProfileLock" data-client-id="${client.id}">${client.profileLocked || user?.profileLocked ? "Unlock Profile Editing" : "Lock Profile Editing"}</button>
+          </div>
+        </div>
+        <div class="${tabClass("Program")}">
+          <div class="result-band"><strong>Program warning</strong><span>Changing program details may require a new monthly plan. Workout history will stay saved.</span></div>
+          <div class="form-grid">
+            ${editInput("client", "programName", "Program name", client.programName || client.packageType || "")}
+            ${editSelect("client", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], client.sportFocus)}
+            ${editInput("client", "goal", "Goal", client.goal || "")}
+            ${editSelect("client", "currentTrainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], client.currentTrainingLevel || "Beginner")}
+            ${editSelect("client", "trainingDaysPerWeek", "Training days per week", [2, 3, 4, 5], client.trainingDaysPerWeek)}
+            ${editSelect("client", "sessionLength", "Session length", [30, 45, 60], client.sessionLength)}
+            ${editInput("client", "startDate", "Start date", client.startDate || "", "date")}
+          </div>
+          <label>Restrictions <textarea data-edit-client-field="currentRestrictions">${escapeHtml(listValue(client.currentRestrictions))}</textarea></label>
+          <label>Equipment access <textarea data-edit-client-field="equipmentAvailable">${escapeHtml(listValue(client.equipmentAvailable))}</textarea></label>
+          <label>Injury notes <textarea data-edit-client-field="injuryNotes">${escapeHtml(client.injuryNotes || client.injuryRestrictionNotes || "")}</textarea></label>
+        </div>
+        <div class="${tabClass("Package")}">
+          <div class="result-band"><strong>Package warning</strong><span>This package change may affect workout days per week.</span></div>
+          <div class="form-grid">
+            ${editSelect("client", "packageId", "Package", [{ value: "", label: "No package" }, ...store.packages.map((pkg) => ({ value: pkg.id, label: pkg.packageName }))], currentPackageId)}
+            ${editSelect("client", "planOfferingId", "Plan offering", [{ value: "", label: "No plan offering" }, ...store.planOfferings.map((offering) => ({ value: offering.id, label: offering.planName }))], client.planOfferingId || store.packages.find((pkg) => pkg.id === currentPackageId)?.planOfferingId || "")}
+            ${editInput("client", "sessionsPurchased", "Sessions purchased", client.sessionsPurchased || client.sessionsIncluded || "", "number")}
+            ${editInput("client", "sessionsUsed", "Sessions used", client.sessionsUsed || "", "number")}
+            ${editInput("client", "sessionsRemaining", "Sessions remaining", client.sessionsRemaining || "", "number")}
+            ${editSelect("client", "packageStatus", "Package status", ["Active", "Paused", "Completed", "Archived"], client.packageStatus || "Active")}
+            ${editSelect("client", "paymentStatus", "Payment status", ["Not tracked", "Paid", "Partial", "Past Due"], client.paymentStatus || "Not tracked")}
+          </div>
+        </div>
+        <div class="${tabClass("Workouts")}">
+          <div class="grid-3 stat-strip">
+            ${infoCard("Active plan", activePlan?.month || "None")}
+            ${infoCard("Workout history", store.monthlyPlanItems.filter((item) => item.clientId === client.id).length)}
+            ${infoCard("Draft plans", store.monthlyPlans.filter((plan) => plan.clientId === client.id && plan.status === "Draft").length)}
+          </div>
+          <div class="form-grid">
+            ${modalSelect("clientModalPlanOfferingForDraft", "Plan offering for new Draft", store.planOfferings.map((offering) => ({ value: offering.id, label: offering.planName })), client.planOfferingId || store.planOfferings[0]?.id)}
+            ${modalSelect("clientModalWorkoutTemplate", "Assign workout template", store.workoutTemplates.map((template) => ({ value: template.id, label: template.workoutName })), "")}
+          </div>
+          <div class="modal-actions left-actions">
+            <button id="clientModalGenerateDraft" data-client-id="${client.id}">Generate New Draft Plan</button>
+            ${activePlan ? `<button id="clientModalArchivePlan" data-plan-id="${activePlan.id}">Archive Current Plan</button>` : ""}
+            <button id="clientModalWorkoutWarning">Change Future Workouts Only</button>
+          </div>
+          <div class="admin-list modal-list">
+            ${store.monthlyPlans.filter((plan) => plan.clientId === client.id).map((plan) => `<div class="admin-row"><span>${plan.month} / ${plan.status} / ${plan.trainingLevel || plan.planLevel}</span></div>`).join("") || `<div class="empty">No monthly plan history yet.</div>`}
+          </div>
+        </div>
+        <div class="${tabClass("Assessments")}">
+          <div class="grid-3 stat-strip">
+            ${infoCard("Latest assessment", latestAssessment?.assessmentDate || client.lastAssessmentDate || "None")}
+            ${infoCard("Latest result", latestAssessment?.recommendedTrainingLevel || latestAssessment?.suggestedStartLevel || "None")}
+            ${infoCard("Latest reassessment", latestReassessment?.assessmentDate || "None")}
+          </div>
+          <div class="form-grid">
+            ${editInput("client", "nextReassessmentDate", "Next reassessment due", client.nextReassessmentDate || "", "date")}
+            ${editSelect("client", "reassessmentFrequency", "Reassessment frequency", ["Monthly", "Every 6 Weeks", "Quarterly", "As Needed"], client.reassessmentFrequency || "Monthly")}
+          </div>
+          <div class="modal-actions left-actions">
+            <button id="clientModalScheduleAssessment" data-client-id="${client.id}">Schedule Assessment</button>
+            <button id="clientModalScheduleReassessment" data-client-id="${client.id}">Schedule Reassessment</button>
+            <button id="clientModalViewHistory" data-client-id="${client.id}">View History</button>
+          </div>
+        </div>
+        <div class="${tabClass("Notes")}">
+          <label>Admin notes <textarea data-edit-client-field="notes">${escapeHtml(client.notes || "")}</textarea></label>
+          <label>Coach notes summary <textarea data-edit-client-field="coachNotesSummary">${escapeHtml(client.coachNotesSummary || "")}</textarea></label>
+          <label>Client notes summary <textarea data-edit-client-field="clientNotesSummary">${escapeHtml(client.clientNotesSummary || client.progressNotes || "")}</textarea></label>
+          <label>Injury / restriction notes <textarea data-edit-client-field="injuryRestrictionNotes">${escapeHtml(client.injuryRestrictionNotes || client.injuryNotes || "")}</textarea></label>
+        </div>
+        <div class="modal-actions sticky-modal-actions">
+          <span class="muted" id="clientEditSuccess">${state.editModal?.success || ""}</span>
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="saveClientModal" data-client-id="${client.id}">Save Changes</button>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 function coachEditModal(coachId) {
@@ -2219,6 +2350,13 @@ function bindGlobal() {
     state.editModal = { type: "exercise", id: button.dataset.openExerciseEditor };
     render();
   }));
+  document.querySelectorAll("[data-open-client-editor]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "client", id: button.dataset.openClientEditor };
+    state.clientEditTab = "Profile";
+    state.editModalDirty = false;
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Opened Edit Client popup for ${button.dataset.openClientEditor}`, createdAt: new Date().toISOString() });
+    render();
+  }));
   document.querySelectorAll("[data-open-workout-editor]").forEach((button) => button.addEventListener("click", () => {
     state.editModal = { type: "workout", id: button.dataset.openWorkoutEditor };
     render();
@@ -2254,7 +2392,17 @@ function bindGlobal() {
     render();
   });
   document.querySelectorAll("#closeEditModal, #closeEditModalSecondary").forEach((button) => button.addEventListener("click", () => {
+    if (state.editModal?.type === "client" && state.editModalDirty && !window.confirm("Close without saving your client changes?")) return;
     state.editModal = null;
+    state.editModalDirty = false;
+    render();
+  }));
+  document.querySelectorAll("[data-edit-client-field]").forEach((field) => {
+    field.addEventListener("input", () => state.editModalDirty = true);
+    field.addEventListener("change", () => state.editModalDirty = true);
+  });
+  document.querySelectorAll("[data-client-edit-tab]").forEach((button) => button.addEventListener("click", () => {
+    state.clientEditTab = button.dataset.clientEditTab;
     render();
   }));
   document.querySelector("#saveExerciseModal")?.addEventListener("click", (event) => {
@@ -2307,6 +2455,35 @@ function bindGlobal() {
     adminUpdateCoach(store, state.currentUser, coachId, patch);
     state.editModal = null;
     render();
+  });
+  document.querySelector("#saveClientModal")?.addEventListener("click", (event) => {
+    try {
+      const clientId = event.currentTarget.dataset.clientId;
+      const patch = collectEditFields("client");
+      patch.fullName = patch.name;
+      patch.assignedCoach = patch.coachId;
+      patch.trainingDaysPerWeek = Number(patch.trainingDaysPerWeek || 0);
+      patch.sessionLength = Number(patch.sessionLength || 0);
+      patch.sessionsPurchased = Number(patch.sessionsPurchased || 0);
+      patch.sessionsUsed = Number(patch.sessionsUsed || 0);
+      patch.sessionsRemaining = Number(patch.sessionsRemaining || 0);
+      patch.accountLocked = patch.accountLocked === "true";
+      patch.profileLocked = patch.profileLocked === "true";
+      patch.currentRestrictions = csvValue(patch.currentRestrictions);
+      patch.equipmentAvailable = csvValue(patch.equipmentAvailable);
+      if (patch.packageId) {
+        const pkg = store.packages.find((item) => item.id === patch.packageId);
+        patch.packageType = pkg?.packageName || patch.packageType;
+      }
+      adminUpdateClient(store, state.currentUser, clientId, patch);
+      changeSelectedClient(clientId, false);
+      window.alert("Client changes saved.");
+      state.editModal = null;
+      state.editModalDirty = false;
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
   });
   document.querySelectorAll("[data-edit-template-test]").forEach((button) => button.addEventListener("click", () => {
     const template = store.assessmentTemplates.find((item) => item.id === state.editModal?.id);
@@ -2399,6 +2576,40 @@ function bindGlobal() {
     adminUpdateClient(store, state.currentUser, button.dataset.saveClient, { name, fullName: name });
     render();
   }));
+  document.querySelector("#clientModalResetPin")?.addEventListener("click", (event) => {
+    const user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
+    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    render();
+  });
+  document.querySelector("#clientModalToggleLock")?.addEventListener("click", (event) => {
+    const user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
+    if (user) adminUpdateClient(store, state.currentUser, event.currentTarget.dataset.clientId, { accountLocked: !user.accountLocked });
+    render();
+  });
+  document.querySelector("#clientModalToggleProfileLock")?.addEventListener("click", (event) => {
+    const client = store.clients.find((item) => item.id === event.currentTarget.dataset.clientId);
+    adminUpdateClient(store, state.currentUser, event.currentTarget.dataset.clientId, { profileLocked: !client?.profileLocked });
+    render();
+  });
+  document.querySelector("#clientModalGenerateDraft")?.addEventListener("click", (event) => {
+    const planOfferingId = document.querySelector("#clientModalPlanOfferingForDraft")?.value;
+    if (!planOfferingId) return window.alert("Choose a plan offering first.");
+    const draft = generateMonthlyPlanFromPlanOffering(store, state.currentUser, event.currentTarget.dataset.clientId, planOfferingId);
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Generated new Draft monthly plan ${draft.id} from Edit Client popup`, createdAt: new Date().toISOString() });
+    window.alert("New Draft monthly plan created.");
+    render();
+  });
+  document.querySelector("#clientModalArchivePlan")?.addEventListener("click", (event) => {
+    adminArchiveMonthlyPlan(store, state.currentUser, event.currentTarget.dataset.planId);
+    window.alert("Current monthly plan archived.");
+    render();
+  });
+  document.querySelector("#clientModalWorkoutWarning")?.addEventListener("click", () => {
+    window.alert("Future workout changes are noted. Past workout history will not be deleted.");
+  });
+  document.querySelector("#clientModalScheduleAssessment")?.addEventListener("click", () => window.alert("Assessment scheduling note saved for Admin follow-up."));
+  document.querySelector("#clientModalScheduleReassessment")?.addEventListener("click", () => window.alert("Reassessment scheduling note saved for Admin follow-up."));
+  document.querySelector("#clientModalViewHistory")?.addEventListener("click", () => window.alert("Assessment and workout history is shown in the client profile and plan history sections."));
   document.querySelectorAll("[data-archive-client]").forEach((button) => button.addEventListener("click", () => {
     adminArchiveClient(store, state.currentUser, button.dataset.archiveClient);
     render();
