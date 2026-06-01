@@ -912,9 +912,14 @@ export function clientOwnsRecord(record, clientId) {
 }
 
 export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, coachAgrees) {
-  const changed = !currentPlan || currentPlan.planLevel !== assessment.planLevel || JSON.stringify(currentPlan.restrictions || []) !== JSON.stringify(assessment.restrictions || []) || currentPlan.workoutPermission !== assessment.workoutPermission;
+  const assessmentLevel = assessment.trainingLevel || assessment.recommendedTrainingLevel || normalizeTrainingLevel(assessment.planLevel);
+  const currentLevel = currentPlan?.trainingLevel || normalizeTrainingLevel(currentPlan?.planLevel);
+  const changed = !currentPlan
+    || currentLevel !== assessmentLevel
+    || JSON.stringify(currentPlan.restrictions || []) !== JSON.stringify(assessment.restrictions || [])
+    || currentPlan.workoutPermission !== assessment.workoutPermission;
   if (!changed || !coachAgrees) return { shouldPrompt: changed, draftPlan: null };
-    const draftPlan = {
+  const draftPlan = {
     id: makeId("plan"),
     clientId: assessment.clientId,
     coachId: store.clients.find((c) => c.id === assessment.clientId)?.coachId,
@@ -923,15 +928,117 @@ export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, 
     planStatus: "Draft",
     approved: false,
     coachApproved: false,
-    planLevel: assessment.planLevel,
-    trainingLevel: assessment.trainingLevel || assessment.recommendedTrainingLevel || normalizeTrainingLevel(assessment.planLevel),
+    planLevel: assessmentLevel,
+    trainingLevel: assessmentLevel,
     restrictions: assessment.restrictions,
     workoutPermission: assessment.workoutPermission,
     createdFromAssessmentId: assessment.assessmentId,
-    generatedFromAssessmentId: assessment.assessmentId
+    generatedFromAssessmentId: assessment.assessmentId,
+    generatedFrom: "Assessment recommendation",
+    createdAt: nowIso()
   };
   store.monthlyPlans.push(draftPlan);
+  createAssessmentDrivenMonthlyPlanItems(store, draftPlan, assessment);
   return { shouldPrompt: true, draftPlan };
+}
+
+function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment) {
+  const client = findById(store.clients, plan.clientId, "Client");
+  const trainingDays = Math.max(1, Math.min(5, Number(client.trainingDaysPerWeek || 3)));
+  const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery" || toArray(assessment.restrictions).includes("Pain high");
+  const sections = recoveryMode
+    ? ["Warm-Up", "Recovery", "Skill / Technique", "Core", "Cooldown"]
+    : ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Cooldown"];
+  const startDate = nextPlanStartDate();
+  for (let week = 1; week <= 4; week += 1) {
+    for (let day = 1; day <= trainingDays; day += 1) {
+      const workoutDate = addDaysIso(startDate, ((week - 1) * 7) + ((day - 1) * Math.max(1, Math.floor(7 / trainingDays))));
+      const items = sections.map((section, index) => {
+        const exercise = chooseAssessmentExercise(store.exercises, {
+          section,
+          trainingLevel: plan.trainingLevel,
+          sportFocus: client.sportFocus,
+          goal: client.goal,
+          equipment: client.equipmentAvailable || [],
+          restrictions: assessment.restrictions || [],
+          recoveryMode,
+          index
+        });
+        return exerciseToPlanItem(exercise, section, recoveryMode);
+      }).filter(Boolean);
+      store.monthlyPlanItems.push({
+        id: makeId("item"),
+        clientId: client.id,
+        monthlyPlanId: plan.id,
+        workoutDate,
+        trainingDayNumber: ((week - 1) * trainingDays) + day,
+        weekNumber: week,
+        trainingLevel: plan.trainingLevel,
+        adjustmentMode: recoveryMode ? "Recovery" : "Normal",
+        sessionLength: client.sessionLength,
+        coachAllowsMarkComplete: true,
+        coachAllowsBonus: !recoveryMode && ["Advanced", "Pro"].includes(plan.trainingLevel),
+        title: `${plan.trainingLevel} ${client.sportFocus || "Training"} - Week ${week} Day ${day}`,
+        generatedFromAssessmentId: assessment.assessmentId,
+        items
+      });
+    }
+  }
+}
+
+function chooseAssessmentExercise(exercises, context) {
+  const levelOrder = ["Beginner", "Intermediate", "Advanced", "Pro"];
+  const targetIndex = Math.max(0, levelOrder.indexOf(normalizeTrainingLevel(context.trainingLevel)));
+  const equipmentText = toArray(context.equipment).join(" ").toLowerCase();
+  const sectionKey = String(context.section || "").toLowerCase();
+  const sportText = String(context.sportFocus || "").toLowerCase();
+  const goalText = String(context.goal || "").toLowerCase();
+  const candidates = exercises.filter((exercise) => {
+    if (exercise.active === false || exercise.archived) return false;
+    if (levelOrder.indexOf(normalizeTrainingLevel(exercise.trainingLevel || exercise.planLevel)) > targetIndex) return false;
+    if (context.recoveryMode && !exercise.lowImpact && !exercise.recoveryAlternative) return false;
+    if (context.restrictions.some((restriction) => toArray(exercise.contraindications).includes(restriction))) return false;
+    const exerciseSection = String(exercise.sessionPart || exercise.category || exercise.replacementCategory || "").toLowerCase();
+    const exercisePattern = String(exercise.replacementCategory || "").toLowerCase();
+    if (!exerciseSection.includes(sectionKey) && !exercisePattern.includes(sectionKey.split(" ")[0])) return false;
+    const equipment = toArray(exercise.equipment).join(" ").toLowerCase();
+    if (equipment && !equipment.includes("bodyweight") && !equipment.includes("mobility") && !equipment.includes("low-impact") && !equipmentText.includes(equipment.split(" ")[0])) return false;
+    return true;
+  });
+  return candidates.find((exercise) => String(exercise.sportFocus || "").toLowerCase().includes(sportText.split(" ")[0]))
+    || candidates.find((exercise) => String(exercise.goal || "").toLowerCase().includes(goalText.split(" ")[0]))
+    || candidates[context.index % Math.max(1, candidates.length)]
+    || exercises.find((exercise) => exercise.active !== false && !exercise.archived && (exercise.lowImpact || exercise.recoveryAlternative))
+    || exercises.find((exercise) => exercise.active !== false && !exercise.archived);
+}
+
+function exerciseToPlanItem(exercise, section, recoveryMode) {
+  if (!exercise) return null;
+  return {
+    exerciseId: exercise.id,
+    name: exercise.exerciseName || exercise.name,
+    sessionPart: section,
+    sets: recoveryMode ? Math.min(2, Number(exercise.sets || 2)) : exercise.sets || (section === "Strength" ? 3 : null),
+    reps: recoveryMode ? exercise.reps || null : exercise.reps || null,
+    time: parseDoseNumber(exercise.time) || (section === "Warm-Up" || section === "Cooldown" || section === "Recovery" ? 5 : null),
+    rest: parseDoseNumber(exercise.rest) || (recoveryMode ? 90 : 60),
+    rounds: recoveryMode ? Math.min(2, Number(exercise.rounds || 2)) : exercise.rounds || null,
+    difficulty: exercise.difficulty,
+    equipment: toArray(exercise.equipment).join(", "),
+    replacementReason: recoveryMode ? "Recovery alternative from reassessment" : ""
+  };
+}
+
+function nextPlanStartDate() {
+  const date = new Date(`${todayIso()}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function addDaysIso(startIso, days) {
+  const date = new Date(`${startIso}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export function approveMonthlyPlan(store, planId) {

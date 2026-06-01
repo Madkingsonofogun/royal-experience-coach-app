@@ -27,6 +27,8 @@ import {
   archiveProgressImage,
   authenticateUser,
   canUserAccessClient,
+  approveMonthlyPlan,
+  createReassessmentDraftIfNeeded,
   createInviteCode,
   deleteInviteCode,
   equipmentOptions,
@@ -177,6 +179,7 @@ const state = {
   },
   view: "home",
   adminPanel: "overview",
+  planDraftNotice: "",
   clientId: "client_ada",
   selectedWorkoutId: null,
   selectedExerciseId: null,
@@ -306,12 +309,11 @@ function navTabs() {
     { id: "plan", label: "Monthly Plan" },
     { id: "chat", label: "Chat" }
   ];
-  if (state.currentUser.role === "Client") return [...shared, { id: "client", label: "Client View" }];
+  if (state.currentUser.role === "Client") return [...shared, { id: "weekly", label: "Weekly Check-In" }, { id: "client", label: "Client View" }];
   if (state.currentUser.role === "Coach") {
     return [
       ...shared,
       { id: "assessment", label: "Assessment" },
-      { id: "weekly", label: "Weekly Check-In" },
       { id: "library", label: "Exercise Library" },
       { id: "alerts", label: "Coach Alerts" }
     ];
@@ -319,7 +321,6 @@ function navTabs() {
   return [
     ...shared,
     { id: "assessment", label: "Assessment" },
-    { id: "weekly", label: "Weekly Check-In" },
     { id: "library", label: "Exercise Library" },
     { id: "alerts", label: "Coach Alerts" },
     { id: "admin", label: "Admin Control" }
@@ -513,6 +514,15 @@ function assessmentPage() {
 }
 
 function weeklyPage() {
+  if (state.currentUser.role !== "Client") {
+    return `
+      <section class="workspace">
+        <div class="empty">
+          Weekly check-ins are submitted from the client side. Coaches and Admin can review trends from the client profile, alerts, and plan history.
+        </div>
+      </section>
+    `;
+  }
   return `<section class="workspace">${weeklyCheckInView(selectedClient())}</section>`;
 }
 
@@ -520,6 +530,8 @@ function monthlyPlanPage() {
   const client = selectedClient();
   const plan = getClientVisiblePlan(store, client.id);
   const items = store.monthlyPlanItems.filter((item) => item.clientId === client.id && item.monthlyPlanId === plan?.id);
+  const canManagePlans = state.currentUser.role !== "Client";
+  const draftPlans = canManagePlans ? store.monthlyPlans.filter((item) => item.clientId === client.id && item.status === "Draft") : [];
   const latestAssessment = latestClientAssessment(client.id) || summarizeAssessment(state.assessment);
   const recommended = recommendPlanDirection(client, latestAssessment);
   return `
@@ -538,9 +550,43 @@ function monthlyPlanPage() {
         ${infoCard("Equipment score", `${latestAssessment.equipmentScore} / 5`)}
         ${infoCard("Plan rule", recommended)}
       </div>
+      ${state.planDraftNotice ? `<div class="result-band"><strong>Plan workflow</strong><p>${state.planDraftNotice}</p></div>` : ""}
       <div class="card-list">
         ${items.map((item) => workoutCard(item, false)).join("") || `<div class="empty">No approved active plan is visible for this client.</div>`}
       </div>
+      ${canManagePlans ? draftPlanSection(draftPlans) : ""}
+    </section>
+  `;
+}
+
+function draftPlanSection(draftPlans) {
+  return `
+    <section class="draft-plan-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Coach workflow</p>
+          <h3>Draft monthly plans</h3>
+          <p class="muted">Clients cannot see draft plans. Approving a draft archives the old active plan and makes the new plan visible to the client.</p>
+        </div>
+      </div>
+      ${draftPlans.length ? draftPlans.map((plan) => {
+        const draftItems = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id);
+        return `
+          <article class="card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">${plan.month} / ${plan.trainingLevel}</p>
+                <h3>Assessment-generated draft</h3>
+                <p class="muted">Based on the latest assessment, client goals, sport focus, pain/restrictions, equipment, and progression level.</p>
+              </div>
+              <button class="success" data-approve-plan="${plan.id}">Approve and Activate</button>
+            </div>
+            <div class="card-list compact-plan-list">
+              ${draftItems.map((item) => workoutCard(item, false)).join("") || `<div class="empty">Draft created. Add workouts before approval.</div>`}
+            </div>
+          </article>
+        `;
+      }).join("") : `<div class="empty">No draft monthly plans waiting for approval.</div>`}
     </section>
   `;
 }
@@ -613,7 +659,6 @@ function coachView() {
         <label>Client</label>
         <select id="clientSelect">${store.clients.map((clientOption) => `<option value="${clientOption.id}" ${clientOption.id === state.clientId ? "selected" : ""}>${clientOption.name}</option>`).join("")}</select>
         <button class="primary full" id="startAssessment">Start Assessment</button>
-        <button class="ghost full" id="seedWeekly">Save Sample Weekly Check-In</button>
         <div class="mini-panel">
           <h3>${client.name}</h3>
           <p>${client.goal}</p>
@@ -628,9 +673,6 @@ function coachView() {
       <section class="panel">
         ${assessmentWizard(client)}
       </section>
-    </section>
-    <section class="workspace">
-      ${weeklyCheckInView(client)}
     </section>
   `;
 }
@@ -759,8 +801,11 @@ function summaryBlock(summary) {
         <h2>${summary.workoutPermission}</h2>
         <p>${summary.summaryText}</p>
       </div>
-      <button class="primary">Recommended next step: ${summary.recommendedNextStep}</button>
+      ${state.currentUser?.role === "Client"
+        ? `<span class="badge orange">Coach review required</span>`
+        : `<button class="primary" id="generateAssessmentPlan">Use Suggestion: ${summary.recommendedNextStep}</button>`}
     </div>
+    ${state.planDraftNotice ? `<div class="result-band"><strong>Coach plan workflow</strong><p>${state.planDraftNotice}</p></div>` : ""}
     <div class="grid-4 stat-strip">
       ${infoCard("Average score", summary.averageCapabilityScore)}
       ${infoCard("Lowest score", summary.lowestCapabilityScore)}
@@ -1405,6 +1450,11 @@ function bindGlobal() {
     state.view = "exerciseDetail";
     render();
   }));
+  document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", () => {
+    const plan = approveMonthlyPlan(store, button.dataset.approvePlan);
+    state.planDraftNotice = `${plan.month} ${plan.trainingLevel} plan approved. The client can now open Monthly Plan and see the full month of workouts.`;
+    render();
+  }));
   document.querySelector("#globalClientSelect")?.addEventListener("change", (event) => {
     changeSelectedClient(event.target.value);
   });
@@ -1455,8 +1505,21 @@ function bindGlobal() {
     render();
   }));
   document.querySelector("#saveAssessment")?.addEventListener("click", () => {
-    saveAssessment(store, state.assessment);
+    const saved = saveAssessment(store, state.assessment);
+    state.planDraftNotice = `Assessment saved for ${selectedClient().name}. Coach can generate a draft monthly plan from the summary suggestion.`;
     state.assessmentStep = 5;
+    state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
+    render();
+  });
+  document.querySelector("#generateAssessmentPlan")?.addEventListener("click", () => {
+    const saved = saveAssessment(store, state.assessment);
+    state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
+    const currentPlan = getClientVisiblePlan(store, saved.clientId);
+    const result = createReassessmentDraftIfNeeded(store, saved, currentPlan, true);
+    state.planDraftNotice = result.draftPlan
+      ? `Draft ${result.draftPlan.trainingLevel} monthly plan created from the assessment. Review it, then approve it before the client can see it.`
+      : `The assessment did not require a new draft plan. You can still manually edit or generate a plan from Admin controls.`;
+    state.view = "plan";
     render();
   });
   document.querySelector("#saveWeekly")?.addEventListener("click", () => {
@@ -1912,16 +1975,29 @@ function todayPreviewPanel(client) {
 }
 
 function quickLinksPanel() {
+  const isClient = state.currentUser.role === "Client";
+  const actions = isClient
+    ? [
+        ["profile", "My Profile"],
+        ["weekly", "Weekly Check-In"],
+        ["plan", "Monthly Plan"],
+        ["client", "Today"],
+        ["chat", "Chat"]
+      ]
+    : [
+        ["profile", "Profile"],
+        ["assessment", "Assessment"],
+        ["plan", "Monthly Plan"],
+        ["library", "Exercise Library"],
+        ["alerts", "Alerts"],
+        ...(state.currentUser.role === "Admin" ? [["admin", "Admin Control"]] : [])
+      ];
   return `
     <article class="card decision-card">
       <p class="eyebrow">Workflow</p>
-      <h3>Coach tools</h3>
+      <h3>${isClient ? "Client tools" : state.currentUser.role === "Admin" ? "Admin tools" : "Coach tools"}</h3>
       <div class="quick-actions">
-        <button data-view="profile">Profile</button>
-        <button data-view="assessment">Assessment</button>
-        <button data-view="weekly">Weekly Check-In</button>
-        <button data-view="plan">Monthly Plan</button>
-        <button data-view="library">Exercise Library</button>
+        ${actions.map(([view, label]) => `<button data-view="${view}">${label}</button>`).join("")}
       </div>
     </article>
   `;

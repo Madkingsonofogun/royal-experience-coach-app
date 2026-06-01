@@ -1123,6 +1123,34 @@ test("reassessment can change main training level after coach and client approva
   assert.equal(getClientVisiblePlan(store, "client_ada").trainingLevel, "Pro");
 });
 
+test("accepted assessment suggestion creates a draft monthly plan with workouts", () => {
+  const store = createStore();
+  const assessment = saveAssessment(store, { ...blankAssessment("client_ada"), assessmentType: "Reassessment", movementScores: allScores(5) });
+  const currentPlan = getClientVisiblePlan(store, "client_ada");
+  const result = createReassessmentDraftIfNeeded(store, assessment, currentPlan, true);
+  const generatedItems = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === result.draftPlan.id);
+  assert.equal(result.draftPlan.status, "Draft");
+  assert.equal(result.draftPlan.approved, false);
+  assert.equal(generatedItems.length, 12);
+  assert.ok(generatedItems.every((item) => item.trainingLevel === "Pro"));
+  assert.ok(generatedItems.every((item) => item.items.length > 0));
+});
+
+test("reassessment pain recommendation generates recovery alternatives without changing active plan", () => {
+  const store = createStore();
+  const scores = allScores(4);
+  scores.pain = 1;
+  const beforePlan = getClientVisiblePlan(store, "client_ada");
+  const assessment = saveAssessment(store, { ...blankAssessment("client_ada"), assessmentType: "Reassessment", movementScores: scores });
+  const result = createReassessmentDraftIfNeeded(store, assessment, beforePlan, true);
+  const generatedItems = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === result.draftPlan.id);
+  const generatedExercises = generatedItems.flatMap((item) => item.items).map((item) => store.exercises.find((exercise) => exercise.id === item.exerciseId)).filter(Boolean);
+  assert.equal(getClientVisiblePlan(store, "client_ada").id, beforePlan.id);
+  assert.equal(result.draftPlan.status, "Draft");
+  assert.ok(generatedItems.every((item) => item.adjustmentMode === "Recovery"));
+  assert.ok(generatedExercises.every((exercise) => exercise.lowImpact || exercise.recoveryAlternative));
+});
+
 test("Advanced client with high pain gets Recovery Mode for today only", () => {
   const store = createStore();
   const plan = getClientVisiblePlan(store, "client_ada");
