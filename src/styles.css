@@ -31,6 +31,16 @@ body {
   color: var(--ink);
 }
 
+.visually-hidden {
+  height: 1px;
+  left: -9999px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
+}
+
 button,
 input,
 select,

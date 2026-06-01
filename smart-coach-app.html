@@ -37,6 +37,16 @@ body {
   color: var(--ink);
 }
 
+.visually-hidden {
+  height: 1px;
+  left: -9999px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  top: auto;
+  width: 1px;
+}
+
 button,
 input,
 select,
@@ -33198,7 +33208,8 @@ function adminView() {
           <label><input class="inline-check" data-admin-check="exercise:recoveryAlternative" type="checkbox" ${d.exercise.recoveryAlternative ? "checked" : ""} /> Recovery alternative</label>
           <label>Coaching cues <textarea data-admin-draft="exercise:coachingCues">${d.exercise.coachingCues}</textarea></label>
           <button class="primary full" id="adminCreateExercise">Add New Exercise</button>
-          <button class="success full" id="adminImportExcel">Import Excel Starter Library</button>
+          <input id="adminExerciseExcelInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/tab-separated-values" />
+          <button class="success full" id="adminImportExcel">Import Excel Exercise Library</button>
           <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><input data-exercise-name="${exercise.id}" value="${exercise.exerciseName || exercise.name}" /><button data-save-exercise="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card" id="admin-workouts-new">
@@ -33656,8 +33667,21 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#adminImportExcel")?.addEventListener("click", () => {
-    adminImportExercisesFromRows(store, state.currentUser, store.excelStarterRows);
-    render();
+    document.querySelector("#adminExerciseExcelInput")?.click();
+  });
+  document.querySelector("#adminExerciseExcelInput")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const rows = await readExerciseImportFile(file);
+      const imported = adminImportExercisesFromRows(store, state.currentUser, rows);
+      window.alert(`Imported ${imported.length} new exercises from ${file.name}. Existing duplicates were skipped.`);
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    } finally {
+      event.target.value = "";
+    }
   });
   document.querySelectorAll("[data-save-exercise]").forEach((button) => button.addEventListener("click", () => {
     const exerciseName = document.querySelector(`[data-exercise-name="${button.dataset.saveExercise}"]`).value;
@@ -33799,6 +33823,74 @@ function userForProfile(client) {
 function avatar(imageUrl, name, size = "") {
   const initials = String(name || "MK").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   return `<div class="avatar ${size}">${imageUrl ? `<img src="${imageUrl}" alt="${name} profile image" />` : `<span>${initials}</span>`}</div>`;
+}
+
+async function readExerciseImportFile(file) {
+  const extension = file.name.split(".").pop().toLowerCase();
+  if (["csv", "tsv"].includes(extension)) {
+    const text = await file.text();
+    return parseDelimitedRows(text, extension === "tsv" ? "\t" : ",");
+  }
+  if (["xlsx", "xls"].includes(extension)) {
+    const XLSX = await loadXlsxLibrary();
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const preferredSheet = workbook.SheetNames.find((name) => /exercise|database|library/i.test(name)) || workbook.SheetNames[0];
+    const sheet = workbook.Sheets[preferredSheet];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) throw new Error("No exercise rows were found in that Excel sheet.");
+    return rows;
+  }
+  throw new Error("Choose an Excel, CSV, or TSV file.");
+}
+
+function parseDelimitedRows(text, delimiter) {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) throw new Error("The file needs a header row and at least one exercise row.");
+  const headers = splitDelimitedLine(lines[0], delimiter);
+  return lines.slice(1).map((line) => {
+    const values = splitDelimitedLine(line, delimiter);
+    return headers.reduce((row, header, index) => {
+      row[header] = values[index] || "";
+      return row;
+    }, {});
+  });
+}
+
+function splitDelimitedLine(line, delimiter) {
+  const values = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === "\"" && quoted && next === "\"") {
+      current += "\"";
+      index += 1;
+    } else if (char === "\"") {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      values.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current.trim());
+  return values;
+}
+
+function loadXlsxLibrary() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (window.__xlsxLoader) return window.__xlsxLoader;
+  window.__xlsxLoader = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+    script.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error("Excel reader loaded, but was not available."));
+    script.onerror = () => reject(new Error("Could not load the Excel reader. Check your internet connection or try saving the sheet as CSV."));
+    document.head.appendChild(script);
+  });
+  return window.__xlsxLoader;
 }
 
 function latestClientAssessment(clientId) {
