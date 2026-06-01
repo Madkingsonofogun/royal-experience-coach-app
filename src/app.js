@@ -41,6 +41,7 @@ import {
   getClientVisiblePlan,
   getCoachAlerts,
   getExerciseDetailForUser,
+  ensureMonthlyPlanHasWorkouts,
   getProgressImagesForUser,
   getWorkoutDetailForUser,
   markNotificationsRead,
@@ -69,7 +70,7 @@ const store = createStore();
 const today = "2026-05-29";
 const state = {
   currentUser: null,
-  loginRole: "Coach",
+  loginRole: "Client",
   loginIdentifier: "",
   loginPin: "",
   signupOpen: false,
@@ -340,7 +341,7 @@ function loginPage() {
         ${state.signupOpen ? signupForm() : `
           <label>Account type
             <select id="loginRole">
-              ${["Coach", "Client", "Admin"].map((role) => `<option ${state.loginRole === role ? "selected" : ""}>${role}</option>`).join("")}
+              ${["Client", "Coach", "Admin"].map((role) => `<option ${state.loginRole === role ? "selected" : ""}>${role}</option>`).join("")}
             </select>
           </label>
           <label>Numeric password / PIN
@@ -529,18 +530,20 @@ function weeklyPage() {
 function monthlyPlanPage() {
   const client = selectedClient();
   const plan = getClientVisiblePlan(store, client.id);
+  const latestAssessment = latestClientAssessment(client.id) || summarizeAssessment({ ...state.assessment, clientId: client.id });
+  if (plan) ensureMonthlyPlanHasWorkouts(store, plan.id, latestAssessment);
   const items = store.monthlyPlanItems.filter((item) => item.clientId === client.id && item.monthlyPlanId === plan?.id);
   const canManagePlans = state.currentUser.role !== "Client";
   const draftPlans = canManagePlans ? store.monthlyPlans.filter((item) => item.clientId === client.id && item.status === "Draft") : [];
-  const latestAssessment = latestClientAssessment(client.id) || summarizeAssessment(state.assessment);
   const recommended = recommendPlanDirection(client, latestAssessment);
+  const sortedItems = items.sort((a, b) => (a.weekNumber - b.weekNumber) || (a.trainingDayNumber - b.trainingDayNumber) || String(a.workoutDate).localeCompare(String(b.workoutDate)));
   return `
     <section class="workspace">
       <div class="section-head">
         <div>
           <p class="eyebrow">Dynamic Monthly Plan</p>
           <h2>${client.name}</h2>
-          <p class="muted">Built from goal, sport, assessment score, risk, weekly check-ins, schedule, session length, equipment, and level.</p>
+          <p class="muted">Full month view. Past, current, and future workouts stay visible so the client can review the whole month.</p>
         </div>
         <span class="badge ${latestAssessment.recoveryRecommended ? "orange" : "green"}">${recommended}</span>
       </div>
@@ -552,7 +555,7 @@ function monthlyPlanPage() {
       </div>
       ${state.planDraftNotice ? `<div class="result-band"><strong>Plan workflow</strong><p>${state.planDraftNotice}</p></div>` : ""}
       <div class="card-list">
-        ${items.map((item) => workoutCard(item, false)).join("") || `<div class="empty">No approved active plan is visible for this client.</div>`}
+        ${sortedItems.map((item) => workoutCard(item, false)).join("") || `<div class="empty">No approved active plan is visible for this client.</div>`}
       </div>
       ${canManagePlans ? draftPlanSection(draftPlans) : ""}
     </section>
@@ -577,12 +580,20 @@ function draftPlanSection(draftPlans) {
               <div>
                 <p class="eyebrow">${plan.month} / ${plan.trainingLevel}</p>
                 <h3>Assessment-generated draft</h3>
-                <p class="muted">Based on the latest assessment, client goals, sport focus, pain/restrictions, equipment, and progression level.</p>
+                <p class="muted">Coach-editable suggested workouts based on the latest assessment, client goals, sport focus, pain/restrictions, equipment, and progression level.</p>
               </div>
               <button class="success" data-approve-plan="${plan.id}">Approve and Activate</button>
             </div>
             <div class="card-list compact-plan-list">
-              ${draftItems.map((item) => workoutCard(item, false)).join("") || `<div class="empty">Draft created. Add workouts before approval.</div>`}
+              ${draftItems.map((item) => `
+                <div>
+                  ${workoutCard(item, false)}
+                  <div class="actions">
+                    <button class="ghost" data-add-suggested-exercise="${item.id}">Add Suggested Exercise</button>
+                    <button class="ghost" data-replace-suggested-workout="${item.id}">Replace with New Suggestion</button>
+                  </div>
+                </div>
+              `).join("") || `<div class="empty">Draft created. Add workouts before approval.</div>`}
             </div>
           </article>
         `;
@@ -1075,7 +1086,7 @@ function chatPage() {
           <h2>${client.name}</h2>
           <p class="muted">Messages create notifications for the receiver. Admins can audit and intervene when needed.</p>
         </div>
-        <button class="ghost" id="markReadButton">Mark Notifications Read</button>
+        <button class="ghost" id="markReadButton">Mark Messages Read</button>
       </div>
       <div class="chat-layout">
         <article class="card chat-thread">
@@ -1094,7 +1105,7 @@ function chatPage() {
           <textarea id="chatDraft" placeholder="Type a message to ${partner?.name || "this chat"}">${state.chatDraft}</textarea>
           <button class="primary full" id="sendChatButton" ${partner ? "" : "disabled"}>Send Message</button>
           <h3>Notifications</h3>
-          ${store.notifications.filter((item) => item.userId === state.currentUser.id).map((item) => `<div class="notification ${item.read ? "" : "unread"}"><strong>${item.title}</strong><p>${item.body}</p></div>`).join("") || `<p class="muted">No notifications.</p>`}
+          ${store.notifications.filter((item) => item.userId === state.currentUser.id && item.clientId === client.id).map((item) => `<div class="notification ${item.read ? "" : "unread"}"><strong>${item.title}</strong><p>${item.body}</p></div>`).join("") || `<p class="muted">No notifications.</p>`}
         </aside>
       </div>
     </section>
@@ -1451,8 +1462,19 @@ function bindGlobal() {
     render();
   }));
   document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", () => {
+    ensureMonthlyPlanHasWorkouts(store, button.dataset.approvePlan, latestClientAssessment(state.clientId));
     const plan = approveMonthlyPlan(store, button.dataset.approvePlan);
     state.planDraftNotice = `${plan.month} ${plan.trainingLevel} plan approved. The client can now open Monthly Plan and see the full month of workouts.`;
+    render();
+  }));
+  document.querySelectorAll("[data-add-suggested-exercise]").forEach((button) => button.addEventListener("click", () => {
+    addSuggestedExerciseToWorkout(button.dataset.addSuggestedExercise);
+    state.planDraftNotice = "Suggested exercise added. Coach can keep editing before approval.";
+    render();
+  }));
+  document.querySelectorAll("[data-replace-suggested-workout]").forEach((button) => button.addEventListener("click", () => {
+    replaceSuggestedWorkout(button.dataset.replaceSuggestedWorkout);
+    state.planDraftNotice = "Workout replaced with a fresh suggestion from the exercise library.";
     render();
   }));
   document.querySelector("#globalClientSelect")?.addEventListener("change", (event) => {
@@ -1582,7 +1604,7 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#markReadButton")?.addEventListener("click", () => {
-    markNotificationsRead(store, state.currentUser.id);
+    markNotificationsRead(store, state.currentUser.id, state.clientId);
     render();
   });
   const bindLibraryFilter = (selector, key, eventName = "input") => {
@@ -2017,6 +2039,89 @@ function recommendPlanDirection(client, assessment) {
   if ((assessment.trainingLevel === "Advanced" || assessment.trainingLevel === "Pro") && strongTrend) return "Progress carefully with harder sport-specific variations";
   if (assessment.trainingLevel === "Pro") return "Pro plan with coach-supervised high-output options";
   return `${assessment.trainingLevel || "Intermediate"} plan with smart exercise rotation`;
+}
+
+function addSuggestedExerciseToWorkout(workoutId) {
+  const workout = store.monthlyPlanItems.find((item) => item.id === workoutId);
+  if (!workout) return;
+  const assessment = latestClientAssessment(workout.clientId) || summarizeAssessment({ ...state.assessment, clientId: workout.clientId });
+  const currentIds = new Set(workout.items.map((item) => item.exerciseId));
+  const exercise = findSuggestedExerciseForWorkout(workout, assessment, currentIds);
+  if (!exercise) return;
+  workout.items.push({
+    exerciseId: exercise.id,
+    name: exercise.exerciseName || exercise.name,
+    sessionPart: exercise.sessionPart || exercise.replacementCategory || "Strength",
+    sets: exercise.sets || 2,
+    reps: exercise.reps || null,
+    time: parseUiDose(exercise.time),
+    rest: parseUiDose(exercise.rest) || 60,
+    rounds: exercise.rounds || null,
+    difficulty: exercise.difficulty,
+    equipment: Array.isArray(exercise.equipment) ? exercise.equipment.join(", ") : exercise.equipment,
+    replacementReason: "Coach added suggested exercise"
+  });
+}
+
+function replaceSuggestedWorkout(workoutId) {
+  const workout = store.monthlyPlanItems.find((item) => item.id === workoutId);
+  if (!workout) return;
+  const assessment = latestClientAssessment(workout.clientId) || summarizeAssessment({ ...state.assessment, clientId: workout.clientId });
+  const sections = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery"
+    ? ["Warm-Up", "Recovery", "Skill / Technique", "Core", "Cooldown"]
+    : ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Cooldown"];
+  const used = new Set();
+  workout.items = sections.map((section) => {
+    const exercise = findSuggestedExerciseForWorkout({ ...workout, preferredSection: section }, assessment, used);
+    if (!exercise) return null;
+    used.add(exercise.id);
+    return {
+      exerciseId: exercise.id,
+      name: exercise.exerciseName || exercise.name,
+      sessionPart: section,
+      sets: assessment.recoveryRecommended ? Math.min(2, Number(exercise.sets || 2)) : exercise.sets || null,
+      reps: exercise.reps || null,
+      time: parseUiDose(exercise.time) || (section === "Warm-Up" || section === "Cooldown" || section === "Recovery" ? 5 : null),
+      rest: parseUiDose(exercise.rest) || (assessment.recoveryRecommended ? 90 : 60),
+      rounds: assessment.recoveryRecommended ? Math.min(2, Number(exercise.rounds || 2)) : exercise.rounds || null,
+      difficulty: exercise.difficulty,
+      equipment: Array.isArray(exercise.equipment) ? exercise.equipment.join(", ") : exercise.equipment,
+      replacementReason: "Fresh coach suggestion"
+    };
+  }).filter(Boolean);
+}
+
+function findSuggestedExerciseForWorkout(workout, assessment, usedIds = new Set()) {
+  const client = store.clients.find((item) => item.id === workout.clientId) || selectedClient();
+  const targetLevel = assessment.trainingLevel || workout.trainingLevel || client.currentTrainingLevel || "Beginner";
+  const levelOrder = ["Beginner", "Intermediate", "Advanced", "Pro"];
+  const targetIndex = levelOrder.indexOf(targetLevel);
+  const section = String(workout.preferredSection || "").toLowerCase();
+  const equipment = (client.equipmentAvailable || []).join(" ").toLowerCase();
+  const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery";
+  const candidates = store.exercises.filter((exercise) => {
+    if (exercise.active === false || exercise.archived || usedIds.has(exercise.id)) return false;
+    const exerciseLevel = levelOrder.indexOf(exercise.trainingLevel || exercise.planLevel || "Beginner");
+    if (exerciseLevel > targetIndex) return false;
+    if (recoveryMode && !exercise.lowImpact && !exercise.recoveryAlternative) return false;
+    if ((assessment.restrictions || []).some((restriction) => (exercise.contraindications || []).includes(restriction))) return false;
+    if (section) {
+      const exerciseSection = String(exercise.sessionPart || exercise.category || exercise.replacementCategory || "").toLowerCase();
+      if (!exerciseSection.includes(section.split(" ")[0])) return false;
+    }
+    const needed = Array.isArray(exercise.equipment) ? exercise.equipment.join(" ").toLowerCase() : String(exercise.equipment || "").toLowerCase();
+    if (needed && !needed.includes("bodyweight") && !needed.includes("mobility") && !needed.includes("low-impact") && !equipment.includes(needed.split(" ")[0])) return false;
+    return true;
+  });
+  return candidates.find((exercise) => String(exercise.sportFocus || "").toLowerCase().includes(String(client.sportFocus || "").toLowerCase().split(" ")[0]))
+    || candidates.find((exercise) => String(exercise.goal || "").toLowerCase().includes(String(client.goal || "").toLowerCase().split(" ")[0]))
+    || candidates[0];
+}
+
+function parseUiDose(value) {
+  if (typeof value === "number") return value;
+  const match = String(value || "").match(/\d+/);
+  return match ? Number(match[0]) : value || null;
 }
 
 function scoreInput(label, key, value) {

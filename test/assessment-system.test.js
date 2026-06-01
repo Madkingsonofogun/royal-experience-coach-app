@@ -39,6 +39,7 @@ import {
   getCoachAlerts,
   getChatMessages,
   getExerciseDetailForUser,
+  ensureMonthlyPlanHasWorkouts,
   getProgressImagesForUser,
   getTodayWorkoutForClient,
   getWorkoutDetailForUser,
@@ -285,6 +286,15 @@ test("draft monthly plans are hidden from client and approved active plans are v
   assert.notEqual(visible.id, "plan_ada_draft");
 });
 
+test("monthly plan can fill the entire month even when earlier weeks have passed", () => {
+  const store = createStore();
+  const plan = getClientVisiblePlan(store, "client_ada");
+  const before = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id).length;
+  const items = ensureMonthlyPlanHasWorkouts(store, plan.id, summarizeAssessment({ ...blankAssessment("client_ada"), movementScores: allScores(3) }));
+  assert.ok(before < 12);
+  assert.equal(items.length, 12);
+});
+
 test("client can only see own assessments and check-ins", () => {
   const assessment = { clientId: "client_ada" };
   assert.equal(clientOwnsRecord(assessment, "client_ada"), true);
@@ -388,6 +398,27 @@ test("approving reassessment-based plan archives old plan and activates new plan
   approveMonthlyPlan(store, draftPlan.id);
   assert.equal(store.monthlyPlans.find((plan) => plan.id === "plan_ada_active").status, "Archived");
   assert.equal(store.monthlyPlans.find((plan) => plan.id === draftPlan.id).status, "Active");
+  assert.ok(store.monthlyPlanItems.filter((item) => item.monthlyPlanId === draftPlan.id).length >= 12);
+  assert.equal(getClientVisiblePlan(store, "client_ada").id, draftPlan.id);
+});
+
+test("coach can accept suggested workouts even when reassessment level stays the same", () => {
+  const store = createStore();
+  const current = getClientVisiblePlan(store, "client_ada");
+  const assessment = saveAssessment(store, {
+    ...blankAssessment("client_ada"),
+    assessmentType: "Reassessment",
+    movementScores: allScores(3),
+    equipment: { bodyweight: true, chair: true, bands: true, dumbbells: true, bag: true }
+  });
+  assessment.trainingLevel = current.trainingLevel;
+  assessment.planLevel = current.trainingLevel;
+  assessment.restrictions = current.restrictions;
+  assessment.workoutPermission = current.workoutPermission;
+  const { draftPlan } = createReassessmentDraftIfNeeded(store, assessment, current, true);
+  assert.equal(draftPlan.status, "Draft");
+  assert.equal(draftPlan.coachEditable, true);
+  assert.ok(store.monthlyPlanItems.filter((item) => item.monthlyPlanId === draftPlan.id).length > 0);
 });
 
 test("multiple poor daily check-ins create a coach alert", () => {

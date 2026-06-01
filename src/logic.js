@@ -918,7 +918,7 @@ export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, 
     || currentLevel !== assessmentLevel
     || JSON.stringify(currentPlan.restrictions || []) !== JSON.stringify(assessment.restrictions || [])
     || currentPlan.workoutPermission !== assessment.workoutPermission;
-  if (!changed || !coachAgrees) return { shouldPrompt: changed, draftPlan: null };
+  if (!coachAgrees) return { shouldPrompt: changed, draftPlan: null };
   const draftPlan = {
     id: makeId("plan"),
     clientId: assessment.clientId,
@@ -934,15 +934,35 @@ export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, 
     workoutPermission: assessment.workoutPermission,
     createdFromAssessmentId: assessment.assessmentId,
     generatedFromAssessmentId: assessment.assessmentId,
-    generatedFrom: "Assessment recommendation",
+    generatedFrom: changed ? "Assessment recommendation" : "Coach accepted suggested workouts",
+    coachEditable: true,
+    coachCanAddExercises: true,
+    coachCanReplaceWorkouts: true,
     createdAt: nowIso()
   };
   store.monthlyPlans.push(draftPlan);
-  createAssessmentDrivenMonthlyPlanItems(store, draftPlan, assessment);
+  ensureMonthlyPlanHasWorkouts(store, draftPlan.id, assessment);
   return { shouldPrompt: true, draftPlan };
 }
 
-function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment) {
+export function ensureMonthlyPlanHasWorkouts(store, planId, assessment = null) {
+  const plan = findById(store.monthlyPlans, planId, "Monthly plan");
+  const existing = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id);
+  const client = findById(store.clients, plan.clientId, "Client");
+  const targetCount = Math.max(1, Math.min(5, Number(client.trainingDaysPerWeek || 3))) * 4;
+  if (existing.length >= targetCount) return existing;
+  const sourceAssessment = assessment || store.assessments.filter((item) => item.clientId === plan.clientId).at(-1) || {
+    assessmentId: plan.generatedFromAssessmentId,
+    clientId: plan.clientId,
+    trainingLevel: plan.trainingLevel,
+    restrictions: plan.restrictions || [],
+    recoveryRecommended: false,
+    adjustmentMode: "Normal"
+  };
+  return [...existing, ...createAssessmentDrivenMonthlyPlanItems(store, plan, sourceAssessment, existing.length)];
+}
+
+function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment, startAtIndex = 0) {
   const client = findById(store.clients, plan.clientId, "Client");
   const trainingDays = Math.max(1, Math.min(5, Number(client.trainingDaysPerWeek || 3)));
   const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery" || toArray(assessment.restrictions).includes("Pain high");
@@ -950,8 +970,11 @@ function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment) {
     ? ["Warm-Up", "Recovery", "Skill / Technique", "Core", "Cooldown"]
     : ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Cooldown"];
   const startDate = nextPlanStartDate();
+  const created = [];
   for (let week = 1; week <= 4; week += 1) {
     for (let day = 1; day <= trainingDays; day += 1) {
+      const absoluteIndex = ((week - 1) * trainingDays) + day - 1;
+      if (absoluteIndex < startAtIndex) continue;
       const workoutDate = addDaysIso(startDate, ((week - 1) * 7) + ((day - 1) * Math.max(1, Math.floor(7 / trainingDays))));
       const items = sections.map((section, index) => {
         const exercise = chooseAssessmentExercise(store.exercises, {
@@ -966,7 +989,7 @@ function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment) {
         });
         return exerciseToPlanItem(exercise, section, recoveryMode);
       }).filter(Boolean);
-      store.monthlyPlanItems.push({
+      const monthlyItem = {
         id: makeId("item"),
         clientId: client.id,
         monthlyPlanId: plan.id,
@@ -980,10 +1003,15 @@ function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment) {
         coachAllowsBonus: !recoveryMode && ["Advanced", "Pro"].includes(plan.trainingLevel),
         title: `${plan.trainingLevel} ${client.sportFocus || "Training"} - Week ${week} Day ${day}`,
         generatedFromAssessmentId: assessment.assessmentId,
+        coachEditable: true,
+        source: "Suggested workout from exercise library",
         items
-      });
+      };
+      store.monthlyPlanItems.push(monthlyItem);
+      created.push(monthlyItem);
     }
   }
+  return created;
 }
 
 function chooseAssessmentExercise(exercises, context) {
@@ -1044,6 +1072,7 @@ function addDaysIso(startIso, days) {
 export function approveMonthlyPlan(store, planId) {
   const plan = store.monthlyPlans.find((item) => item.id === planId);
   if (!plan) throw new Error("Plan not found");
+  ensureMonthlyPlanHasWorkouts(store, plan.id);
   store.monthlyPlans.forEach((item) => {
     if (item.clientId === plan.clientId && item.status === "Active") item.status = "Archived";
   });
@@ -1140,9 +1169,17 @@ export function unreadNotificationCount(store, userId) {
   return store.notifications.filter((notification) => notification.userId === userId && !notification.read).length;
 }
 
-export function markNotificationsRead(store, userId) {
-  store.notifications.forEach((notification) => {
-    if (notification.userId === userId) notification.read = true;
+export function markNotificationsRead(store, userId, clientId = null) {
+  store.notifications = store.notifications.filter((notification) => {
+    const matchesUser = notification.userId === userId;
+    const matchesClient = !clientId || notification.clientId === clientId;
+    return !(matchesUser && matchesClient);
+  });
+  store.chatMessages.forEach((message) => {
+    const matchesClient = !clientId || message.clientId === clientId;
+    if (matchesClient && (message.toUserId === userId || message.fromUserId === userId) && !message.readBy.includes(userId)) {
+      message.readBy.push(userId);
+    }
   });
 }
 
