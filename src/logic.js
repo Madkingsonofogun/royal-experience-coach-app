@@ -1564,6 +1564,13 @@ export function adminRemoveWorkoutTemplateItem(store, adminUser, itemId) {
   return removeById(store.workoutTemplateItems, itemId, "Workout item");
 }
 
+export function adminUpdateWorkoutTemplateItem(store, adminUser, itemId, patch) {
+  requireAdmin(adminUser);
+  const item = findById(store.workoutTemplateItems, itemId, "Workout item");
+  Object.assign(item, cleanPatch(patch), { updatedAt: nowIso() });
+  return item;
+}
+
 export function adminReorderWorkoutTemplateItems(store, adminUser, workoutTemplateId, orderedItemIds) {
   requireAdmin(adminUser);
   orderedItemIds.forEach((id, index) => {

@@ -1136,6 +1136,56 @@ dd {
   color: var(--muted);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.modal-card {
+  width: min(980px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  border: 1px solid rgba(214, 178, 77, 0.55);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+}
+
+.large-modal {
+  width: min(1120px, 100%);
+}
+
+.modal-head,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.modal-list {
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.modal-item-row {
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
+  align-items: end;
+}
+
 @media (max-width: 980px) {
   .topbar,
   .section-head,
@@ -31028,6 +31078,13 @@ function adminRemoveWorkoutTemplateItem(store, adminUser, itemId) {
   return removeById(store.workoutTemplateItems, itemId, "Workout item");
 }
 
+function adminUpdateWorkoutTemplateItem(store, adminUser, itemId, patch) {
+  requireAdmin(adminUser);
+  const item = findById(store.workoutTemplateItems, itemId, "Workout item");
+  Object.assign(item, cleanPatch(patch), { updatedAt: nowIso() });
+  return item;
+}
+
 function adminReorderWorkoutTemplateItems(store, adminUser, workoutTemplateId, orderedItemIds) {
   requireAdmin(adminUser);
   orderedItemIds.forEach((id, index) => {
@@ -32488,6 +32545,7 @@ const state = {
   selectedWorkoutId: null,
   selectedExerciseId: null,
   selectedAssessmentTemplateId: "assessment_template_default",
+  editModal: null,
   chatDraft: "",
   assessment: blankAssessment("client_ada", today),
   assessmentStep: 0,
@@ -32583,6 +32641,7 @@ function render() {
       </div>
     </header>
     <main>${route()}</main>
+    ${adminEditModal()}
   `;
   bindGlobal();
 }
@@ -33601,7 +33660,7 @@ function adminView() {
           <button class="primary full" id="adminCreateExercise">Add New Exercise</button>
           <input id="adminExerciseExcelInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/tab-separated-values" />
           <button class="success full" id="adminImportExcel">Import Excel Exercise Library</button>
-          <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><input data-exercise-name="${exercise.id}" value="${exercise.exerciseName || exercise.name}" /><input data-exercise-video="${exercise.id}" value="${exercise.videoUrl || exercise.youtubeUrl || ""}" placeholder="Video URL" /><button data-save-exercise="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button><button data-delete-exercise="${exercise.id}">Delete</button></div>`).join("")}</div>
+          <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><button data-open-exercise-editor="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button><button data-delete-exercise="${exercise.id}">Delete</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("workouts")}" id="admin-workouts-new">
           <h3>Add Workout Template</h3>
@@ -33629,7 +33688,7 @@ function adminView() {
             ${adminInput("workoutItem", "rounds", "Rounds", "number")}
           </div>
           <button class="full" id="adminAddWorkoutItem">Add Exercise To Workout</button>
-          <div class="admin-list">${store.workoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><input data-template-name="${workout.id}" value="${workout.workoutName}" /><button data-save-template="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-delete-template="${workout.id}">Delete</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
+          <div class="admin-list">${store.workoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><button data-open-workout-editor="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-delete-template="${workout.id}">Delete</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("offerings")}" id="admin-plan-offerings-new">
           <h3>Add Plan Offering</h3>
@@ -33715,6 +33774,172 @@ function adminView() {
       <div class="card-list">${store.adminAuditLog.map((entry) => `<article class="card"><p>${entry.action}</p><small>${new Date(entry.createdAt).toLocaleString()}</small></article>`).join("") || `<div class="empty">No admin actions yet.</div>`}</div>
     </section>
   `;
+}
+
+function adminEditModal() {
+  if (!state.editModal || state.currentUser?.role !== "Admin") return "";
+  if (state.editModal.type === "exercise") return exerciseEditModal(state.editModal.id);
+  if (state.editModal.type === "workout") return workoutEditModal(state.editModal.id);
+  return "";
+}
+
+function exerciseEditModal(exerciseId) {
+  const exercise = store.exercises.find((item) => item.id === exerciseId);
+  if (!exercise) return "";
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal">
+        <div class="modal-head">
+          <div><p class="eyebrow">Edit Exercise</p><h2>${escapeHtml(exercise.exerciseName || exercise.name)}</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="form-grid">
+          ${editInput("exercise", "exerciseName", "Exercise name", exercise.exerciseName || exercise.name)}
+          ${editInput("exercise", "description", "Description", exercise.description)}
+          ${editSelect("exercise", "category", "Category", ["Strength", "Cardio", "Boxing", "Kickboxing", "Mobility", "Core", "Recovery"], exercise.category)}
+          ${editSelect("exercise", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "General Fitness"], exercise.sportFocus)}
+          ${editInput("exercise", "goal", "Goal", exercise.goal)}
+          ${editSelect("exercise", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], exercise.difficulty)}
+          ${editSelect("exercise", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], exercise.trainingLevel || exercise.planLevel)}
+          ${editSelect("exercise", "sessionPart", "Session part", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"], exercise.sessionPart)}
+          ${editInput("exercise", "equipment", "Equipment needed", listValue(exercise.equipment))}
+          ${editInput("exercise", "bodyArea", "Body area", listValue(exercise.bodyArea))}
+          ${editInput("exercise", "stressArea", "Stress area", listValue(exercise.stressArea))}
+          ${editInput("exercise", "sets", "Sets", exercise.sets, "number")}
+          ${editInput("exercise", "reps", "Reps", exercise.reps, "number")}
+          ${editInput("exercise", "time", "Time", exercise.time)}
+          ${editInput("exercise", "rest", "Rest", exercise.rest)}
+          ${editInput("exercise", "rounds", "Rounds", exercise.rounds, "number")}
+          ${editInput("exercise", "videoUrl", "Video URL", exercise.videoUrl || exercise.youtubeUrl)}
+          ${editInput("exercise", "regressionExerciseId", "Easier version ID", exercise.regressionExerciseId)}
+          ${editInput("exercise", "progressionExerciseId", "Harder version ID", exercise.progressionExerciseId)}
+          ${editInput("exercise", "safeAlternativeExerciseId", "Safe alternative ID", exercise.safeAlternativeExerciseId)}
+          ${editInput("exercise", "replacementCategory", "Replacement category", exercise.replacementCategory)}
+        </div>
+        <div class="check-grid">
+          <label><input class="inline-check" id="editExerciseLowImpact" type="checkbox" ${exercise.lowImpact ? "checked" : ""} /> Low impact</label>
+          <label><input class="inline-check" id="editExerciseRecoveryAlternative" type="checkbox" ${exercise.recoveryAlternative ? "checked" : ""} /> Recovery alternative</label>
+          <label><input class="inline-check" id="editExerciseActive" type="checkbox" ${exercise.active !== false ? "checked" : ""} /> Active</label>
+        </div>
+        <label>Setup instructions <textarea data-edit-exercise-field="setupInstructions">${escapeHtml(exercise.setupInstructions || "")}</textarea></label>
+        <label>How to perform <textarea data-edit-exercise-field="howToPerform">${escapeHtml(exercise.howToPerform || exercise.instructions || "")}</textarea></label>
+        <label>Coaching cues <textarea data-edit-exercise-field="coachingCues">${escapeHtml(listValue(exercise.coachingCues))}</textarea></label>
+        <label>Common mistakes <textarea data-edit-exercise-field="commonMistakes">${escapeHtml(listValue(exercise.commonMistakes))}</textarea></label>
+        <label>Safety / pain warnings <textarea data-edit-exercise-field="safetyWarnings">${escapeHtml(listValue(exercise.safetyWarnings || exercise.painWarnings))}</textarea></label>
+        <label>Contraindications <textarea data-edit-exercise-field="contraindications">${escapeHtml(listValue(exercise.contraindications))}</textarea></label>
+        <div class="modal-actions">
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="saveExerciseModal" data-exercise-id="${exercise.id}">Save Exercise</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function workoutEditModal(workoutId) {
+  const workout = store.workoutTemplates.find((item) => item.id === workoutId);
+  if (!workout) return "";
+  const items = store.workoutTemplateItems
+    .filter((item) => item.workoutTemplateId === workoutId)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal">
+        <div class="modal-head">
+          <div><p class="eyebrow">Edit Workout Template</p><h2>${escapeHtml(workout.workoutName)}</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="form-grid">
+          ${editInput("workout", "workoutName", "Workout name", workout.workoutName)}
+          ${editSelect("workout", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], workout.sportFocus)}
+          ${editInput("workout", "goal", "Goal", workout.goal)}
+          ${editSelect("workout", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], workout.trainingLevel || workout.planLevel)}
+          ${editSelect("workout", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], workout.difficulty)}
+          ${editSelect("workout", "sessionLength", "Session length", [30, 45, 60], workout.sessionLength)}
+          ${editSelect("workout", "trainingDayType", "Training day type", ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"], workout.trainingDayType)}
+          ${editSelect("workout", "workoutCategory", "Workout category", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "Conditioning", "Recovery", "General Fitness"], workout.workoutCategory)}
+        </div>
+        <label>Description <textarea data-edit-workout-field="description">${escapeHtml(workout.description || "")}</textarea></label>
+        <label>Coach notes <textarea data-edit-workout-field="coachNotes">${escapeHtml(workout.coachNotes || "")}</textarea></label>
+        <label>Client notes <textarea data-edit-workout-field="clientNotes">${escapeHtml(workout.clientNotes || "")}</textarea></label>
+        <div class="section-title"><h3>Workout Exercises</h3><span>${items.length} item${items.length === 1 ? "" : "s"}</span></div>
+        <div class="admin-list modal-list">
+          ${items.map((item) => workoutItemEditRow(item)).join("") || `<div class="empty">No exercises in this workout yet.</div>`}
+        </div>
+        <div class="section-title"><h3>Add Exercise</h3><span>Use full library</span></div>
+        <div class="form-grid compact-form">
+          ${modalSelect("modalNewItemExercise", "Exercise", store.exercises.map((exerciseItem) => ({ value: exerciseItem.id, label: exerciseItem.exerciseName || exerciseItem.name })))}
+          ${modalSelect("modalNewItemPart", "Block", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"])}
+          ${modalInput("modalNewItemSets", "Sets", "", "number")}
+          ${modalInput("modalNewItemReps", "Reps", "", "number")}
+          ${modalInput("modalNewItemTime", "Time", "")}
+          ${modalInput("modalNewItemRest", "Rest", "60 sec")}
+          ${modalInput("modalNewItemRounds", "Rounds", "", "number")}
+        </div>
+        <button class="success full" id="modalAddWorkoutItem" data-workout-id="${workout.id}">Add Exercise To This Workout</button>
+        <div class="modal-actions">
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="saveWorkoutModal" data-workout-id="${workout.id}">Save Workout</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function workoutItemEditRow(item) {
+  return `
+    <div class="admin-row modal-item-row">
+      ${modalSelect(`itemExercise-${item.id}`, "Exercise", store.exercises.map((exercise) => ({ value: exercise.id, label: exercise.exerciseName || exercise.name })), item.exerciseId)}
+      ${modalSelect(`itemPart-${item.id}`, "Block", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"], item.sessionPart)}
+      ${modalInput(`itemSets-${item.id}`, "Sets", item.sets || "", "number")}
+      ${modalInput(`itemReps-${item.id}`, "Reps", item.reps || "", "number")}
+      ${modalInput(`itemTime-${item.id}`, "Time", item.time || "")}
+      ${modalInput(`itemRest-${item.id}`, "Rest", item.rest || "")}
+      ${modalInput(`itemRounds-${item.id}`, "Rounds", item.rounds || "", "number")}
+      ${modalInput(`itemOrder-${item.id}`, "Order", item.displayOrder || "", "number")}
+      <button data-save-workout-item="${item.id}">Save Item</button>
+      <button data-remove-workout-item="${item.id}">Remove</button>
+    </div>
+  `;
+}
+
+function editInput(group, key, label, value = "", type = "text") {
+  return `<label>${label}<input data-edit-${group}-field="${key}" type="${type}" value="${escapeHtml(value ?? "")}" /></label>`;
+}
+
+function editSelect(group, key, label, options, value = "") {
+  return `<label>${label}<select data-edit-${group}-field="${key}">${options.map((option) => {
+    const item = typeof option === "object" ? option : { value: option, label: option };
+    return `<option value="${item.value}" ${String(item.value) === String(value ?? "") ? "selected" : ""}>${item.label}</option>`;
+  }).join("")}</select></label>`;
+}
+
+function modalInput(id, label, value = "", type = "text") {
+  return `<label>${label}<input id="${id}" type="${type}" value="${escapeHtml(value ?? "")}" /></label>`;
+}
+
+function modalSelect(id, label, options, value = "") {
+  return `<label>${label}<select id="${id}">${options.map((option) => {
+    const item = typeof option === "object" ? option : { value: option, label: option };
+    return `<option value="${item.value}" ${String(item.value) === String(value ?? "") ? "selected" : ""}>${item.label}</option>`;
+  }).join("")}</select></label>`;
+}
+
+function listValue(value) {
+  if (Array.isArray(value)) return value.join(", ");
+  return value || "";
+}
+
+function csvValue(value) {
+  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function collectEditFields(group) {
+  const patch = {};
+  document.querySelectorAll(`[data-edit-${group}-field]`).forEach((field) => {
+    patch[field.dataset[`edit${group[0].toUpperCase()}${group.slice(1)}Field`]] = field.value;
+  });
+  return patch;
 }
 
 function adminInput(group, key, label, type = "text") {
@@ -34084,6 +34309,84 @@ function bindGlobal() {
     state.adminPanel = button.dataset.adminPanel;
     render();
   }));
+  document.querySelectorAll("[data-open-exercise-editor]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "exercise", id: button.dataset.openExerciseEditor };
+    render();
+  }));
+  document.querySelectorAll("[data-open-workout-editor]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "workout", id: button.dataset.openWorkoutEditor };
+    render();
+  }));
+  document.querySelectorAll("#closeEditModal, #closeEditModalSecondary").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = null;
+    render();
+  }));
+  document.querySelector("#saveExerciseModal")?.addEventListener("click", (event) => {
+    const exerciseId = event.currentTarget.dataset.exerciseId;
+    const patch = collectEditFields("exercise");
+    patch.name = patch.exerciseName;
+    patch.planLevel = patch.trainingLevel;
+    patch.youtubeUrl = patch.videoUrl;
+    patch.equipment = csvValue(patch.equipment);
+    patch.bodyArea = csvValue(patch.bodyArea);
+    patch.stressArea = csvValue(patch.stressArea);
+    patch.coachingCues = csvValue(patch.coachingCues);
+    patch.commonMistakes = csvValue(patch.commonMistakes);
+    patch.safetyWarnings = csvValue(patch.safetyWarnings);
+    patch.painWarnings = patch.safetyWarnings;
+    patch.contraindications = csvValue(patch.contraindications);
+    patch.lowImpact = document.querySelector("#editExerciseLowImpact")?.checked || false;
+    patch.recoveryAlternative = document.querySelector("#editExerciseRecoveryAlternative")?.checked || false;
+    patch.active = document.querySelector("#editExerciseActive")?.checked || false;
+    patch.archived = !patch.active;
+    adminUpdateExercise(store, state.currentUser, exerciseId, patch);
+    state.editModal = null;
+    render();
+  });
+  document.querySelector("#saveWorkoutModal")?.addEventListener("click", (event) => {
+    const workoutId = event.currentTarget.dataset.workoutId;
+    const patch = collectEditFields("workout");
+    patch.planLevel = patch.trainingLevel;
+    adminUpdateWorkoutTemplate(store, state.currentUser, workoutId, patch);
+    state.editModal = null;
+    render();
+  });
+  document.querySelectorAll("[data-save-workout-item]").forEach((button) => button.addEventListener("click", () => {
+    const itemId = button.dataset.saveWorkoutItem;
+    const exercise = store.exercises.find((item) => item.id === document.getElementById(`itemExercise-${itemId}`)?.value);
+    adminUpdateWorkoutTemplateItem(store, state.currentUser, itemId, {
+      exerciseId: exercise?.id,
+      exerciseName: exercise?.exerciseName || exercise?.name,
+      sessionPart: document.getElementById(`itemPart-${itemId}`)?.value,
+      sets: document.getElementById(`itemSets-${itemId}`)?.value,
+      reps: document.getElementById(`itemReps-${itemId}`)?.value,
+      time: document.getElementById(`itemTime-${itemId}`)?.value,
+      rest: document.getElementById(`itemRest-${itemId}`)?.value,
+      rounds: document.getElementById(`itemRounds-${itemId}`)?.value,
+      displayOrder: Number(document.getElementById(`itemOrder-${itemId}`)?.value || 0)
+    });
+    render();
+  }));
+  document.querySelectorAll("[data-remove-workout-item]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Remove this exercise from the workout?")) return;
+    adminRemoveWorkoutTemplateItem(store, state.currentUser, button.dataset.removeWorkoutItem);
+    render();
+  }));
+  document.querySelector("#modalAddWorkoutItem")?.addEventListener("click", (event) => {
+    const workoutId = event.currentTarget.dataset.workoutId;
+    const exercise = store.exercises.find((item) => item.id === document.querySelector("#modalNewItemExercise")?.value);
+    adminAddExerciseToWorkoutTemplate(store, state.currentUser, workoutId, {
+      exerciseId: exercise?.id,
+      exerciseName: exercise?.exerciseName || exercise?.name,
+      sessionPart: document.querySelector("#modalNewItemPart")?.value,
+      sets: document.querySelector("#modalNewItemSets")?.value,
+      reps: document.querySelector("#modalNewItemReps")?.value,
+      time: document.querySelector("#modalNewItemTime")?.value,
+      rest: document.querySelector("#modalNewItemRest")?.value,
+      rounds: document.querySelector("#modalNewItemRounds")?.value
+    });
+    render();
+  });
   document.querySelectorAll("[data-admin-jump]").forEach((button) => button.addEventListener("click", () => {
     const map = {
       "View Alerts": "admin-alerts",
