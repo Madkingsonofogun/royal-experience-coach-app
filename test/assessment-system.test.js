@@ -11,6 +11,7 @@ import {
   adminAssignPlanOfferingToPackage,
   adminCreateAssessmentTemplate,
   adminCreateClient,
+  adminCreateCoach,
   adminCreateExercise,
   adminCreatePackage,
   adminCreatePlanOffering,
@@ -977,6 +978,30 @@ test("admin can update coach emergency contact", () => {
   const admin = authenticateUser(store, "Admin", "9999");
   const coach = adminUpdateCoach(store, admin, "coach_1", { emergencyContact: "Coach Contact / 555-222-9999" });
   assert.equal(coach.emergencyContact, "Coach Contact / 555-222-9999");
+});
+
+test("admin can create, edit, and delete a coach", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const { coach, user } = adminCreateCoach(store, admin, {
+    firstName: "Jordan",
+    lastName: "King",
+    email: "jordan@example.com",
+    phone: "5554442222",
+    specialty: "Kickboxing",
+    emergencyContact: "Sam King / 555-444-9999",
+    pin: "4444",
+    confirmPin: "4444"
+  });
+  assert.equal(coach.name, "Jordan King");
+  assert.equal(user.linkedId, coach.id);
+  assert.equal(authenticateUser(store, "jordan@example.com", "4444").id, user.id);
+  adminUpdateCoach(store, admin, coach.id, { name: "Jordan Royal", phone: "5554443333", specialty: "Boxing" });
+  assert.equal(store.coaches.find((item) => item.id === coach.id).name, "Jordan Royal");
+  assert.equal(store.users.find((item) => item.id === user.id).phone, "5554443333");
+  adminDeleteCoach(store, admin, coach.id);
+  assert.equal(store.coaches.some((item) => item.id === coach.id), false);
+  assert.equal(store.users.some((item) => item.id === user.id), false);
 });
 
 test("admin can delete a client and linked records", () => {

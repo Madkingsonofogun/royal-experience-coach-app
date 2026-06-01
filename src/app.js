@@ -8,6 +8,7 @@ import {
   adminAssignPlanOfferingToPackage,
   adminCreateAssessmentTemplate,
   adminCreateClient,
+  adminCreateCoach,
   adminCreateExercise,
   adminCreatePackage,
   adminCreatePlanOffering,
@@ -133,6 +134,20 @@ const state = {
       notes: "",
       injuryRestrictionNotes: "",
       emergencyContact: ""
+    },
+    coach: {
+      firstName: "",
+      lastName: "",
+      fullName: "",
+      email: "",
+      phone: "",
+      specialty: "",
+      bio: "",
+      emergencyContact: "",
+      status: "Active",
+      pin: "1234",
+      confirmPin: "1234",
+      forcePinChange: true
     },
     exercise: {
       exerciseName: "",
@@ -1271,6 +1286,7 @@ function adminView() {
   const d = state.adminDrafts;
   const creationActions = [
     { label: "Add Client", panel: "clients" },
+    { label: "Add Coach", panel: "coaches" },
     { label: "Account Requests", panel: "accountRequests" },
     { label: "Add Exercise", panel: "exercises" },
     { label: "Add Workout", panel: "workouts" },
@@ -1335,6 +1351,26 @@ function adminView() {
           <label>Injury / restriction notes <textarea data-admin-draft="client:injuryRestrictionNotes">${d.client.injuryRestrictionNotes}</textarea></label>
           <button class="primary full" id="adminCreateClient">Add New Client</button>
           <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-delete-client="${client.id}">Delete</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
+        </article>
+        <article class="card admin-card ${adminPanelClass("coaches")}" id="admin-coaches-new">
+          <h3>Add Coach</h3>
+          <div class="form-grid">
+            ${adminInput("coach", "firstName", "First name")}
+            ${adminInput("coach", "lastName", "Last name")}
+            ${adminInput("coach", "email", "Email")}
+            ${adminInput("coach", "phone", "Phone number")}
+            ${adminInput("coach", "specialty", "Coach title / specialty")}
+            ${adminInput("coach", "emergencyContact", "Emergency contact")}
+            ${adminSelect("coach", "status", "Status", ["Active", "Inactive", "Suspended", "Archived"])}
+            ${adminInput("coach", "pin", "4-digit PIN", "password")}
+            ${adminInput("coach", "confirmPin", "Confirm 4-digit PIN", "password")}
+          </div>
+          <label>Bio <textarea data-admin-draft="coach:bio">${d.coach.bio}</textarea></label>
+          <label><input class="inline-check" data-admin-check="coach:forcePinChange" type="checkbox" ${d.coach.forcePinChange ? "checked" : ""} /> Force PIN change on first login</label>
+          <button class="primary full" id="adminCreateCoach">Add New Coach</button>
+          <div class="admin-list">
+            ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name} / ${coach.status || "Active"} / ${coach.specialty || "Coach"} / Emergency: ${coach.emergencyContact || "Not saved"}</span><button data-open-coach-editor="${coach.id}">Edit</button><button data-delete-coach="${coach.id}">Delete</button><button data-reset-coach-pin="${coach.id}">Reset PIN</button></div>`).join("")}
+          </div>
         </article>
         <article class="card admin-card ${adminPanelClass("exercises")}" id="admin-exercise-library-new">
           <h3>Add Exercise</h3>
@@ -1485,9 +1521,41 @@ function adminEditModal() {
   if (state.editModal.type === "exercise") return exerciseEditModal(state.editModal.id);
   if (state.editModal.type === "workout") return workoutEditModal(state.editModal.id);
   if (state.editModal.type === "offering") return planOfferingEditModal(state.editModal.id);
+  if (state.editModal.type === "coach") return coachEditModal(state.editModal.id);
   if (state.editModal.type === "assessmentTemplate") return assessmentTemplateEditModal(state.editModal.id);
   if (state.editModal.type === "account") return accountReviewModal(state.editModal.id);
   return "";
+}
+
+function coachEditModal(coachId) {
+  const coach = store.coaches.find((item) => item.id === coachId);
+  if (!coach) return "";
+  const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card">
+        <div class="modal-head">
+          <div><p class="eyebrow">Edit Coach</p><h2>${escapeHtml(coach.name)}</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="form-grid">
+          ${editInput("coach", "name", "Full name", coach.name)}
+          ${editInput("coach", "firstName", "First name", coach.firstName || user?.firstName || "")}
+          ${editInput("coach", "lastName", "Last name", coach.lastName || user?.lastName || "")}
+          ${editInput("coach", "email", "Email", coach.email || user?.email || "")}
+          ${editInput("coach", "phone", "Phone number", coach.phone || user?.phone || "")}
+          ${editInput("coach", "specialty", "Coach title / specialty", coach.specialty || "")}
+          ${editInput("coach", "emergencyContact", "Emergency contact", coach.emergencyContact || "")}
+          ${editSelect("coach", "status", "Status", ["Active", "Inactive", "Suspended", "Archived"], coach.status || user?.accountStatus || "Active")}
+        </div>
+        <label>Bio <textarea data-edit-coach-field="bio">${escapeHtml(coach.bio || "")}</textarea></label>
+        <div class="modal-actions">
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="saveCoachModal" data-coach-id="${coach.id}">Save Coach</button>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 function planOfferingEditModal(offeringId) {
@@ -2159,6 +2227,10 @@ function bindGlobal() {
     state.editModal = { type: "offering", id: button.dataset.openOfferingEditor };
     render();
   }));
+  document.querySelectorAll("[data-open-coach-editor]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "coach", id: button.dataset.openCoachEditor };
+    render();
+  }));
   document.querySelectorAll("[data-open-assessment-template-editor]").forEach((button) => button.addEventListener("click", () => {
     state.editModal = { type: "assessmentTemplate", id: button.dataset.openAssessmentTemplateEditor };
     render();
@@ -2228,6 +2300,14 @@ function bindGlobal() {
     state.editModal = null;
     render();
   });
+  document.querySelector("#saveCoachModal")?.addEventListener("click", (event) => {
+    const coachId = event.currentTarget.dataset.coachId;
+    const patch = collectEditFields("coach");
+    patch.fullName = patch.name;
+    adminUpdateCoach(store, state.currentUser, coachId, patch);
+    state.editModal = null;
+    render();
+  });
   document.querySelectorAll("[data-edit-template-test]").forEach((button) => button.addEventListener("click", () => {
     const template = store.assessmentTemplates.find((item) => item.id === state.editModal?.id);
     if (!template) return;
@@ -2291,6 +2371,28 @@ function bindGlobal() {
     const client = adminCreateClient(store, state.currentUser, state.adminDrafts.client);
     changeSelectedClient(client.id, false);
     render();
+  });
+  document.querySelector("#adminCreateCoach")?.addEventListener("click", () => {
+    try {
+      adminCreateCoach(store, state.currentUser, state.adminDrafts.coach);
+      state.adminDrafts.coach = {
+        firstName: "",
+        lastName: "",
+        fullName: "",
+        email: "",
+        phone: "",
+        specialty: "",
+        bio: "",
+        emergencyContact: "",
+        status: "Active",
+        pin: "1234",
+        confirmPin: "1234",
+        forcePinChange: true
+      };
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
   });
   document.querySelectorAll("[data-save-client]").forEach((button) => button.addEventListener("click", () => {
     const name = document.querySelector(`[data-client-name="${button.dataset.saveClient}"]`).value;
@@ -2424,6 +2526,11 @@ function bindGlobal() {
   document.querySelectorAll("[data-temp-pin]").forEach((button) => button.addEventListener("click", () => {
     const result = adminResetUserPin(store, state.currentUser, button.dataset.tempPin);
     window.alert(`Temporary PIN for ${result.user.name}: ${result.temporaryPin}`);
+    render();
+  }));
+  document.querySelectorAll("[data-reset-coach-pin]").forEach((button) => button.addEventListener("click", () => {
+    const user = store.users.find((item) => item.role === "Coach" && item.linkedId === button.dataset.resetCoachPin);
+    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
     render();
   }));
   document.querySelectorAll("[data-resolve-pin-request]").forEach((button) => button.addEventListener("click", () => {

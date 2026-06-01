@@ -1666,10 +1666,86 @@ export function adminDeleteCoach(store, adminUser, coachId) {
   return removed;
 }
 
+export function adminCreateCoach(store, adminUser, input) {
+  requireAdmin(adminUser);
+  validateNumericPin(input.pin || "1234", input.confirmPin || input.pin || "1234");
+  const fullName = input.fullName || `${input.firstName || ""} ${input.lastName || ""}`.trim();
+  if (!fullName) throw new Error("Coach name is required.");
+  const coach = {
+    id: makeId("coach"),
+    role: "Coach",
+    name: fullName,
+    firstName: input.firstName || fullName.split(" ")[0] || "",
+    lastName: input.lastName || fullName.split(" ").slice(1).join(" "),
+    email: String(input.email || "").toLowerCase(),
+    phone: String(input.phone || ""),
+    specialty: input.specialty || input.coachTitle || "",
+    bio: input.bio || "",
+    emergencyContact: input.emergencyContact || "",
+    status: input.status || "Active",
+    profileLocked: Boolean(input.profileLocked),
+    profileUnlockedByAdminId: adminUser.id,
+    profileUnlockedAt: nowIso(),
+    profileLockReason: "",
+    profileImageUrl: "",
+    profileImageStorageKey: "",
+    profileImageUploadedAt: null,
+    createdByAdminId: adminUser.id,
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  const pinSalt = makeId("salt");
+  const user = {
+    id: makeId("coach_user"),
+    role: "Coach",
+    name: coach.name,
+    firstName: coach.firstName,
+    lastName: coach.lastName,
+    email: coach.email,
+    phone: coach.phone,
+    pinSalt,
+    pinHash: hashPin(input.pin || "1234", pinSalt),
+    linkedId: coach.id,
+    accountLocked: false,
+    accountUnlockedByAdminId: adminUser.id,
+    accountUnlockedAt: nowIso(),
+    accountLockReason: "",
+    accountStatus: "Active",
+    requestedRole: "Coach",
+    requestNote: "",
+    profileLocked: Boolean(input.profileLocked),
+    emailVerified: false,
+    forcePinChange: Boolean(input.forcePinChange),
+    temporaryPinExpiresAt: null,
+    disabled: false,
+    coachPermissions: input.permissions || {},
+    profileImageUrl: "",
+    profileImageStorageKey: "",
+    profileImageUploadedAt: null,
+    createdAt: nowIso()
+  };
+  store.coaches.push(coach);
+  store.users.push(user);
+  logAdminAction(store, adminUser, `Created coach ${coach.name}`);
+  return { coach, user };
+}
+
 export function adminUpdateCoach(store, adminUser, coachId, patch) {
   requireAdmin(adminUser);
   const coach = findById(store.coaches, coachId, "Coach");
   Object.assign(coach, patch, { updatedAt: nowIso() });
+  const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
+  if (user) {
+    if (patch.name || patch.fullName) user.name = patch.name || patch.fullName;
+    if (patch.firstName !== undefined) user.firstName = patch.firstName;
+    if (patch.lastName !== undefined) user.lastName = patch.lastName;
+    if (patch.email !== undefined) user.email = String(patch.email || "").toLowerCase();
+    if (patch.phone !== undefined) user.phone = String(patch.phone || "");
+    if (patch.status) {
+      user.accountStatus = patch.status === "Inactive" ? "Suspended" : patch.status;
+      user.disabled = ["Inactive", "Suspended", "Archived"].includes(patch.status);
+    }
+  }
   logAdminAction(store, adminUser, `Updated coach ${coach.name}`);
   return coach;
 }
