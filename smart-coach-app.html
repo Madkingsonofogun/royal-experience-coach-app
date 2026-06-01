@@ -30726,7 +30726,8 @@ function requestLockedAccount(store, input) {
       coachNameIfKnown: input.coachNameIfKnown || "",
       coachTitle: input.coachTitle || "",
       experience: input.experience || "",
-      coachRequestReason: input.coachRequestReason || ""
+      coachRequestReason: input.coachRequestReason || "",
+      emergencyContact: input.emergencyContact || ""
     },
     emailVerified: false,
     forcePinChange: false,
@@ -30829,6 +30830,7 @@ function approveRequestedUserProfile(store, adminUser, user, options) {
         phone: user.phone,
         specialty: user.requestDetails?.coachTitle || "",
         experience: user.requestDetails?.experience || "",
+        emergencyContact: user.requestDetails?.emergencyContact || "",
         permissions: options.permissions || {},
         profileLocked: !options.unlockProfile,
         profileUnlockedByAdminId: options.unlockProfile ? adminUser.id : null,
@@ -31206,6 +31208,14 @@ function adminDeleteCoach(store, adminUser, coachId) {
   return removed;
 }
 
+function adminUpdateCoach(store, adminUser, coachId, patch) {
+  requireAdmin(adminUser);
+  const coach = findById(store.coaches, coachId, "Coach");
+  Object.assign(coach, patch, { updatedAt: nowIso() });
+  logAdminAction(store, adminUser, `Updated coach ${coach.name}`);
+  return coach;
+}
+
 function adminCreateExercise(store, actorUser, input) {
   requireAdminOrPermission(store, actorUser, "coachCanCreateExercises", "Only Admin can create exercises");
   const exercise = normalizeExerciseInput(input, actorUser.id);
@@ -31339,7 +31349,7 @@ function adminRemoveWorkoutTemplateItem(store, adminUser, itemId) {
 function adminUpdateWorkoutTemplateItem(store, adminUser, itemId, patch) {
   requireAdmin(adminUser);
   const item = findById(store.workoutTemplateItems, itemId, "Workout item");
-  Object.assign(item, cleanPatch(patch), { updatedAt: nowIso() });
+  Object.assign(item, patch, { updatedAt: nowIso() });
   return item;
 }
 
@@ -32202,8 +32212,8 @@ function createStore() {
       user("client_user_marcus", "Client", "Marcus Lee", "marcus@example.com", "55533333", "3333", "client_marcus")
     ],
     coaches: [
-      { id: "coach_1", name: "Coach Maya Rivera", role: "Coach" },
-      { id: "admin_1", name: "Admin", role: "Admin" }
+      { id: "coach_1", name: "Coach Maya Rivera", role: "Coach", emergencyContact: "Luis Rivera / 555-220-1000" },
+      { id: "admin_1", name: "Admin", role: "Admin", emergencyContact: "Office / 555-000-0000" }
     ],
     clients: [
       {
@@ -32223,6 +32233,7 @@ function createStore() {
         sessionsRemaining: 9,
         startDate: "2026-04-15",
         progressNotes: "Improving consistency. Keep impact controlled until knee tolerance improves.",
+        emergencyContact: "Denise Johnson / 555-111-9000",
         currentTrainingLevel: "Intermediate",
         currentPlanLevel: "Intermediate",
         currentRestrictions: ["Knee limitation"],
@@ -32250,6 +32261,7 @@ function createStore() {
         sessionsRemaining: 13,
         startDate: "2026-05-03",
         progressNotes: "Start with recovery pacing and short kickboxing technique rounds.",
+        emergencyContact: "Tara Lee / 555-333-9000",
         currentTrainingLevel: "Beginner",
         currentPlanLevel: null,
         currentRestrictions: ["Low cardio tolerance"],
@@ -32716,7 +32728,8 @@ const state = {
     coachNameIfKnown: "",
     coachTitle: "",
     experience: "",
-    coachRequestReason: ""
+    coachRequestReason: "",
+    emergencyContact: ""
   },
   accountRequestFilter: "Pending",
   adminDrafts: {
@@ -33028,6 +33041,7 @@ function signupForm() {
       <label>Coach name if known <input data-signup-field="coachNameIfKnown" value="${state.signup.coachNameIfKnown}" /></label>
     ` : `
       <label>Coach title / specialty <input data-signup-field="coachTitle" value="${state.signup.coachTitle}" /></label>
+      <label>Emergency contact <input data-signup-field="emergencyContact" value="${state.signup.emergencyContact}" placeholder="Name / phone" /></label>
       <label>Experience <textarea data-signup-field="experience">${state.signup.experience}</textarea></label>
       <label>Reason for coach access <textarea data-signup-field="coachRequestReason">${state.signup.coachRequestReason}</textarea></label>
     `}
@@ -33081,6 +33095,8 @@ function profilePage() {
   const client = selectedClient();
   const profileUser = userForProfile(client);
   const progressImages = getProgressImagesForUser(store, state.currentUser, client.id);
+  const assignedCoach = store.coaches.find((coach) => coach.id === client.coachId);
+  const ownCoach = state.currentUser.role === "Coach" ? store.coaches.find((coach) => coach.id === state.currentUser.linkedId) : null;
   return `
     <section class="workspace">
       <div class="section-head">
@@ -33099,8 +33115,11 @@ function profilePage() {
       </div>
       <div class="split">
         <article class="card"><h3>Injury notes</h3><p>${client.injuryNotes}</p></article>
+        <article class="card"><h3>Client emergency contact</h3><p>${client.emergencyContact || "No emergency contact saved."}</p></article>
+        <article class="card"><h3>Assigned coach emergency contact</h3><p>${assignedCoach?.emergencyContact || "No coach emergency contact saved."}</p></article>
         <article class="card"><h3>Equipment available</h3>${chipSection("Available", client.equipmentAvailable)}</article>
         <article class="card"><h3>Progress notes</h3><p>${client.progressNotes}</p></article>
+        ${ownCoach ? `<article class="card"><h3>My coach profile emergency contact</h3><p>${ownCoach.emergencyContact || "No emergency contact saved."}</p></article>` : ""}
       </div>
       ${progressImagePanel(client, progressImages)}
     </section>
@@ -34038,7 +34057,7 @@ function adminView() {
           <h4>Manual PIN Controls</h4>
           ${store.users.map((user) => `<div class="admin-row"><span>${user.name} / ${user.role}${user.forcePinChange ? " / must change PIN" : ""}${user.disabled ? " / disabled" : ""}</span><input data-pin-user="${user.id}" inputmode="numeric" placeholder="New numeric PIN" /><button data-save-pin="${user.id}">Set PIN</button><button data-temp-pin="${user.id}">Temp PIN</button><button data-toggle-login="${user.id}">${user.disabled ? "Reactivate" : "Disable"}</button></div>`).join("")}
           <h3>Coaches</h3>
-          ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name}</span><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
+          ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name} / Emergency: ${coach.emergencyContact || "Not saved"}</span><input data-coach-emergency="${coach.id}" value="${coach.emergencyContact || ""}" placeholder="Emergency contact" /><button data-save-coach-emergency="${coach.id}">Save Emergency</button><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
         </article>
         <article class="card ${adminPanelClass("accountRequests")}">
           <h3>Pending Account Requests</h3>
@@ -35041,6 +35060,11 @@ function bindGlobal() {
   document.querySelectorAll("[data-delete-coach]").forEach((button) => button.addEventListener("click", () => {
     if (!window.confirm("Delete this coach login/profile and reassign their clients?")) return;
     adminDeleteCoach(store, state.currentUser, button.dataset.deleteCoach);
+    render();
+  }));
+  document.querySelectorAll("[data-save-coach-emergency]").forEach((button) => button.addEventListener("click", () => {
+    const emergencyContact = document.querySelector(`[data-coach-emergency="${button.dataset.saveCoachEmergency}"]`)?.value || "";
+    adminUpdateCoach(store, state.currentUser, button.dataset.saveCoachEmergency, { emergencyContact });
     render();
   }));
   document.querySelectorAll("[data-template-test]").forEach((button) => button.addEventListener("click", () => {

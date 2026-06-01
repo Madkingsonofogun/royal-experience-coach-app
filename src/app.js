@@ -22,6 +22,7 @@ import {
   adminDeletePackage,
   adminDeletePlanOffering,
   adminDeleteWorkoutTemplate,
+  adminUpdateCoach,
   addProgressImageCoachNote,
   adminRemoveWorkoutTemplateItem,
   adminReorderWorkoutTemplateItems,
@@ -111,7 +112,8 @@ const state = {
     coachNameIfKnown: "",
     coachTitle: "",
     experience: "",
-    coachRequestReason: ""
+    coachRequestReason: "",
+    emergencyContact: ""
   },
   accountRequestFilter: "Pending",
   adminDrafts: {
@@ -423,6 +425,7 @@ function signupForm() {
       <label>Coach name if known <input data-signup-field="coachNameIfKnown" value="${state.signup.coachNameIfKnown}" /></label>
     ` : `
       <label>Coach title / specialty <input data-signup-field="coachTitle" value="${state.signup.coachTitle}" /></label>
+      <label>Emergency contact <input data-signup-field="emergencyContact" value="${state.signup.emergencyContact}" placeholder="Name / phone" /></label>
       <label>Experience <textarea data-signup-field="experience">${state.signup.experience}</textarea></label>
       <label>Reason for coach access <textarea data-signup-field="coachRequestReason">${state.signup.coachRequestReason}</textarea></label>
     `}
@@ -476,6 +479,8 @@ function profilePage() {
   const client = selectedClient();
   const profileUser = userForProfile(client);
   const progressImages = getProgressImagesForUser(store, state.currentUser, client.id);
+  const assignedCoach = store.coaches.find((coach) => coach.id === client.coachId);
+  const ownCoach = state.currentUser.role === "Coach" ? store.coaches.find((coach) => coach.id === state.currentUser.linkedId) : null;
   return `
     <section class="workspace">
       <div class="section-head">
@@ -494,8 +499,11 @@ function profilePage() {
       </div>
       <div class="split">
         <article class="card"><h3>Injury notes</h3><p>${client.injuryNotes}</p></article>
+        <article class="card"><h3>Client emergency contact</h3><p>${client.emergencyContact || "No emergency contact saved."}</p></article>
+        <article class="card"><h3>Assigned coach emergency contact</h3><p>${assignedCoach?.emergencyContact || "No coach emergency contact saved."}</p></article>
         <article class="card"><h3>Equipment available</h3>${chipSection("Available", client.equipmentAvailable)}</article>
         <article class="card"><h3>Progress notes</h3><p>${client.progressNotes}</p></article>
+        ${ownCoach ? `<article class="card"><h3>My coach profile emergency contact</h3><p>${ownCoach.emergencyContact || "No emergency contact saved."}</p></article>` : ""}
       </div>
       ${progressImagePanel(client, progressImages)}
     </section>
@@ -1433,7 +1441,7 @@ function adminView() {
           <h4>Manual PIN Controls</h4>
           ${store.users.map((user) => `<div class="admin-row"><span>${user.name} / ${user.role}${user.forcePinChange ? " / must change PIN" : ""}${user.disabled ? " / disabled" : ""}</span><input data-pin-user="${user.id}" inputmode="numeric" placeholder="New numeric PIN" /><button data-save-pin="${user.id}">Set PIN</button><button data-temp-pin="${user.id}">Temp PIN</button><button data-toggle-login="${user.id}">${user.disabled ? "Reactivate" : "Disable"}</button></div>`).join("")}
           <h3>Coaches</h3>
-          ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name}</span><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
+          ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name} / Emergency: ${coach.emergencyContact || "Not saved"}</span><input data-coach-emergency="${coach.id}" value="${coach.emergencyContact || ""}" placeholder="Emergency contact" /><button data-save-coach-emergency="${coach.id}">Save Emergency</button><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
         </article>
         <article class="card ${adminPanelClass("accountRequests")}">
           <h3>Pending Account Requests</h3>
@@ -2436,6 +2444,11 @@ function bindGlobal() {
   document.querySelectorAll("[data-delete-coach]").forEach((button) => button.addEventListener("click", () => {
     if (!window.confirm("Delete this coach login/profile and reassign their clients?")) return;
     adminDeleteCoach(store, state.currentUser, button.dataset.deleteCoach);
+    render();
+  }));
+  document.querySelectorAll("[data-save-coach-emergency]").forEach((button) => button.addEventListener("click", () => {
+    const emergencyContact = document.querySelector(`[data-coach-emergency="${button.dataset.saveCoachEmergency}"]`)?.value || "";
+    adminUpdateCoach(store, state.currentUser, button.dataset.saveCoachEmergency, { emergencyContact });
     render();
   }));
   document.querySelectorAll("[data-template-test]").forEach((button) => button.addEventListener("click", () => {

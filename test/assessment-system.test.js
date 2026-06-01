@@ -22,6 +22,7 @@ import {
   adminDeletePackage,
   adminDeletePlanOffering,
   adminDeleteWorkoutTemplate,
+  adminUpdateCoach,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
   adminReorderWorkoutTemplateItems,
@@ -959,14 +960,23 @@ test("admin can create, edit, and archive a new client", () => {
     assignedCoach: "coach_1",
     startDate: today,
     status: "Active",
-    injuryRestrictionNotes: "No current restrictions"
+    injuryRestrictionNotes: "No current restrictions",
+    emergencyContact: "Amy Diaz / 555-121-9000"
   });
   assert.equal(client.name, "Rosa Diaz");
+  assert.equal(client.emergencyContact, "Amy Diaz / 555-121-9000");
   assert.equal(store.users.some((user) => user.linkedId === client.id), false);
   adminUpdateClient(store, admin, client.id, { goal: "Kickboxing fitness", coachId: "coach_1" });
   assert.equal(store.clients.find((item) => item.id === client.id).goal, "Kickboxing fitness");
   adminArchiveClient(store, admin, client.id);
   assert.equal(store.clients.find((item) => item.id === client.id).status, "Archived");
+});
+
+test("admin can update coach emergency contact", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const coach = adminUpdateCoach(store, admin, "coach_1", { emergencyContact: "Coach Contact / 555-222-9999" });
+  assert.equal(coach.emergencyContact, "Coach Contact / 555-222-9999");
 });
 
 test("admin can delete a client and linked records", () => {

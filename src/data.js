@@ -16,8 +16,8 @@ export function createStore() {
       user("client_user_marcus", "Client", "Marcus Lee", "marcus@example.com", "55533333", "3333", "client_marcus")
     ],
     coaches: [
-      { id: "coach_1", name: "Coach Maya Rivera", role: "Coach" },
-      { id: "admin_1", name: "Admin", role: "Admin" }
+      { id: "coach_1", name: "Coach Maya Rivera", role: "Coach", emergencyContact: "Luis Rivera / 555-220-1000" },
+      { id: "admin_1", name: "Admin", role: "Admin", emergencyContact: "Office / 555-000-0000" }
     ],
     clients: [
       {
@@ -37,6 +37,7 @@ export function createStore() {
         sessionsRemaining: 9,
         startDate: "2026-04-15",
         progressNotes: "Improving consistency. Keep impact controlled until knee tolerance improves.",
+        emergencyContact: "Denise Johnson / 555-111-9000",
         currentTrainingLevel: "Intermediate",
         currentPlanLevel: "Intermediate",
         currentRestrictions: ["Knee limitation"],
@@ -64,6 +65,7 @@ export function createStore() {
         sessionsRemaining: 13,
         startDate: "2026-05-03",
         progressNotes: "Start with recovery pacing and short kickboxing technique rounds.",
+        emergencyContact: "Tara Lee / 555-333-9000",
         currentTrainingLevel: "Beginner",
         currentPlanLevel: null,
         currentRestrictions: ["Low cardio tolerance"],

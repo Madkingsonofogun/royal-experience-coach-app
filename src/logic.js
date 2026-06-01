@@ -1184,7 +1184,8 @@ export function requestLockedAccount(store, input) {
       coachNameIfKnown: input.coachNameIfKnown || "",
       coachTitle: input.coachTitle || "",
       experience: input.experience || "",
-      coachRequestReason: input.coachRequestReason || ""
+      coachRequestReason: input.coachRequestReason || "",
+      emergencyContact: input.emergencyContact || ""
     },
     emailVerified: false,
     forcePinChange: false,
@@ -1287,6 +1288,7 @@ function approveRequestedUserProfile(store, adminUser, user, options) {
         phone: user.phone,
         specialty: user.requestDetails?.coachTitle || "",
         experience: user.requestDetails?.experience || "",
+        emergencyContact: user.requestDetails?.emergencyContact || "",
         permissions: options.permissions || {},
         profileLocked: !options.unlockProfile,
         profileUnlockedByAdminId: options.unlockProfile ? adminUser.id : null,
@@ -1664,6 +1666,14 @@ export function adminDeleteCoach(store, adminUser, coachId) {
   return removed;
 }
 
+export function adminUpdateCoach(store, adminUser, coachId, patch) {
+  requireAdmin(adminUser);
+  const coach = findById(store.coaches, coachId, "Coach");
+  Object.assign(coach, patch, { updatedAt: nowIso() });
+  logAdminAction(store, adminUser, `Updated coach ${coach.name}`);
+  return coach;
+}
+
 export function adminCreateExercise(store, actorUser, input) {
   requireAdminOrPermission(store, actorUser, "coachCanCreateExercises", "Only Admin can create exercises");
   const exercise = normalizeExerciseInput(input, actorUser.id);
@@ -1797,7 +1807,7 @@ export function adminRemoveWorkoutTemplateItem(store, adminUser, itemId) {
 export function adminUpdateWorkoutTemplateItem(store, adminUser, itemId, patch) {
   requireAdmin(adminUser);
   const item = findById(store.workoutTemplateItems, itemId, "Workout item");
-  Object.assign(item, cleanPatch(patch), { updatedAt: nowIso() });
+  Object.assign(item, patch, { updatedAt: nowIso() });
   return item;
 }
 
