@@ -272,7 +272,10 @@ export function evaluateSafety(answers = {}) {
 }
 
 export function summarizeAssessment(input) {
-  const scores = movementTests.map((test) => Number(input.movementScores?.[test.id] ?? 0));
+  const activeTests = input.movementTestIds?.length
+    ? movementTests.filter((test) => input.movementTestIds.includes(test.id))
+    : movementTests;
+  const scores = activeTests.map((test) => Number(input.movementScores?.[test.id] ?? 0));
   const averageCapabilityScore = round1(scores.reduce((sum, score) => sum + score, 0) / scores.length);
   const lowestCapabilityScore = Math.min(...scores);
   const painScore = Number(input.movementScores?.pain ?? 0);
@@ -300,6 +303,7 @@ export function summarizeAssessment(input) {
     assessmentType: input.assessmentType,
     safetyAnswers: input.safetyAnswers,
     movementScores: input.movementScores,
+    movementTestIds: activeTests.map((test) => test.id),
     equipment: input.equipment,
     equipmentScore,
     equipmentLevel,
@@ -764,6 +768,8 @@ export function evaluateDailyCheckIn(input, originalWorkout, exercises = []) {
 }
 
 export function saveDailyCheckIn(store, input) {
+  const existing = store.dailyCheckIns.find((item) => item.clientId === input.clientId && item.workoutDate === input.workoutDate);
+  if (existing) throw new Error("You already checked in for today.");
   const originalWorkout = getTodayWorkoutForClient(store, input.clientId, input.workoutDate);
   const painCheckIn = createPainCheckIn(input);
   const evaluated = evaluateDailyCheckIn({ ...input, painCheckIn, painCheckInId: painCheckIn?.id || null }, originalWorkout, store.exercises);
@@ -1392,10 +1398,40 @@ export function adminArchiveClient(store, adminUser, clientId) {
 
 export function adminDeleteClient(store, adminUser, clientId) {
   requireAdmin(adminUser);
-  if (store.monthlyPlans.some((plan) => plan.clientId === clientId) || store.users.some((user) => user.linkedId === clientId)) {
-    throw new Error("Client has linked records. Archive instead of delete.");
-  }
-  return removeById(store.clients, clientId, "Client");
+  store.users = store.users.filter((user) => !(user.role === "Client" && user.linkedId === clientId));
+  store.assessments = store.assessments.filter((item) => item.clientId !== clientId);
+  store.weeklyCheckIns = store.weeklyCheckIns.filter((item) => item.clientId !== clientId);
+  store.dailyCheckIns = store.dailyCheckIns.filter((item) => item.clientId !== clientId);
+  store.painCheckIns = store.painCheckIns.filter((item) => item.clientId !== clientId);
+  store.progressImages = store.progressImages.filter((item) => item.clientId !== clientId);
+  store.coachAlerts = store.coachAlerts.filter((item) => item.clientId !== clientId);
+  store.todayWorkoutAdjustments = store.todayWorkoutAdjustments.filter((item) => item.clientId !== clientId);
+  store.workoutCompletions = store.workoutCompletions.filter((item) => item.clientId !== clientId);
+  store.chatMessages = store.chatMessages.filter((item) => item.clientId !== clientId);
+  store.notifications = store.notifications.filter((item) => item.clientId !== clientId);
+  store.monthlyPlans = store.monthlyPlans.filter((item) => item.clientId !== clientId);
+  store.monthlyPlanItems = store.monthlyPlanItems.filter((item) => item.clientId !== clientId);
+  store.inviteCodes = store.inviteCodes.filter((item) => item.clientId !== clientId);
+  const removed = removeById(store.clients, clientId, "Client");
+  logAdminAction(store, adminUser, `Deleted client ${removed.name}`);
+  return removed;
+}
+
+export function adminDeleteCoach(store, adminUser, coachId) {
+  requireAdmin(adminUser);
+  const removed = removeById(store.coaches, coachId, "Coach");
+  store.users = store.users.filter((user) => !(user.role === "Coach" && user.linkedId === coachId));
+  const fallbackCoach = store.coaches.find((coach) => coach.role === "Coach") || store.coaches[0] || null;
+  store.clients.forEach((client) => {
+    if (client.coachId === coachId) {
+      client.coachId = fallbackCoach?.id || null;
+      client.assignedCoach = fallbackCoach?.id || null;
+    }
+  });
+  store.coachAlerts = store.coachAlerts.filter((alert) => alert.coachId !== coachId);
+  store.inviteCodes = store.inviteCodes.filter((invite) => invite.coachId !== coachId);
+  logAdminAction(store, adminUser, `Deleted coach ${removed.name}`);
+  return removed;
 }
 
 export function adminCreateExercise(store, actorUser, input) {
@@ -1420,8 +1456,10 @@ export function adminArchiveExercise(store, adminUser, exerciseId) {
 
 export function adminDeleteExercise(store, adminUser, exerciseId) {
   requireAdmin(adminUser);
-  if (store.workoutTemplateItems.some((item) => item.exerciseId === exerciseId)) throw new Error("Exercise is used in workout templates. Archive instead of delete.");
-  return removeById(store.exercises, exerciseId, "Exercise");
+  store.workoutTemplateItems = store.workoutTemplateItems.filter((item) => item.exerciseId !== exerciseId);
+  const removed = removeById(store.exercises, exerciseId, "Exercise");
+  logAdminAction(store, adminUser, `Deleted exercise ${removed.exerciseName || removed.name}`);
+  return removed;
 }
 
 export function adminDuplicateExercise(store, adminUser, exerciseId) {
@@ -1487,9 +1525,13 @@ export function adminArchiveWorkoutTemplate(store, adminUser, workoutTemplateId)
 
 export function adminDeleteWorkoutTemplate(store, adminUser, workoutTemplateId) {
   requireAdmin(adminUser);
-  if (store.planOfferings.some((offering) => offering.workoutTemplateIds?.includes(workoutTemplateId))) throw new Error("Workout is connected to a plan offering. Archive instead of delete.");
+  store.planOfferings.forEach((offering) => {
+    offering.workoutTemplateIds = (offering.workoutTemplateIds || []).filter((id) => id !== workoutTemplateId);
+  });
   store.workoutTemplateItems = store.workoutTemplateItems.filter((item) => item.workoutTemplateId !== workoutTemplateId);
-  return removeById(store.workoutTemplates, workoutTemplateId, "Workout");
+  const removed = removeById(store.workoutTemplates, workoutTemplateId, "Workout");
+  logAdminAction(store, adminUser, `Deleted workout template ${removed.workoutName}`);
+  return removed;
 }
 
 export function adminAddExerciseToWorkoutTemplate(store, adminUser, workoutTemplateId, input) {
@@ -1603,6 +1645,19 @@ export function adminArchivePlanOffering(store, adminUser, offeringId) {
   return adminUpdatePlanOffering(store, adminUser, offeringId, { active: false, archived: true });
 }
 
+export function adminDeletePlanOffering(store, adminUser, offeringId) {
+  requireAdmin(adminUser);
+  store.packages.forEach((pkg) => {
+    if (pkg.planOfferingId === offeringId) pkg.planOfferingId = null;
+  });
+  store.clients.forEach((client) => {
+    if (client.planOfferingId === offeringId) client.planOfferingId = null;
+  });
+  const removed = removeById(store.planOfferings, offeringId, "Plan offering");
+  logAdminAction(store, adminUser, `Deleted plan offering ${removed.planName}`);
+  return removed;
+}
+
 export function adminCreatePackage(store, adminUser, input) {
   requireAdmin(adminUser);
   const pkg = {
@@ -1619,6 +1674,53 @@ export function adminCreatePackage(store, adminUser, input) {
   };
   store.packages.push(pkg);
   return pkg;
+}
+
+export function adminDeletePackage(store, adminUser, packageId) {
+  requireAdmin(adminUser);
+  store.clients.forEach((client) => {
+    if (client.packageId === packageId) {
+      client.packageId = null;
+      client.packageType = "";
+    }
+  });
+  const removed = removeById(store.packages, packageId, "Package");
+  logAdminAction(store, adminUser, `Deleted package ${removed.packageName}`);
+  return removed;
+}
+
+export function adminCreateAssessmentTemplate(store, adminUser, input) {
+  requireAdmin(adminUser);
+  const template = {
+    id: input.id || makeId("assessment_template"),
+    templateName: input.templateName || "New Assessment Template",
+    sportFocus: input.sportFocus || "General Fitness",
+    goal: input.goal || "General",
+    movementTestIds: input.movementTestIds?.length ? [...input.movementTestIds] : movementTests.map((test) => test.id),
+    active: input.active !== false,
+    archived: Boolean(input.archived),
+    createdByAdminId: adminUser.id,
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  store.assessmentTemplates.push(template);
+  logAdminAction(store, adminUser, `Created assessment template ${template.templateName}`);
+  return template;
+}
+
+export function adminUpdateAssessmentTemplate(store, adminUser, templateId, patch) {
+  requireAdmin(adminUser);
+  const template = findById(store.assessmentTemplates, templateId, "Assessment template");
+  Object.assign(template, patch, { updatedAt: nowIso() });
+  logAdminAction(store, adminUser, `Updated assessment template ${template.templateName}`);
+  return template;
+}
+
+export function adminDeleteAssessmentTemplate(store, adminUser, templateId) {
+  requireAdmin(adminUser);
+  const removed = removeById(store.assessmentTemplates, templateId, "Assessment template");
+  logAdminAction(store, adminUser, `Deleted assessment template ${removed.templateName}`);
+  return removed;
 }
 
 export function adminAssignPlanOfferingToPackage(store, adminUser, packageId, planOfferingId) {

@@ -6,6 +6,7 @@ import {
   adminArchiveWorkoutTemplate,
   adminAssignPackageToClient,
   adminAssignPlanOfferingToPackage,
+  adminCreateAssessmentTemplate,
   adminCreateClient,
   adminCreateExercise,
   adminCreatePackage,
@@ -14,12 +15,20 @@ import {
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
   adminInterveneInChat,
+  adminDeleteAssessmentTemplate,
+  adminDeleteClient,
+  adminDeleteCoach,
+  adminDeleteExercise,
+  adminDeletePackage,
+  adminDeletePlanOffering,
+  adminDeleteWorkoutTemplate,
   addProgressImageCoachNote,
   adminReorderWorkoutTemplateItems,
   adminResetUserPin,
   adminSetUserPin,
   adminSetLoginDisabled,
   adminUpdateClient,
+  adminUpdateAssessmentTemplate,
   adminUpdateExercise,
   adminUpdatePlanOffering,
   adminUpdateWorkout,
@@ -176,6 +185,12 @@ const state = {
       planOfferingId: "offering_boxing_3day",
       price: 249,
       sessionsIncluded: 12
+    },
+    assessmentTemplate: {
+      templateName: "",
+      sportFocus: "Boxing",
+      goal: "Conditioning",
+      movementTestIds: movementTests.map((test) => test.id)
     }
   },
   view: "home",
@@ -184,6 +199,7 @@ const state = {
   clientId: "client_ada",
   selectedWorkoutId: null,
   selectedExerciseId: null,
+  selectedAssessmentTemplateId: "assessment_template_default",
   chatDraft: "",
   assessment: blankAssessment("client_ada", today),
   assessmentStep: 0,
@@ -509,8 +525,30 @@ function assessmentPage() {
   const client = selectedClient();
   return `
     <section class="workspace panel">
+      ${assessmentTemplatePicker(client)}
       ${assessmentWizard(client)}
     </section>
+  `;
+}
+
+function assessmentTemplatePicker(client) {
+  const options = assessmentTemplateOptions(client);
+  const selected = selectedAssessmentTemplate(client);
+  return `
+    <article class="card">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">Assessment Template</p>
+          <h3>Pick the screen for this client</h3>
+          <p class="muted">Templates can match the client goal and sport focus. Admin can add more templates.</p>
+        </div>
+        <label>Template
+          <select id="assessmentTemplateSelect">
+            ${options.map((template) => `<option value="${template.id}" ${template.id === selected.id ? "selected" : ""}>${template.templateName}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+    </article>
   `;
 }
 
@@ -682,14 +720,41 @@ function coachView() {
         </div>
       </aside>
       <section class="panel">
+        ${assessmentTemplatePicker(client)}
         ${assessmentWizard(client)}
       </section>
     </section>
   `;
 }
 
+function assessmentTemplateOptions(client) {
+  const active = store.assessmentTemplates.filter((template) => template.active !== false && !template.archived);
+  const sport = String(client.sportFocus || "").toLowerCase();
+  const goal = String(client.goal || "").toLowerCase();
+  const matched = active.filter((template) => {
+    const templateSport = String(template.sportFocus || "").toLowerCase();
+    const templateGoal = String(template.goal || "").toLowerCase();
+    return templateSport.includes(sport.split(" ")[0]) || sport.includes(templateSport.split(" ")[0]) || goal.includes(templateGoal.split(" ")[0]);
+  });
+  return matched.length ? matched : active;
+}
+
+function selectedAssessmentTemplate(client = selectedClient()) {
+  return store.assessmentTemplates.find((template) => template.id === state.selectedAssessmentTemplateId)
+    || assessmentTemplateOptions(client)[0]
+    || store.assessmentTemplates[0];
+}
+
+function currentMovementTests(client = selectedClient()) {
+  const template = selectedAssessmentTemplate(client);
+  const ids = template?.movementTestIds?.length ? template.movementTestIds : movementTests.map((test) => test.id);
+  return movementTests.filter((test) => ids.includes(test.id));
+}
+
 function assessmentWizard(client) {
   const steps = ["Setup", "Safety", "Movement", "Equipment", "Summary", "History"];
+  const template = selectedAssessmentTemplate(client);
+  state.assessment.movementTestIds = template?.movementTestIds || movementTests.map((test) => test.id);
   const summary = summarizeAssessment(state.assessment);
   return `
     <div class="section-head">
@@ -699,6 +764,7 @@ function assessmentWizard(client) {
       </div>
       <span class="badge ${summary.riskLevel === "High" ? "red" : summary.riskLevel === "Medium" ? "orange" : "green"}">${summary.riskLevel}</span>
     </div>
+    <p class="muted">Using template: ${template?.templateName || "Default assessment"}</p>
     <div class="progress">${steps.map((step, index) => `<button class="step ${state.assessmentStep === index ? "active" : ""}" data-step="${index}"><span>${index + 1}</span>${step}</button>`).join("")}</div>
     ${assessmentStep(client, summary)}
     <div class="actions">
@@ -755,7 +821,7 @@ function assessmentStep(client, summary) {
   }
   if (state.assessmentStep === 2) {
     return `<div class="guide">${scoreGuide.map((s) => `<span class="score-guide ${scoreColor(s.score)}">${s.score} ${s.label}</span>`).join("")}</div>
-      <div class="card-list">${movementTests.map(testCard).join("")}</div>`;
+      <div class="card-list">${currentMovementTests(client).map(testCard).join("")}</div>`;
   }
   if (state.assessmentStep === 3) {
     return `<div class="equipment-grid">
@@ -1160,7 +1226,7 @@ function adminView() {
     { label: "Add Workout", panel: "workouts" },
     { label: "Add Plan Offering", panel: "offerings" },
     { label: "Add Package", panel: "packages" },
-    { label: "Add Assessment Template", panel: "overview" },
+    { label: "Add Assessment Template", panel: "assessmentTemplates" },
     { label: "PINs / Security", panel: "security" }
   ];
   return `
@@ -1219,7 +1285,7 @@ function adminView() {
           <label>Notes <textarea data-admin-draft="client:notes">${d.client.notes}</textarea></label>
           <label>Injury / restriction notes <textarea data-admin-draft="client:injuryRestrictionNotes">${d.client.injuryRestrictionNotes}</textarea></label>
           <button class="primary full" id="adminCreateClient">Add New Client</button>
-          <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-client-invite="${client.id}">Invite</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
+          <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-delete-client="${client.id}">Delete</button><button data-client-invite="${client.id}">Invite</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("exercises")}" id="admin-exercise-library-new">
           <h3>Add Exercise</h3>
@@ -1247,7 +1313,7 @@ function adminView() {
           <button class="primary full" id="adminCreateExercise">Add New Exercise</button>
           <input id="adminExerciseExcelInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/tab-separated-values" />
           <button class="success full" id="adminImportExcel">Import Excel Exercise Library</button>
-          <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><input data-exercise-name="${exercise.id}" value="${exercise.exerciseName || exercise.name}" /><button data-save-exercise="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button></div>`).join("")}</div>
+          <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><input data-exercise-name="${exercise.id}" value="${exercise.exerciseName || exercise.name}" /><input data-exercise-video="${exercise.id}" value="${exercise.videoUrl || exercise.youtubeUrl || ""}" placeholder="Video URL" /><button data-save-exercise="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button><button data-delete-exercise="${exercise.id}">Delete</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("workouts")}" id="admin-workouts-new">
           <h3>Add Workout Template</h3>
@@ -1275,7 +1341,7 @@ function adminView() {
             ${adminInput("workoutItem", "rounds", "Rounds", "number")}
           </div>
           <button class="full" id="adminAddWorkoutItem">Add Exercise To Workout</button>
-          <div class="admin-list">${store.workoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><input data-template-name="${workout.id}" value="${workout.workoutName}" /><button data-save-template="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
+          <div class="admin-list">${store.workoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><input data-template-name="${workout.id}" value="${workout.workoutName}" /><button data-save-template="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-delete-template="${workout.id}">Delete</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("offerings")}" id="admin-plan-offerings-new">
           <h3>Add Plan Offering</h3>
@@ -1291,7 +1357,7 @@ function adminView() {
             ${adminInput("planOffering", "packageType", "Package type")}
           </div>
           <button class="primary full" id="adminCreatePlanOffering">Add New Plan Offering</button>
-          <div class="admin-list">${store.planOfferings.map((offering) => `<div class="admin-row"><span>${offering.planName} / ${offering.trainingLevel || offering.planLevel} / $${offering.price}</span><input data-offering-name="${offering.id}" value="${offering.planName}" /><button data-save-offering="${offering.id}">Edit</button><button data-archive-offering="${offering.id}">Archive</button></div>`).join("")}</div>
+          <div class="admin-list">${store.planOfferings.map((offering) => `<div class="admin-row"><span>${offering.planName} / ${offering.trainingLevel || offering.planLevel} / $${offering.price}</span><input data-offering-name="${offering.id}" value="${offering.planName}" /><button data-save-offering="${offering.id}">Edit</button><button data-archive-offering="${offering.id}">Archive</button><button data-delete-offering="${offering.id}">Delete</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("packages")}" id="admin-packages-new">
           <h3>Add Package</h3>
@@ -1303,11 +1369,27 @@ function adminView() {
           </div>
           <button class="primary full" id="adminCreatePackage">Add Package</button>
           <button class="success full" id="adminAssignPackage">Assign Selected Package To Selected Client</button>
-          <div class="admin-list">${store.packages.map((pkg) => `<div class="admin-row"><span>${pkg.packageName} / ${store.planOfferings.find((offering) => offering.id === pkg.planOfferingId)?.planName || "No offering"}</span><button data-package-offering="${pkg.id}">Connect Offering</button></div>`).join("")}</div>
+          <div class="admin-list">${store.packages.map((pkg) => `<div class="admin-row"><span>${pkg.packageName} / ${store.planOfferings.find((offering) => offering.id === pkg.planOfferingId)?.planName || "No offering"}</span><button data-package-offering="${pkg.id}">Connect Offering</button><button data-delete-package="${pkg.id}">Delete</button></div>`).join("")}</div>
+        </article>
+        <article class="card admin-card ${adminPanelClass("assessmentTemplates")}" id="admin-assessment-templates-new">
+          <h3>Add Assessment Template</h3>
+          <div class="form-grid">
+            ${adminInput("assessmentTemplate", "templateName", "Template name")}
+            ${adminSelect("assessmentTemplate", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
+            ${adminInput("assessmentTemplate", "goal", "Goal")}
+          </div>
+          <h4>Movement tests in this template</h4>
+          <div class="chip-grid">
+            ${movementTests.map((test) => `<button class="chip-toggle ${d.assessmentTemplate.movementTestIds.includes(test.id) ? "active" : ""}" data-template-test="${test.id}">${test.name}</button>`).join("")}
+          </div>
+          <button class="primary full" id="adminCreateAssessmentTemplate">Add Assessment Template</button>
+          <div class="admin-list">${store.assessmentTemplates.map((template) => `<div class="admin-row"><span>${template.templateName} / ${template.sportFocus || "Any sport"} / ${template.movementTestIds?.length || 0} tests</span><input data-assessment-template-name="${template.id}" value="${template.templateName}" /><button data-save-assessment-template="${template.id}">Edit</button><button data-delete-assessment-template="${template.id}">Delete</button></div>`).join("")}</div>
         </article>
         <article class="card ${adminPanelClass("security")}">
           <h3>User Passwords</h3>
           ${store.users.map((user) => `<div class="admin-row"><span>${user.name} / ${user.role}${user.forcePinChange ? " / must change PIN" : ""}${user.disabled ? " / disabled" : ""}</span><input data-pin-user="${user.id}" inputmode="numeric" placeholder="New numeric PIN" /><button data-save-pin="${user.id}">Set PIN</button><button data-temp-pin="${user.id}">Temp PIN</button><button data-toggle-login="${user.id}">${user.disabled ? "Reactivate" : "Disable"}</button></div>`).join("")}
+          <h3>Coaches</h3>
+          ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name}</span><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
         </article>
         <article class="card ${adminPanelClass("invites")}">
           <h3>Invite Codes</h3>
@@ -1488,8 +1570,15 @@ function bindGlobal() {
   document.querySelector("#clientSelect")?.addEventListener("change", (event) => {
     changeSelectedClient(event.target.value);
   });
+  document.querySelector("#assessmentTemplateSelect")?.addEventListener("change", (event) => {
+    state.selectedAssessmentTemplateId = event.target.value;
+    const template = selectedAssessmentTemplate();
+    state.assessment.movementTestIds = template?.movementTestIds || movementTests.map((test) => test.id);
+    render();
+  });
   document.querySelector("#startAssessment")?.addEventListener("click", () => {
     state.assessment = blankAssessment(state.clientId, today);
+    state.assessment.movementTestIds = selectedAssessmentTemplate()?.movementTestIds || movementTests.map((test) => test.id);
     state.assessmentStep = 0;
     render();
   });
@@ -1571,13 +1660,22 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#submitDaily")?.addEventListener("click", () => {
+    const alreadyCheckedIn = store.dailyCheckIns.some((item) => item.clientId === state.clientId && item.workoutDate === state.daily.workoutDate);
+    if (alreadyCheckedIn) {
+      window.alert("You already checked in for today.");
+      return;
+    }
     state.daily.painCheckIn.painStartedToday = document.querySelector("#painStartedToday")?.checked || false;
     state.daily.painCheckIn.painWorseWithMovement = document.querySelector("#painWorse")?.checked || false;
     state.daily.painCheckIn.feelsSafeToTrain = document.querySelector("#safeTrain")?.checked ?? true;
     state.daily.painCheckIn.painNotes = document.querySelector("#dailyPainNotes")?.value || "";
-    saveDailyCheckIn(store, { ...state.daily, clientId: state.clientId });
-    state.view = "client";
-    render();
+    try {
+      saveDailyCheckIn(store, { ...state.daily, clientId: state.clientId });
+      state.view = "client";
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
   });
   document.querySelectorAll("[data-alert-decision]").forEach((button) => button.addEventListener("click", () => {
     const [alertId, decision] = button.dataset.alertDecision.split(":");
@@ -1719,6 +1817,12 @@ function bindGlobal() {
     adminArchiveClient(store, state.currentUser, button.dataset.archiveClient);
     render();
   }));
+  document.querySelectorAll("[data-delete-client]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this client and their linked app records?")) return;
+    adminDeleteClient(store, state.currentUser, button.dataset.deleteClient);
+    state.clientId = store.clients[0]?.id || state.clientId;
+    render();
+  }));
   document.querySelectorAll("[data-client-invite]").forEach((button) => button.addEventListener("click", () => {
     const client = store.clients.find((item) => item.id === button.dataset.clientInvite);
     createInviteCode(store, state.currentUser, { roleAllowed: "CLIENT", email: client.email, phone: client.phone, clientId: client.id });
@@ -1752,11 +1856,17 @@ function bindGlobal() {
   });
   document.querySelectorAll("[data-save-exercise]").forEach((button) => button.addEventListener("click", () => {
     const exerciseName = document.querySelector(`[data-exercise-name="${button.dataset.saveExercise}"]`).value;
-    adminUpdateExercise(store, state.currentUser, button.dataset.saveExercise, { exerciseName, name: exerciseName });
+    const videoUrl = document.querySelector(`[data-exercise-video="${button.dataset.saveExercise}"]`)?.value || "";
+    adminUpdateExercise(store, state.currentUser, button.dataset.saveExercise, { exerciseName, name: exerciseName, videoUrl, youtubeUrl: videoUrl });
     render();
   }));
   document.querySelectorAll("[data-archive-exercise]").forEach((button) => button.addEventListener("click", () => {
     adminArchiveExercise(store, state.currentUser, button.dataset.archiveExercise);
+    render();
+  }));
+  document.querySelectorAll("[data-delete-exercise]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this exercise and remove it from templates?")) return;
+    adminDeleteExercise(store, state.currentUser, button.dataset.deleteExercise);
     render();
   }));
   document.querySelector("#adminCreateWorkout")?.addEventListener("click", () => {
@@ -1782,6 +1892,11 @@ function bindGlobal() {
     adminArchiveWorkoutTemplate(store, state.currentUser, button.dataset.archiveTemplate);
     render();
   }));
+  document.querySelectorAll("[data-delete-template]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this workout template?")) return;
+    adminDeleteWorkoutTemplate(store, state.currentUser, button.dataset.deleteTemplate);
+    render();
+  }));
   document.querySelectorAll("[data-reorder-template]").forEach((button) => button.addEventListener("click", () => {
     const items = store.workoutTemplateItems.filter((item) => item.workoutTemplateId === button.dataset.reorderTemplate).sort((a, b) => b.displayOrder - a.displayOrder);
     adminReorderWorkoutTemplateItems(store, state.currentUser, button.dataset.reorderTemplate, items.map((item) => item.id));
@@ -1803,12 +1918,22 @@ function bindGlobal() {
     adminArchivePlanOffering(store, state.currentUser, button.dataset.archiveOffering);
     render();
   }));
+  document.querySelectorAll("[data-delete-offering]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this plan offering?")) return;
+    adminDeletePlanOffering(store, state.currentUser, button.dataset.deleteOffering);
+    render();
+  }));
   document.querySelector("#adminCreatePackage")?.addEventListener("click", () => {
     adminCreatePackage(store, state.currentUser, state.adminDrafts.package);
     render();
   });
   document.querySelectorAll("[data-package-offering]").forEach((button) => button.addEventListener("click", () => {
     adminAssignPlanOfferingToPackage(store, state.currentUser, button.dataset.packageOffering, state.adminDrafts.package.planOfferingId);
+    render();
+  }));
+  document.querySelectorAll("[data-delete-package]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this package?")) return;
+    adminDeletePackage(store, state.currentUser, button.dataset.deletePackage);
     render();
   }));
   document.querySelector("#adminAssignPackage")?.addEventListener("click", () => {
@@ -1830,6 +1955,30 @@ function bindGlobal() {
   document.querySelectorAll("[data-toggle-login]").forEach((button) => button.addEventListener("click", () => {
     const user = store.users.find((item) => item.id === button.dataset.toggleLogin);
     adminSetLoginDisabled(store, state.currentUser, user.id, !user.disabled);
+    render();
+  }));
+  document.querySelectorAll("[data-delete-coach]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this coach login/profile and reassign their clients?")) return;
+    adminDeleteCoach(store, state.currentUser, button.dataset.deleteCoach);
+    render();
+  }));
+  document.querySelectorAll("[data-template-test]").forEach((button) => button.addEventListener("click", () => {
+    toggleArrayNoRender(state.adminDrafts.assessmentTemplate.movementTestIds, button.dataset.templateTest);
+    render();
+  }));
+  document.querySelector("#adminCreateAssessmentTemplate")?.addEventListener("click", () => {
+    adminCreateAssessmentTemplate(store, state.currentUser, state.adminDrafts.assessmentTemplate);
+    render();
+  });
+  document.querySelectorAll("[data-save-assessment-template]").forEach((button) => button.addEventListener("click", () => {
+    const templateName = document.querySelector(`[data-assessment-template-name="${button.dataset.saveAssessmentTemplate}"]`).value;
+    adminUpdateAssessmentTemplate(store, state.currentUser, button.dataset.saveAssessmentTemplate, { templateName });
+    render();
+  }));
+  document.querySelectorAll("[data-delete-assessment-template]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Delete this assessment template?")) return;
+    adminDeleteAssessmentTemplate(store, state.currentUser, button.dataset.deleteAssessmentTemplate);
+    if (state.selectedAssessmentTemplateId === button.dataset.deleteAssessmentTemplate) state.selectedAssessmentTemplateId = store.assessmentTemplates[0]?.id || "";
     render();
   }));
   document.querySelector("#createInviteButton")?.addEventListener("click", () => {
@@ -2202,5 +2351,11 @@ function toggleArray(array, value) {
   if (index >= 0) array.splice(index, 1);
   else array.push(value);
   render();
+}
+
+function toggleArrayNoRender(array, value) {
+  const index = array.indexOf(value);
+  if (index >= 0) array.splice(index, 1);
+  else array.push(value);
 }
 

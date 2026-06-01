@@ -9,11 +9,19 @@ import {
   adminArchiveExercise,
   adminAssignPackageToClient,
   adminAssignPlanOfferingToPackage,
+  adminCreateAssessmentTemplate,
   adminCreateClient,
   adminCreateExercise,
   adminCreatePackage,
   adminCreatePlanOffering,
   adminCreateWorkoutTemplate,
+  adminDeleteAssessmentTemplate,
+  adminDeleteClient,
+  adminDeleteCoach,
+  adminDeleteExercise,
+  adminDeletePackage,
+  adminDeletePlanOffering,
+  adminDeleteWorkoutTemplate,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
   adminReorderWorkoutTemplateItems,
@@ -336,6 +344,12 @@ test("client can submit daily check-in before workout", () => {
   assert.equal(result.dailyCheckIn.painCheckInId, store.painCheckIns[0].id);
 });
 
+test("client can only submit one daily check-in per day", () => {
+  const store = createStore();
+  saveDailyCheckIn(store, daily());
+  assert.throws(() => saveDailyCheckIn(store, daily()), /already checked in/i);
+});
+
 test("poor daily check-in creates today-only adjusted workout", () => {
   const store = createStore();
   const result = saveDailyCheckIn(store, daily({ energyScore: 2 }));
@@ -424,7 +438,7 @@ test("coach can accept suggested workouts even when reassessment level stays the
 test("multiple poor daily check-ins create a coach alert", () => {
   const store = createStore();
   saveDailyCheckIn(store, daily({ energyScore: 1 }));
-  saveDailyCheckIn(store, daily({ id: "daily_two", energyScore: 1 }));
+  saveDailyCheckIn(store, daily({ id: "daily_two", workoutDate: "2026-05-30", energyScore: 1 }));
   assert.equal(store.coachAlerts.some((alert) => alert.alertReason.includes("Multiple poor check-ins")), true);
 });
 
@@ -432,7 +446,7 @@ test("multiple strong daily check-ins create a coach-ready trend signal without 
   const store = createStore();
   const beforePlan = JSON.stringify(store.monthlyPlans.find((p) => p.id === "plan_ada_active"));
   saveDailyCheckIn(store, daily({ energyScore: 5, painScore: 1, sleepScore: 5, sorenessScore: 1, readinessScore: 5 }));
-  saveDailyCheckIn(store, daily({ id: "daily_strong_two", energyScore: 5, painScore: 1, sleepScore: 5, sorenessScore: 1, readinessScore: 5 }));
+  saveDailyCheckIn(store, daily({ id: "daily_strong_two", workoutDate: "2026-05-30", energyScore: 5, painScore: 1, sleepScore: 5, sorenessScore: 1, readinessScore: 5 }));
   assert.equal(JSON.stringify(store.monthlyPlans.find((p) => p.id === "plan_ada_active")), beforePlan);
 });
 
@@ -519,7 +533,7 @@ test("coach alert does not change the monthly plan", () => {
 test("multiple poor alerts suggest reassessment", () => {
   const store = createStore();
   saveDailyCheckIn(store, daily({ painScore: 4 }));
-  saveDailyCheckIn(store, daily({ id: "daily_three", painScore: 4 }));
+  saveDailyCheckIn(store, daily({ id: "daily_three", workoutDate: "2026-05-30", painScore: 4 }));
   assert.equal(store.coachAlerts.some((alert) => alert.alertReason.includes("reassessment")), true);
 });
 
@@ -987,6 +1001,15 @@ test("admin can create, edit, and archive a new client", () => {
   assert.equal(store.clients.find((item) => item.id === client.id).status, "Archived");
 });
 
+test("admin can delete a client and linked records", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  adminDeleteClient(store, admin, "client_ada");
+  assert.equal(store.clients.some((client) => client.id === "client_ada"), false);
+  assert.equal(store.monthlyPlans.some((plan) => plan.clientId === "client_ada"), false);
+  assert.equal(store.users.some((user) => user.linkedId === "client_ada"), false);
+});
+
 test("admin can create, edit, and archive an exercise", () => {
   const store = createStore();
   const admin = authenticateUser(store, "Admin", "9999");
@@ -1008,6 +1031,43 @@ test("admin can create, edit, and archive an exercise", () => {
   assert.equal(store.exercises.find((item) => item.id === exercise.id).trainingLevel, "Intermediate");
   adminArchiveExercise(store, admin, exercise.id);
   assert.equal(store.exercises.find((item) => item.id === exercise.id).archived, true);
+});
+
+test("admin can delete exercises, workout templates, plan offerings, packages, and coaches", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const exercise = adminCreateExercise(store, admin, { exerciseName: "Delete Me Drill" });
+  const workout = adminCreateWorkoutTemplate(store, admin, { workoutName: "Delete Me Workout" });
+  adminAddExerciseToWorkoutTemplate(store, admin, workout.id, { exerciseId: exercise.id });
+  const offering = adminCreatePlanOffering(store, admin, { planName: "Delete Me Offering", workoutTemplateIds: [workout.id] });
+  const pkg = adminCreatePackage(store, admin, { packageName: "Delete Me Package", planOfferingId: offering.id });
+  store.coaches.push({ id: "coach_delete", name: "Delete Coach", role: "Coach" });
+  store.users.push({ id: "coach_user_delete", role: "Coach", name: "Delete Coach", linkedId: "coach_delete" });
+  adminDeleteExercise(store, admin, exercise.id);
+  adminDeleteWorkoutTemplate(store, admin, workout.id);
+  adminDeletePlanOffering(store, admin, offering.id);
+  adminDeletePackage(store, admin, pkg.id);
+  adminDeleteCoach(store, admin, "coach_delete");
+  assert.equal(store.exercises.some((item) => item.id === exercise.id), false);
+  assert.equal(store.workoutTemplates.some((item) => item.id === workout.id), false);
+  assert.equal(store.planOfferings.some((item) => item.id === offering.id), false);
+  assert.equal(store.packages.some((item) => item.id === pkg.id), false);
+  assert.equal(store.coaches.some((item) => item.id === "coach_delete"), false);
+});
+
+test("admin can create and delete assessment templates", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const template = adminCreateAssessmentTemplate(store, admin, {
+    templateName: "Boxing Power Assessment",
+    sportFocus: "Boxing",
+    goal: "Power",
+    movementTestIds: ["push", "pull", "core", "conditioning"]
+  });
+  const summary = summarizeAssessment({ ...blankAssessment("client_ada"), movementTestIds: template.movementTestIds, movementScores: allScores(4) });
+  assert.equal(summary.movementTestIds.length, 4);
+  adminDeleteAssessmentTemplate(store, admin, template.id);
+  assert.equal(store.assessmentTemplates.some((item) => item.id === template.id), false);
 });
 
 test("admin can create a workout, add exercises, and reorder workout items", () => {
