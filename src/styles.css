@@ -1137,7 +1137,7 @@ dd {
   display: grid;
   place-items: center;
   padding: 22px;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.84);
 }
 
 .modal-card {
@@ -1146,9 +1146,37 @@ dd {
   overflow: auto;
   border: 1px solid rgba(214, 178, 77, 0.55);
   border-radius: 8px;
-  background: var(--surface);
+  background: #fffdf6;
+  color: var(--ink);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
   padding: 18px;
+}
+
+.modal-card h2,
+.modal-card h3,
+.modal-card h4,
+.modal-card label,
+.modal-card p,
+.modal-card span {
+  color: var(--ink);
+}
+
+.modal-card .eyebrow {
+  color: var(--purple);
+}
+
+.modal-card input,
+.modal-card select,
+.modal-card textarea {
+  background: #fff;
+  color: var(--ink);
+  border-color: #b9aa72;
+}
+
+.modal-card .admin-row,
+.modal-card .card,
+.modal-card .mini-workout {
+  background: #ffffff;
 }
 
 .large-modal {
