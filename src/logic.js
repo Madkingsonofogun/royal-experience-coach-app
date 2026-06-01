@@ -1123,7 +1123,184 @@ export function authenticateUser(store, identifierOrRole, pin, optionalPin = nul
     if (role) return user.role === role;
     return [user.email, user.phone].filter(Boolean).map((value) => String(value).toLowerCase()).includes(identifier);
   });
-  return candidates.find((user) => user.pinHash === hashPin(pinValue, user.pinSalt)) || null;
+  const matched = candidates.find((user) => user.pinHash === hashPin(pinValue, user.pinSalt));
+  if (!matched) return null;
+  if (matched.accountLocked || ["Pending", "Rejected", "Suspended", "Archived"].includes(matched.accountStatus)) return null;
+  return matched;
+}
+
+export function loginBlockedMessage(store, identifierOrRole, pin, optionalPin = null) {
+  const legacyRoles = ["Admin", "Coach", "Client"];
+  const role = optionalPin == null && legacyRoles.includes(identifierOrRole) ? identifierOrRole : null;
+  const identifier = role ? null : String(identifierOrRole || "").toLowerCase();
+  const pinValue = String(role ? pin : pin || "");
+  const user = store.users.find((item) => {
+    if (role && item.role !== role) return false;
+    if (!role && ![item.email, item.phone].filter(Boolean).map((value) => String(value).toLowerCase()).includes(identifier)) return false;
+    return item.pinHash === hashPin(pinValue, item.pinSalt);
+  });
+  if (!user) return "PIN or account type did not match.";
+  if (user.accountStatus === "Pending") return "Your account is waiting for Admin approval. Please check back later or contact Admin.";
+  if (user.accountStatus === "Rejected") return "Your account request was not approved. Please contact Admin.";
+  if (user.accountStatus === "Suspended") return "Your account is suspended. Please contact Admin.";
+  if (user.accountStatus === "Archived") return "This account is archived. Please contact Admin.";
+  if (user.accountLocked) return "Your account is waiting for Admin approval. Please check back later or contact Admin.";
+  if (user.disabled) return "This login is disabled. Please contact Admin.";
+  return "PIN or account type did not match.";
+}
+
+export function requestLockedAccount(store, input) {
+  const requested = normalizeRole(input.accountType || input.requestedRole);
+  if (requested === "ADMIN") throw new Error("Admin accounts cannot be created from the public signup page.");
+  if (!["CLIENT", "COACH"].includes(requested)) throw new Error("Choose Client or Coach account request.");
+  validateNumericPin(input.pin, input.confirmPin);
+  const email = String(input.email || "").toLowerCase();
+  const phone = String(input.phone || "");
+  if (store.users.some((user) => [user.email, user.phone].filter(Boolean).some((value) => String(value).toLowerCase() === email || String(value) === phone))) {
+    throw new Error("An account already exists for this email or phone.");
+  }
+  const fullName = input.fullName || `${input.firstName || ""} ${input.lastName || ""}`.trim();
+  const pinSalt = makeId("salt");
+  const user = {
+    id: makeId(requested === "CLIENT" ? "client_user" : "coach_user"),
+    role: requested === "CLIENT" ? "Client" : "Coach",
+    name: fullName,
+    firstName: input.firstName || fullName.split(" ")[0] || "",
+    lastName: input.lastName || fullName.split(" ").slice(1).join(" "),
+    email,
+    phone,
+    pinSalt,
+    pinHash: hashPin(input.pin, pinSalt),
+    linkedId: null,
+    accountLocked: true,
+    accountStatus: "Pending",
+    profileLocked: true,
+    requestedRole: requested === "CLIENT" ? "Client" : "Coach",
+    requestNote: input.requestNote || "",
+    requestDetails: {
+      goal: input.goal || "",
+      sportFocus: input.sportFocus || "",
+      alreadyTrainsWithCoach: Boolean(input.alreadyTrainsWithCoach),
+      coachNameIfKnown: input.coachNameIfKnown || "",
+      coachTitle: input.coachTitle || "",
+      experience: input.experience || "",
+      coachRequestReason: input.coachRequestReason || ""
+    },
+    emailVerified: false,
+    forcePinChange: false,
+    temporaryPinExpiresAt: null,
+    disabled: false,
+    profileImageUrl: "",
+    profileImageStorageKey: "",
+    profileImageUploadedAt: null,
+    createdAt: nowIso()
+  };
+  store.users.push(user);
+  logAdminAction(store, { id: "public", role: "Public", name: fullName }, `User submitted ${user.requestedRole} account request for ${fullName}`);
+  return user;
+}
+
+export function getAccountRequests(store, adminUser, filter = "Pending") {
+  requireAdmin(adminUser);
+  return store.users.filter((user) => {
+    if (!["Client", "Coach"].includes(user.requestedRole || user.role)) return false;
+    if (filter === "All") return true;
+    if (filter === "Locked") return user.accountLocked;
+    if (filter === "Client" || filter === "Coach") return (user.requestedRole || user.role) === filter;
+    return (user.accountStatus || "Active") === filter;
+  });
+}
+
+export function adminReviewAccountRequest(store, adminUser, targetUserId, action, options = {}) {
+  requireAdmin(adminUser);
+  const user = findById(store.users, targetUserId, "User");
+  const requestedRole = options.requestedRole || user.requestedRole || user.role;
+  if (requestedRole === "Admin") throw new Error("Admin accounts cannot be approved from public requests.");
+  if (options.requestedRole && options.requestedRole !== user.requestedRole) {
+    user.requestedRole = options.requestedRole;
+    user.role = options.requestedRole;
+    logAdminAction(store, adminUser, `Changed requested role for ${user.name} to ${options.requestedRole}`);
+  }
+  if (action === "Reject") {
+    Object.assign(user, { accountStatus: "Rejected", accountLocked: true, accountLockReason: options.reason || "Rejected by Admin" });
+  } else if (action === "Archive") {
+    Object.assign(user, { accountStatus: "Archived", accountLocked: true, accountLockReason: options.reason || "Archived by Admin" });
+  } else if (action === "Lock") {
+    Object.assign(user, { accountLocked: true, accountStatus: options.status || "Suspended", accountLockReason: options.reason || "Locked by Admin" });
+  } else {
+    approveRequestedUserProfile(store, adminUser, user, options);
+    user.accountLocked = false;
+    user.accountStatus = "Active";
+    user.accountUnlockedByAdminId = adminUser.id;
+    user.accountUnlockedAt = nowIso();
+    user.accountLockReason = "";
+    user.profileLocked = options.unlockProfile ? false : true;
+  }
+  logAdminAction(store, adminUser, `${action} account request for ${user.name}`);
+  return user;
+}
+
+function approveRequestedUserProfile(store, adminUser, user, options) {
+  if ((user.requestedRole || user.role) === "Client") {
+    let client = user.linkedId ? store.clients.find((item) => item.id === user.linkedId) : null;
+    if (!client) {
+      client = {
+        id: makeId("client"),
+        coachId: options.coachId || "coach_1",
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        goal: user.requestDetails?.goal || "",
+        sportFocus: user.requestDetails?.sportFocus || "",
+        trainingDaysPerWeek: Number(options.trainingDaysPerWeek || 3),
+        sessionLength: Number(options.sessionLength || 45),
+        packageType: "",
+        sessionsRemaining: 0,
+        startDate: todayIso(),
+        status: "Active",
+        injuryNotes: "",
+        equipmentAvailable: [],
+        progressNotes: "",
+        currentTrainingLevel: "Beginner",
+        currentRestrictions: [],
+        currentAdjustmentMode: "Normal",
+        profileLocked: !options.unlockProfile,
+        profileUnlockedByAdminId: options.unlockProfile ? adminUser.id : null,
+        profileUnlockedAt: options.unlockProfile ? nowIso() : null,
+        profileLockReason: options.unlockProfile ? "" : "Locked until Admin unlocks profile editing.",
+        createdByAdminId: adminUser.id,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      };
+      store.clients.push(client);
+    }
+    user.linkedId = client.id;
+    client.profileLocked = !options.unlockProfile;
+  } else if ((user.requestedRole || user.role) === "Coach") {
+    let coach = user.linkedId ? store.coaches.find((item) => item.id === user.linkedId) : null;
+    if (!coach) {
+      coach = {
+        id: makeId("coach"),
+        name: user.name,
+        role: "Coach",
+        email: user.email,
+        phone: user.phone,
+        specialty: user.requestDetails?.coachTitle || "",
+        experience: user.requestDetails?.experience || "",
+        permissions: options.permissions || {},
+        profileLocked: !options.unlockProfile,
+        profileUnlockedByAdminId: options.unlockProfile ? adminUser.id : null,
+        profileUnlockedAt: options.unlockProfile ? nowIso() : null,
+        profileLockReason: options.unlockProfile ? "" : "Locked until Admin unlocks profile editing.",
+        createdByAdminId: adminUser.id,
+        createdAt: nowIso()
+      };
+      store.coaches.push(coach);
+    }
+    user.linkedId = coach.id;
+    user.coachPermissions = options.permissions || {};
+    coach.profileLocked = !options.unlockProfile;
+  }
 }
 
 export function visibleClientsForUser(store, user) {
@@ -1365,7 +1542,6 @@ export function adminCreateClient(store, adminUser, input) {
     notes: input.notes || "",
     injuryNotes: input.injuryRestrictionNotes || input.injuryNotes || "",
     emergencyContact: input.emergencyContact || "",
-    inviteCode: input.clientInviteCode || input.inviteCode || "",
     equipmentAvailable: input.equipmentAvailable || [],
     sessionsRemaining: Number(input.sessionsRemaining || 0),
     progressNotes: input.progressNotes || "",

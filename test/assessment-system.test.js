@@ -38,10 +38,10 @@ import {
   clientOwnsRecord,
   coachCanSeeClient,
   createReassessmentDraftIfNeeded,
-  createInviteCode,
   filterExercisesForAssessment,
   filterExerciseLibrary,
   getAdminAlerts,
+  getAccountRequests,
   getClientDashboard,
   getClientVisiblePlan,
   getCoachAlerts,
@@ -52,11 +52,13 @@ import {
   getTodayWorkoutForClient,
   getWorkoutDetailForUser,
   generateMonthlyPlanFromPlanOffering,
+  loginBlockedMessage,
   markNotificationsRead,
   resolveCoachAlert,
+  requestLockedAccount,
   saveAssessment,
+  adminReviewAccountRequest,
   sendChatMessage,
-  signUpWithInvite,
   saveDailyCheckIn,
   saveWeeklyCheckIn,
   searchExerciseLibrary,
@@ -754,194 +756,150 @@ test("admin can intervene in chat", () => {
   assert.equal(store.adminAuditLog.at(-1).action, "Intervened in chat for client_ada");
 });
 
-test("client can sign up with valid client invite", () => {
+test("public user can request Client account without invite code", () => {
   const store = createStore();
-  const user = signUpWithInvite(store, {
+  const user = requestLockedAccount(store, {
+    firstName: "New",
+    lastName: "Client",
     fullName: "New Client",
     email: "newclient@example.com",
     phone: "5554444444",
     accountType: "Client",
-    inviteCode: "NEWCLIENT",
     pin: "1234",
-    confirmPin: "1234"
+    confirmPin: "1234",
+    goal: "Boxing conditioning",
+    sportFocus: "Boxing"
   });
   assert.equal(user.role, "Client");
-  assert.equal(user.linkedId, "client_ada");
+  assert.equal(user.accountStatus, "Pending");
+  assert.equal(user.accountLocked, true);
+  assert.equal(user.profileLocked, true);
 });
 
-test("client cannot sign up as Coach using client invite", () => {
+test("public user can request Coach account without invite code", () => {
   const store = createStore();
-  assert.throws(() => signUpWithInvite(store, {
-    fullName: "Wrong Role",
-    email: "newclient@example.com",
-    phone: "5554444444",
-    accountType: "Coach",
-    inviteCode: "NEWCLIENT",
-    pin: "1234",
-    confirmPin: "1234"
-  }), /Invite code role does not match/);
-});
-
-test("random user cannot create Coach account", () => {
-  const store = createStore();
-  assert.throws(() => signUpWithInvite(store, {
-    fullName: "Random Coach",
-    email: "random@example.com",
-    phone: "5558888888",
-    accountType: "Coach",
-    inviteCode: "",
-    pin: "1234",
-    confirmPin: "1234"
-  }), /not authorized/);
-});
-
-test("coach can sign up only with valid Admin-created coach invite", () => {
-  const store = createStore();
-  const user = signUpWithInvite(store, {
+  const user = requestLockedAccount(store, {
     fullName: "New Coach",
     email: "newcoach@example.com",
     phone: "5557777777",
     accountType: "Coach",
-    inviteCode: "COACH2026",
     pin: "6543",
-    confirmPin: "6543"
+    confirmPin: "6543",
+    coachTitle: "Boxing coach",
+    coachRequestReason: "Need coach dashboard access"
   });
   assert.equal(user.role, "Coach");
-  assert.equal(user.linkedId, "coach_1");
-});
-
-test("expired coach invite cannot be used", () => {
-  const store = createStore();
-  const invite = store.inviteCodes.find((item) => item.code === "COACH2026");
-  invite.expiresAt = "2000-01-01T00:00:00.000Z";
-  assert.throws(() => signUpWithInvite(store, {
-    fullName: "Late Coach",
-    email: "newcoach@example.com",
-    phone: "5557777777",
-    accountType: "Coach",
-    inviteCode: "COACH2026",
-    pin: "6543",
-    confirmPin: "6543"
-  }), /expired/);
-});
-
-test("used coach invite cannot be reused", () => {
-  const store = createStore();
-  const signup = {
-    fullName: "New Coach",
-    email: "newcoach@example.com",
-    phone: "5557777777",
-    accountType: "Coach",
-    inviteCode: "COACH2026",
-    pin: "6543",
-    confirmPin: "6543"
-  };
-  signUpWithInvite(store, signup);
-  assert.throws(() => signUpWithInvite(store, { ...signup, email: "newcoach2@example.com", phone: "5557777778" }), /already been used/);
+  assert.equal(user.accountStatus, "Pending");
+  assert.equal(user.accountLocked, true);
 });
 
 test("Admin account cannot be created from public signup", () => {
   const store = createStore();
-  assert.throws(() => signUpWithInvite(store, {
+  assert.throws(() => requestLockedAccount(store, {
     fullName: "Public Admin",
     email: "publicadmin@example.com",
     phone: "55599999",
     accountType: "Admin",
-    inviteCode: "COACH2026",
     pin: "1234",
     confirmPin: "1234"
   }), /Admin accounts cannot be created/);
 });
 
-test("invite code role must match requested signup type", () => {
-  const store = createStore();
-  assert.throws(() => signUpWithInvite(store, {
-    fullName: "Role Mismatch",
-    email: "newcoach@example.com",
-    phone: "5557777777",
-    accountType: "Client",
-    inviteCode: "COACH2026",
-    pin: "1234",
-    confirmPin: "1234"
-  }), /role does not match/);
-});
-
-test("email and phone must match restricted invite", () => {
-  const store = createStore();
-  assert.throws(() => signUpWithInvite(store, {
-    fullName: "Mismatch",
-    email: "wrong@example.com",
-    phone: "5557777777",
-    accountType: "Coach",
-    inviteCode: "COACH2026",
-    pin: "1234",
-    confirmPin: "1234"
-  }), /email does not match/);
-});
-
-test("client cannot create login without valid invite or matching profile", () => {
-  const store = createStore();
-  assert.throws(() => signUpWithInvite(store, {
-    fullName: "Unknown Client",
-    email: "unknown@example.com",
-    phone: "5551212121",
-    accountType: "Client",
-    inviteCode: "",
-    pin: "1234",
-    confirmPin: "1234"
-  }), /could not be matched/);
-});
-
-test("client can create login by matching existing profile email without invite", () => {
-  const store = createStore();
-  store.users = store.users.filter((user) => user.linkedId !== "client_ada");
-  const user = signUpWithInvite(store, {
-    fullName: "Ada Johnson",
-    email: "ada@example.com",
-    phone: "55511111",
-    accountType: "Client",
-    inviteCode: "",
-    pin: "1234",
-    confirmPin: "1234"
-  });
-  assert.equal(user.linkedId, "client_ada");
-});
-
-test("numeric PIN validation rejects letters, symbols, short PINs, and mismatches", () => {
+test("PIN is exactly 4 digits, numeric only, and must match", () => {
   assert.throws(() => validateNumericPin("123abc", "123abc"), /numbers only/);
-  assert.throws(() => validateNumericPin("123!56", "123!56"), /numbers only/);
+  assert.throws(() => validateNumericPin("123!", "123!"), /numbers only/);
   assert.throws(() => validateNumericPin("123", "123"), /exactly 4/);
+  assert.throws(() => validateNumericPin("12345", "12345"), /exactly 4/);
   assert.throws(() => validateNumericPin("1234", "1235"), /must match/);
 });
 
-test("PIN is hashed and never stored as plain text", () => {
+test("PIN is hashed and pending users cannot log in before Admin unlocks", () => {
   const store = createStore();
-  const user = signUpWithInvite(store, {
-    fullName: "New Client",
-    email: "newclient@example.com",
-    phone: "5554444444",
+  const user = requestLockedAccount(store, {
+    fullName: "New Coach",
+    email: "newcoach@example.com",
+    phone: "5557777777",
     accountType: "Client",
-    inviteCode: "NEWCLIENT",
     pin: "1234",
     confirmPin: "1234"
   });
   assert.equal(user.pin, undefined);
   assert.notEqual(user.pinHash, "1234");
-  assert.equal(authenticateUser(store, "newclient@example.com", "1234").id, user.id);
+  assert.equal(authenticateUser(store, "newcoach@example.com", "1234"), null);
+  assert.match(loginBlockedMessage(store, "newcoach@example.com", "1234"), /waiting for Admin approval/);
 });
 
-test("invite code is marked used after account creation", () => {
+test("Admin dashboard can list, approve, reject, and archive account requests", () => {
   const store = createStore();
-  signUpWithInvite(store, {
+  const admin = authenticateUser(store, "Admin", "9999");
+  const client = requestLockedAccount(store, {
     fullName: "New Client",
     email: "newclient@example.com",
     phone: "5554444444",
     accountType: "Client",
-    inviteCode: "NEWCLIENT",
+    pin: "1234",
+    confirmPin: "1234",
+    goal: "Conditioning",
+    sportFocus: "Boxing"
+  });
+  const coach = requestLockedAccount(store, {
+    fullName: "New Coach",
+    email: "newcoach@example.com",
+    phone: "5557777777",
+    accountType: "Coach",
+    pin: "6543",
+    confirmPin: "6543"
+  });
+  const archived = requestLockedAccount(store, {
+    fullName: "Archive Me",
+    email: "archive@example.com",
+    phone: "5557777778",
+    accountType: "Coach",
+    pin: "9876",
+    confirmPin: "9876"
+  });
+  assert.equal(getAccountRequests(store, admin, "Pending").length, 3);
+  adminReviewAccountRequest(store, admin, client.id, "Approve", { coachId: "coach_1", unlockProfile: true });
+  adminReviewAccountRequest(store, admin, coach.id, "Reject");
+  adminReviewAccountRequest(store, admin, archived.id, "Archive");
+  assert.equal(authenticateUser(store, "newclient@example.com", "1234").id, client.id);
+  assert.equal(store.clients.find((item) => item.id === client.linkedId).profileLocked, false);
+  assert.equal(authenticateUser(store, "newcoach@example.com", "6543"), null);
+  assert.match(loginBlockedMessage(store, "newcoach@example.com", "6543"), /not approved/);
+  assert.equal(getAccountRequests(store, admin, "Archived").some((item) => item.id === archived.id), true);
+});
+
+test("Admin can approve Coach with limited permissions", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const coach = requestLockedAccount(store, {
+    fullName: "Limited Coach",
+    email: "limited@example.com",
+    phone: "5557770000",
+    accountType: "Coach",
     pin: "1234",
     confirmPin: "1234"
   });
-  assert.equal(store.inviteCodes.find((invite) => invite.code === "NEWCLIENT").used, true);
+  adminReviewAccountRequest(store, admin, coach.id, "Approve", { permissions: { coachCanCreateWorkouts: false } });
+  const loggedIn = authenticateUser(store, "limited@example.com", "1234");
+  assert.equal(loggedIn.id, coach.id);
+  assert.deepEqual(loggedIn.coachPermissions, { coachCanCreateWorkouts: false });
+});
+
+test("InviteCode is not required for signup, login, or unlock", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const user = requestLockedAccount(store, {
+    fullName: "No Invite",
+    email: "noinvite@example.com",
+    phone: "5551010101",
+    accountType: "Client",
+    pin: "4321",
+    confirmPin: "4321"
+  });
+  assert.equal(store.inviteCodes.length, 0);
+  adminReviewAccountRequest(store, admin, user.id, "Approve", { unlockProfile: false });
+  assert.equal(authenticateUser(store, "noinvite@example.com", "4321").id, user.id);
 });
 
 test("admin can reset client and coach PINs without seeing current PIN", () => {
@@ -965,14 +923,9 @@ test("admin can disable and reactivate login", () => {
   assert.equal(authenticateUser(store, "ada@example.com", "1111").id, "client_user_ada");
 });
 
-test("admin and coach can create allowed invite codes", () => {
+test("new account request system starts without invite codes", () => {
   const store = createStore();
-  const admin = authenticateUser(store, "Admin", "9999");
-  const coach = authenticateUser(store, "Coach", "2222");
-  const coachInvite = createInviteCode(store, admin, { roleAllowed: "COACH", email: "coach2@example.com", phone: "5552229999", coachId: "coach_1" });
-  const clientInvite = createInviteCode(store, coach, { roleAllowed: "CLIENT", email: "client2@example.com", phone: "5551119999", clientId: "client_ada" });
-  assert.equal(coachInvite.roleAllowed, "COACH");
-  assert.equal(clientInvite.roleAllowed, "CLIENT");
+  assert.deepEqual(store.inviteCodes, []);
 });
 
 test("admin can create, edit, and archive a new client", () => {

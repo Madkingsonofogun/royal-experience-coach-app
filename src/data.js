@@ -106,11 +106,7 @@ export function createStore() {
         createdAt: "2026-05-29T10:00:00.000Z"
       }
     ],
-    inviteCodes: [
-      invite("invite_client_ada", "ADA2026", "CLIENT", "ada@example.com", "55511111", "client_ada", null, "admin_1"),
-      invite("invite_client_new", "NEWCLIENT", "CLIENT", "newclient@example.com", "5554444444", "client_ada", null, "coach_user_1"),
-      invite("invite_coach_new", "COACH2026", "COACH", "newcoach@example.com", "5557777777", null, "coach_1", "admin_1")
-    ],
+    inviteCodes: [],
     adminAuditLog: [],
     planOfferings: [
       {
@@ -324,6 +320,14 @@ function user(id, role, name, email, phone, pin, linkedId) {
     pinSalt,
     pinHash: hashPin(pin, pinSalt),
     linkedId,
+    accountLocked: false,
+    accountUnlockedByAdminId: role === "Admin" ? "seed" : "admin_1",
+    accountUnlockedAt: "2026-05-29T09:00:00.000Z",
+    accountLockReason: "",
+    accountStatus: "Active",
+    requestedRole: role,
+    requestNote: "",
+    profileLocked: false,
     emailVerified: role === "Admin",
     forcePinChange: false,
     temporaryPinExpiresAt: null,

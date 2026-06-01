@@ -40,13 +40,11 @@ import {
   canUserAccessClient,
   approveMonthlyPlan,
   createReassessmentDraftIfNeeded,
-  createInviteCode,
-  deleteInviteCode,
   equipmentOptions,
-  expireInviteCode,
   filterExercisesForAssessment,
   filterExerciseLibrary,
   getAdminAlerts,
+  getAccountRequests,
   getChatMessages,
   getClientDashboard,
   getClientVisiblePlan,
@@ -55,15 +53,16 @@ import {
   ensureMonthlyPlanHasWorkouts,
   getProgressImagesForUser,
   getWorkoutDetailForUser,
+  loginBlockedMessage,
   markNotificationsRead,
   removeProfileImage,
   movementTests,
   resolveCoachAlert,
-  resendInviteCode,
   safetyQuestions,
   saveAssessment,
+  adminReviewAccountRequest,
   sendChatMessage,
-  signUpWithInvite,
+  requestLockedAccount,
   saveDailyCheckIn,
   saveWeeklyCheckIn,
   searchExerciseLibrary,
@@ -88,21 +87,24 @@ const state = {
   signupError: "",
   signupSuccess: "",
   signup: {
+    firstName: "",
+    lastName: "",
     fullName: "",
     email: "",
     phone: "",
     accountType: "Client",
-    inviteCode: "",
     pin: "",
-    confirmPin: ""
+    confirmPin: "",
+    requestNote: "",
+    goal: "",
+    sportFocus: "Boxing",
+    alreadyTrainsWithCoach: false,
+    coachNameIfKnown: "",
+    coachTitle: "",
+    experience: "",
+    coachRequestReason: ""
   },
-  inviteDraft: {
-    roleAllowed: "CLIENT",
-    email: "",
-    phone: "",
-    clientId: "client_ada",
-    coachId: "coach_1"
-  },
+  accountRequestFilter: "Pending",
   adminDrafts: {
     client: {
       firstName: "",
@@ -119,8 +121,7 @@ const state = {
       status: "Active",
       notes: "",
       injuryRestrictionNotes: "",
-      emergencyContact: "",
-      clientInviteCode: ""
+      emergencyContact: ""
     },
     exercise: {
       exerciseName: "",
@@ -355,10 +356,13 @@ function loginPage() {
         <img class="login-logo" src="./assets/mad-king-conditioning-logo.png" alt="Mad King Conditioning logo" />
         <div>
           <p class="eyebrow">A Royal Experience</p>
-          <h1>${state.signupOpen ? "Create Login" : "Log in with your numeric PIN"}</h1>
-          <p class="muted">${state.signupOpen ? "Client logins must match an existing profile or invite. Coach accounts require an invite code from Admin." : "Demo PINs: Coach 2222, Client Ada 1111, Client Marcus 3333, Admin 9999."}</p>
+          <h1>${state.signupOpen ? "Create Account Request" : "Log in with your numeric PIN"}</h1>
+          <p class="muted">${state.signupOpen ? "Your account will stay locked until Admin reviews and unlocks it." : "Demo PINs: Coach 2222, Client Ada 1111, Client Marcus 3333, Admin 9999."}</p>
         </div>
         ${state.signupOpen ? signupForm() : `
+          <label>Email or phone number
+            <input id="loginIdentifier" value="${state.loginIdentifier}" placeholder="email or phone" />
+          </label>
           <label>Account type
             <select id="loginRole">
               ${["Client", "Coach", "Admin"].map((role) => `<option ${state.loginRole === role ? "selected" : ""}>${role}</option>`).join("")}
@@ -370,9 +374,10 @@ function loginPage() {
           <button class="primary full" id="loginButton">Log In</button>
           <div class="login-links">
             <button class="ghost" id="forgotPinButton">Forgot PIN</button>
-            <button class="success" id="openSignupButton">Create Login / Sign Up</button>
+            <button class="success" id="openSignupButton">Create Account</button>
           </div>
           <p class="login-error" id="loginError"></p>
+          <p class="login-success">${state.signupSuccess}</p>
         `}
       </section>
     </main>
@@ -382,17 +387,31 @@ function loginPage() {
 function signupForm() {
   return `
     <div class="signup-choice">
-      <button class="${state.signup.accountType === "Client" ? "active" : ""}" data-signup-type="Client">Create Client Login</button>
-      <button class="${state.signup.accountType === "Coach" ? "active" : ""}" data-signup-type="Coach">Create Coach Login with Invite Code</button>
+      <button class="${state.signup.accountType === "Client" ? "active" : ""}" data-signup-type="Client">Request Client Account</button>
+      <button class="${state.signup.accountType === "Coach" ? "active" : ""}" data-signup-type="Coach">Request Coach Account</button>
     </div>
-    <p class="muted">${state.signup.accountType === "Coach" ? "Coach accounts require an invite code from Admin." : "Client accounts must match an existing client profile or invite from your coach."}</p>
+    <p class="muted">${state.signup.accountType === "Coach" ? "Coach accounts stay locked until Admin approves permissions." : "Client accounts stay locked until Admin approves and connects the profile."}</p>
+    <label>First name <input data-signup-field="firstName" value="${state.signup.firstName}" /></label>
+    <label>Last name <input data-signup-field="lastName" value="${state.signup.lastName}" /></label>
     <label>Full name <input data-signup-field="fullName" value="${state.signup.fullName}" /></label>
     <label>Email <input data-signup-field="email" value="${state.signup.email}" /></label>
     <label>Phone number <input data-signup-field="phone" value="${state.signup.phone}" /></label>
-    <label>Invite code / access code <input data-signup-field="inviteCode" value="${state.signup.inviteCode}" /></label>
+    ${state.signup.accountType === "Client" ? `
+      <label>Goal <input data-signup-field="goal" value="${state.signup.goal}" /></label>
+      <label>Preferred sport focus
+        <select data-signup-field="sportFocus">${["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "General Fitness"].map((item) => `<option value="${item}" ${state.signup.sportFocus === item ? "selected" : ""}>${item}</option>`).join("")}</select>
+      </label>
+      <label><input class="inline-check" data-signup-check="alreadyTrainsWithCoach" type="checkbox" ${state.signup.alreadyTrainsWithCoach ? "checked" : ""} /> I already train with a coach</label>
+      <label>Coach name if known <input data-signup-field="coachNameIfKnown" value="${state.signup.coachNameIfKnown}" /></label>
+    ` : `
+      <label>Coach title / specialty <input data-signup-field="coachTitle" value="${state.signup.coachTitle}" /></label>
+      <label>Experience <textarea data-signup-field="experience">${state.signup.experience}</textarea></label>
+      <label>Reason for coach access <textarea data-signup-field="coachRequestReason">${state.signup.coachRequestReason}</textarea></label>
+    `}
+    <label>Short note / reason optional <textarea data-signup-field="requestNote">${state.signup.requestNote}</textarea></label>
     <label>Create numeric PIN <input data-signup-field="pin" inputmode="numeric" type="password" value="${state.signup.pin}" placeholder="4 digits" /></label>
     <label>Confirm numeric PIN <input data-signup-field="confirmPin" inputmode="numeric" type="password" value="${state.signup.confirmPin}" /></label>
-    <button class="primary full" id="createLoginButton">Create Login</button>
+    <button class="primary full" id="createLoginButton">Submit Account Request</button>
     <button class="ghost full" id="backToLoginButton">Back to Login</button>
     <p class="login-error">${state.signupError}</p>
     <p class="login-success">${state.signupSuccess}</p>
@@ -445,6 +464,7 @@ function profilePage() {
         <div><p class="eyebrow">Client Profile</p><h2>${client.name}</h2></div>
         <span class="badge green">${client.packageType}</span>
       </div>
+      ${client.profileLocked ? `<article class="card locked">Your profile is locked. Contact Admin to request changes.</article>` : ""}
       ${profileImagePanel(profileUser, client)}
       <div class="grid-3 stat-strip">
         ${infoCard("Age", client.age)}
@@ -1225,7 +1245,7 @@ function adminView() {
   const d = state.adminDrafts;
   const creationActions = [
     { label: "Add Client", panel: "clients" },
-    { label: "Add Coach", panel: "invites" },
+    { label: "Account Requests", panel: "accountRequests" },
     { label: "Add Exercise", panel: "exercises" },
     { label: "Add Workout", panel: "workouts" },
     { label: "Add Plan Offering", panel: "offerings" },
@@ -1235,7 +1255,7 @@ function adminView() {
   ];
   return `
     <section class="workspace">
-      <div class="section-head"><div><p class="eyebrow">Admin Control Center</p><h2>Create and manage the whole coaching system</h2><p class="muted">Build exercises, workouts, templates, offerings, packages, clients, invites, passwords, alerts, and chats from one place.</p></div></div>
+      <div class="section-head"><div><p class="eyebrow">Admin Control Center</p><h2>Create and manage the whole coaching system</h2><p class="muted">Build exercises, workouts, templates, offerings, packages, clients, locked accounts, passwords, alerts, and chats from one place.</p></div></div>
       <div class="quick-actions admin-quick">
         ${creationActions.map((action) => `<button class="${state.adminPanel === action.panel ? "active" : ""}" data-admin-panel="${action.panel}">${action.label}</button>`).join("")}
         <button data-admin-jump="View Alerts">View Alerts</button>
@@ -1284,12 +1304,11 @@ function adminView() {
             ${adminInput("client", "startDate", "Start date", "date")}
             ${adminSelect("client", "status", "Status", ["Active", "Inactive", "Suspended", "Archived"])}
             ${adminInput("client", "emergencyContact", "Emergency contact")}
-            ${adminInput("client", "clientInviteCode", "Client invite code")}
           </div>
           <label>Notes <textarea data-admin-draft="client:notes">${d.client.notes}</textarea></label>
           <label>Injury / restriction notes <textarea data-admin-draft="client:injuryRestrictionNotes">${d.client.injuryRestrictionNotes}</textarea></label>
           <button class="primary full" id="adminCreateClient">Add New Client</button>
-          <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-delete-client="${client.id}">Delete</button><button data-client-invite="${client.id}">Invite</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
+          <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-delete-client="${client.id}">Delete</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("exercises")}" id="admin-exercise-library-new">
           <h3>Add Exercise</h3>
@@ -1395,13 +1414,12 @@ function adminView() {
           <h3>Coaches</h3>
           ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name}</span><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
         </article>
-        <article class="card ${adminPanelClass("invites")}">
-          <h3>Invite Codes</h3>
-          <label>Invite type <select id="inviteRole"><option value="CLIENT">Client</option><option value="COACH">Coach</option></select></label>
-          <label>Email <input id="inviteEmail" placeholder="invite@email.com" /></label>
-          <label>Phone <input id="invitePhone" placeholder="55512347" /></label>
-          <button class="primary full" id="createInviteButton">Create Invite</button>
-          ${store.inviteCodes.map((invite) => `<div class="admin-row"><span>${invite.code} / ${invite.roleAllowed} / ${invite.used ? "Used" : "Unused"}</span><button data-resend-invite="${invite.id}">Resend</button><button data-expire-invite="${invite.id}">Expire</button><button data-delete-invite="${invite.id}">Delete</button></div>`).join("")}
+        <article class="card ${adminPanelClass("accountRequests")}">
+          <h3>Pending Account Requests</h3>
+          <label>Filter
+            <select id="accountRequestFilter">${["Pending", "Active", "Locked", "Rejected", "Suspended", "Archived", "Client", "Coach", "All"].map((filter) => `<option value="${filter}" ${state.accountRequestFilter === filter ? "selected" : ""}>${filter}</option>`).join("")}</select>
+          </label>
+          <div class="admin-list">${getAccountRequests(store, state.currentUser, state.accountRequestFilter).map((user) => `<div class="admin-row"><span>${user.name} / ${user.email || user.phone} / ${user.requestedRole || user.role} / ${user.accountStatus || "Active"}${user.accountLocked ? " / Locked" : ""}</span><button data-review-account="${user.id}">Review</button><button data-account-action="${user.id}:Approve">Unlock / Approve</button><button data-account-action="${user.id}:Reject">Reject</button><button data-account-action="${user.id}:Archive">Archive</button></div>`).join("") || `<div class="empty">No account requests match this filter.</div>`}</div>
         </article>
         <article class="card ${adminPanelClass("clients")}"><h3>Current Client Details</h3>${adminClientDetail(selectedClient())}</article>
         <article class="card ${adminPanelClass("chats")}">
@@ -1437,7 +1455,54 @@ function adminEditModal() {
   if (!state.editModal || state.currentUser?.role !== "Admin") return "";
   if (state.editModal.type === "exercise") return exerciseEditModal(state.editModal.id);
   if (state.editModal.type === "workout") return workoutEditModal(state.editModal.id);
+  if (state.editModal.type === "account") return accountReviewModal(state.editModal.id);
   return "";
+}
+
+function accountReviewModal(userId) {
+  const user = store.users.find((item) => item.id === userId);
+  if (!user) return "";
+  const details = user.requestDetails || {};
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card">
+        <div class="modal-head">
+          <div><p class="eyebrow">Account Request Review</p><h2>${escapeHtml(user.name)}</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="grid-3 stat-strip">
+          ${infoCard("Requested role", user.requestedRole || user.role)}
+          ${infoCard("Status", `${user.accountStatus || "Active"}${user.accountLocked ? " / Locked" : ""}`)}
+          ${infoCard("Profile", user.profileLocked ? "Locked" : "Unlocked")}
+        </div>
+        <div class="split">
+          <p><strong>Email:</strong> ${user.email || "None"}</p>
+          <p><strong>Phone:</strong> ${user.phone || "None"}</p>
+          <p><strong>Note:</strong> ${user.requestNote || "No note"}</p>
+          <p><strong>Goal:</strong> ${details.goal || "None"}</p>
+          <p><strong>Sport focus:</strong> ${details.sportFocus || "None"}</p>
+          <p><strong>Coach info:</strong> ${details.coachNameIfKnown || details.coachTitle || "None"}</p>
+          <p><strong>Experience:</strong> ${details.experience || "None"}</p>
+          <p><strong>Reason:</strong> ${details.coachRequestReason || "None"}</p>
+        </div>
+        <label>Requested role
+          <select id="reviewRequestedRole">
+            ${["Client", "Coach"].map((role) => `<option value="${role}" ${(user.requestedRole || user.role) === role ? "selected" : ""}>${role}</option>`).join("")}
+          </select>
+        </label>
+        <label>Assign coach if Client
+          <select id="reviewCoachId">${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<option value="${coach.id}">${coach.name}</option>`).join("")}</select>
+        </label>
+        <label><input class="inline-check" id="reviewUnlockProfile" type="checkbox" /> Unlock login and profile editing</label>
+        <div class="modal-actions">
+          <button data-account-action="${user.id}:Approve">Approve and Unlock Account</button>
+          <button data-account-action="${user.id}:Reject">Reject Account</button>
+          <button data-account-action="${user.id}:Archive">Archive Account</button>
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 function exerciseEditModal(exerciseId) {
@@ -1645,9 +1710,10 @@ function bindLogin() {
     event.target.value = state.loginPin;
   });
   document.querySelector("#loginButton")?.addEventListener("click", () => {
-    const user = authenticateUser(store, state.loginRole, state.loginPin);
+    const loginKey = state.loginIdentifier.trim() || state.loginRole;
+    const user = authenticateUser(store, loginKey, state.loginPin);
     if (!user) {
-      document.querySelector("#loginError").textContent = "That account type and numeric PIN did not match an active account.";
+      document.querySelector("#loginError").textContent = loginBlockedMessage(store, loginKey, state.loginPin);
       return;
     }
     state.currentUser = user;
@@ -1680,15 +1746,15 @@ function bindLogin() {
     state.signup[key] = key === "pin" || key === "confirmPin" ? input.value.replace(/\D/g, "") : input.value;
     if (key === "pin" || key === "confirmPin") input.value = state.signup[key];
   }));
+  document.querySelectorAll("[data-signup-check]").forEach((input) => input.addEventListener("change", () => {
+    state.signup[input.dataset.signupCheck] = input.checked;
+  }));
   document.querySelector("#createLoginButton")?.addEventListener("click", () => {
     try {
-      const user = signUpWithInvite(store, state.signup);
-      state.currentUser = user;
+      requestLockedAccount(store, state.signup);
       state.signupOpen = false;
-      state.signupSuccess = "";
-      const firstClient = visibleClientsForUser(store, user)[0];
-      if (firstClient) changeSelectedClient(firstClient.id, false);
-      state.view = user.role === "Client" ? "client" : "home";
+      state.signupSuccess = "Account request submitted. Admin must approve and unlock your account before you can log in.";
+      state.signupError = "";
       render();
     } catch (error) {
       state.signupError = error.message;
@@ -1974,6 +2040,24 @@ function bindGlobal() {
     state.editModal = { type: "workout", id: button.dataset.openWorkoutEditor };
     render();
   }));
+  document.querySelectorAll("[data-review-account]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "account", id: button.dataset.reviewAccount };
+    render();
+  }));
+  document.querySelectorAll("[data-account-action]").forEach((button) => button.addEventListener("click", () => {
+    const [userId, action] = button.dataset.accountAction.split(":");
+    adminReviewAccountRequest(store, state.currentUser, userId, action, {
+      requestedRole: document.querySelector("#reviewRequestedRole")?.value,
+      coachId: document.querySelector("#reviewCoachId")?.value,
+      unlockProfile: document.querySelector("#reviewUnlockProfile")?.checked || false
+    });
+    state.editModal = null;
+    render();
+  }));
+  document.querySelector("#accountRequestFilter")?.addEventListener("change", (event) => {
+    state.accountRequestFilter = event.target.value;
+    render();
+  });
   document.querySelectorAll("#closeEditModal, #closeEditModalSecondary").forEach((button) => button.addEventListener("click", () => {
     state.editModal = null;
     render();
@@ -2069,11 +2153,6 @@ function bindGlobal() {
     if (!window.confirm("Delete this client and their linked app records?")) return;
     adminDeleteClient(store, state.currentUser, button.dataset.deleteClient);
     state.clientId = store.clients[0]?.id || state.clientId;
-    render();
-  }));
-  document.querySelectorAll("[data-client-invite]").forEach((button) => button.addEventListener("click", () => {
-    const client = store.clients.find((item) => item.id === button.dataset.clientInvite);
-    createInviteCode(store, state.currentUser, { roleAllowed: "CLIENT", email: client.email, phone: client.phone, clientId: client.id });
     render();
   }));
   document.querySelectorAll("[data-reset-client-pin]").forEach((button) => button.addEventListener("click", () => {
@@ -2227,28 +2306,6 @@ function bindGlobal() {
     if (!window.confirm("Delete this assessment template?")) return;
     adminDeleteAssessmentTemplate(store, state.currentUser, button.dataset.deleteAssessmentTemplate);
     if (state.selectedAssessmentTemplateId === button.dataset.deleteAssessmentTemplate) state.selectedAssessmentTemplateId = store.assessmentTemplates[0]?.id || "";
-    render();
-  }));
-  document.querySelector("#createInviteButton")?.addEventListener("click", () => {
-    createInviteCode(store, state.currentUser, {
-      roleAllowed: document.querySelector("#inviteRole").value,
-      email: document.querySelector("#inviteEmail").value,
-      phone: document.querySelector("#invitePhone").value,
-      clientId: state.clientId,
-      coachId: "coach_1"
-    });
-    render();
-  });
-  document.querySelectorAll("[data-resend-invite]").forEach((button) => button.addEventListener("click", () => {
-    resendInviteCode(store, state.currentUser, button.dataset.resendInvite);
-    render();
-  }));
-  document.querySelectorAll("[data-expire-invite]").forEach((button) => button.addEventListener("click", () => {
-    expireInviteCode(store, state.currentUser, button.dataset.expireInvite);
-    render();
-  }));
-  document.querySelectorAll("[data-delete-invite]").forEach((button) => button.addEventListener("click", () => {
-    deleteInviteCode(store, state.currentUser, button.dataset.deleteInvite);
     render();
   }));
   document.querySelectorAll("[data-save-workout]").forEach((button) => button.addEventListener("click", () => {
