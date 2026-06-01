@@ -176,6 +176,7 @@ const state = {
     }
   },
   view: "home",
+  adminPanel: "overview",
   clientId: "client_ada",
   selectedWorkoutId: null,
   selectedExerciseId: null,
@@ -1096,13 +1097,37 @@ function alertCard(alert) {
 function adminView() {
   const alerts = getAdminAlerts(store);
   const d = state.adminDrafts;
+  const creationActions = [
+    { label: "Add Client", panel: "clients" },
+    { label: "Add Coach", panel: "invites" },
+    { label: "Add Exercise", panel: "exercises" },
+    { label: "Add Workout", panel: "workouts" },
+    { label: "Add Plan Offering", panel: "offerings" },
+    { label: "Add Package", panel: "packages" },
+    { label: "Add Assessment Template", panel: "overview" },
+    { label: "PINs / Security", panel: "security" }
+  ];
   return `
     <section class="workspace">
       <div class="section-head"><div><p class="eyebrow">Admin Control Center</p><h2>Create and manage the whole coaching system</h2><p class="muted">Build exercises, workouts, templates, offerings, packages, clients, invites, passwords, alerts, and chats from one place.</p></div></div>
       <div class="quick-actions admin-quick">
-        ${["Add Client", "Add Coach", "Add Exercise", "Add Workout", "Add Plan Offering", "Add Package", "Add Assessment Template", "View Alerts", "View Chats"].map((label) => `<button data-admin-jump="${label}">${label}</button>`).join("")}
+        ${creationActions.map((action) => `<button class="${state.adminPanel === action.panel ? "active" : ""}" data-admin-panel="${action.panel}">${action.label}</button>`).join("")}
+        <button data-admin-jump="View Alerts">View Alerts</button>
+        <button data-admin-jump="View Chats">View Chats</button>
       </div>
-      <article class="card admin-card" id="admin-profile-images">
+      <article class="card admin-overview ${adminPanelClass("overview")}">
+        <div class="section-head compact-head">
+          <div>
+            <p class="eyebrow">Admin Overview</p>
+            <h3>Choose one control area above</h3>
+            <p class="muted">The large creation tools now open one section at a time, so this page stays cleaner while Admin still has full control.</p>
+          </div>
+        </div>
+        <div class="grid-3 stat-strip">
+          ${infoCard("Clients", store.clients.length)}
+          ${infoCard("Exercises", store.exercises.length)}
+          ${infoCard("Open alerts", alerts.filter((alert) => alert.status !== "Resolved").length)}
+        </div>
         <h3>Profile Images</h3>
         <div class="admin-list">
           ${store.users.filter((user) => user.role !== "Admin").map((user) => `
@@ -1117,7 +1142,7 @@ function adminView() {
         </div>
       </article>
       <div class="split">
-        <article class="card admin-card" id="admin-clients-new">
+        <article class="card admin-card ${adminPanelClass("clients")}" id="admin-clients-new">
           <h3>Add Client</h3>
           <div class="form-grid">
             ${adminInput("client", "firstName", "First name")}
@@ -1140,7 +1165,7 @@ function adminView() {
           <button class="primary full" id="adminCreateClient">Add New Client</button>
           <div class="admin-list">${store.clients.map((client) => `<div class="admin-row"><span>${client.name} / ${client.status || "Active"} / ${client.packageType || "No package"}</span><input data-client-name="${client.id}" value="${client.name}" /><button data-save-client="${client.id}">Edit</button><button data-archive-client="${client.id}">Archive</button><button data-client-invite="${client.id}">Invite</button><button data-reset-client-pin="${client.id}">Reset PIN</button></div>`).join("")}</div>
         </article>
-        <article class="card admin-card" id="admin-exercise-library-new">
+        <article class="card admin-card ${adminPanelClass("exercises")}" id="admin-exercise-library-new">
           <h3>Add Exercise</h3>
           <div class="form-grid">
             ${adminInput("exercise", "exerciseName", "Exercise name")}
@@ -1168,7 +1193,7 @@ function adminView() {
           <button class="success full" id="adminImportExcel">Import Excel Exercise Library</button>
           <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><input data-exercise-name="${exercise.id}" value="${exercise.exerciseName || exercise.name}" /><button data-save-exercise="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button></div>`).join("")}</div>
         </article>
-        <article class="card admin-card" id="admin-workouts-new">
+        <article class="card admin-card ${adminPanelClass("workouts")}" id="admin-workouts-new">
           <h3>Add Workout Template</h3>
           <div class="form-grid">
             ${adminInput("workout", "workoutName", "Workout name")}
@@ -1196,7 +1221,7 @@ function adminView() {
           <button class="full" id="adminAddWorkoutItem">Add Exercise To Workout</button>
           <div class="admin-list">${store.workoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><input data-template-name="${workout.id}" value="${workout.workoutName}" /><button data-save-template="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
         </article>
-        <article class="card admin-card" id="admin-plan-offerings-new">
+        <article class="card admin-card ${adminPanelClass("offerings")}" id="admin-plan-offerings-new">
           <h3>Add Plan Offering</h3>
           <div class="form-grid">
             ${adminInput("planOffering", "planName", "Plan name")}
@@ -1212,7 +1237,7 @@ function adminView() {
           <button class="primary full" id="adminCreatePlanOffering">Add New Plan Offering</button>
           <div class="admin-list">${store.planOfferings.map((offering) => `<div class="admin-row"><span>${offering.planName} / ${offering.trainingLevel || offering.planLevel} / $${offering.price}</span><input data-offering-name="${offering.id}" value="${offering.planName}" /><button data-save-offering="${offering.id}">Edit</button><button data-archive-offering="${offering.id}">Archive</button></div>`).join("")}</div>
         </article>
-        <article class="card admin-card" id="admin-packages-new">
+        <article class="card admin-card ${adminPanelClass("packages")}" id="admin-packages-new">
           <h3>Add Package</h3>
           <div class="form-grid">
             ${adminInput("package", "packageName", "Package name")}
@@ -1224,11 +1249,11 @@ function adminView() {
           <button class="success full" id="adminAssignPackage">Assign Selected Package To Selected Client</button>
           <div class="admin-list">${store.packages.map((pkg) => `<div class="admin-row"><span>${pkg.packageName} / ${store.planOfferings.find((offering) => offering.id === pkg.planOfferingId)?.planName || "No offering"}</span><button data-package-offering="${pkg.id}">Connect Offering</button></div>`).join("")}</div>
         </article>
-        <article class="card">
+        <article class="card ${adminPanelClass("security")}">
           <h3>User Passwords</h3>
           ${store.users.map((user) => `<div class="admin-row"><span>${user.name} / ${user.role}${user.forcePinChange ? " / must change PIN" : ""}${user.disabled ? " / disabled" : ""}</span><input data-pin-user="${user.id}" inputmode="numeric" placeholder="New numeric PIN" /><button data-save-pin="${user.id}">Set PIN</button><button data-temp-pin="${user.id}">Temp PIN</button><button data-toggle-login="${user.id}">${user.disabled ? "Reactivate" : "Disable"}</button></div>`).join("")}
         </article>
-        <article class="card">
+        <article class="card ${adminPanelClass("invites")}">
           <h3>Invite Codes</h3>
           <label>Invite type <select id="inviteRole"><option value="CLIENT">Client</option><option value="COACH">Coach</option></select></label>
           <label>Email <input id="inviteEmail" placeholder="invite@email.com" /></label>
@@ -1236,8 +1261,8 @@ function adminView() {
           <button class="primary full" id="createInviteButton">Create Invite</button>
           ${store.inviteCodes.map((invite) => `<div class="admin-row"><span>${invite.code} / ${invite.roleAllowed} / ${invite.used ? "Used" : "Unused"}</span><button data-resend-invite="${invite.id}">Resend</button><button data-expire-invite="${invite.id}">Expire</button><button data-delete-invite="${invite.id}">Delete</button></div>`).join("")}
         </article>
-        <article class="card"><h3>Current Client Details</h3>${adminClientDetail(selectedClient())}</article>
-        <article class="card">
+        <article class="card ${adminPanelClass("clients")}"><h3>Current Client Details</h3>${adminClientDetail(selectedClient())}</article>
+        <article class="card ${adminPanelClass("chats")}">
           <h3>Intervene in Chat</h3>
           <textarea id="adminIntervention" placeholder="Write an admin note to the coach about this client chat."></textarea>
           <button class="primary full" id="adminInterveneButton">Send Admin Intervention</button>
@@ -1268,6 +1293,10 @@ function adminView() {
 
 function adminInput(group, key, label, type = "text") {
   return `<label>${label}<input data-admin-draft="${group}:${key}" type="${type}" value="${state.adminDrafts[group][key] ?? ""}" /></label>`;
+}
+
+function adminPanelClass(panel) {
+  return state.adminPanel === panel ? "active-admin-panel" : "hidden";
 }
 
 function adminSelect(group, key, label, options) {
@@ -1580,15 +1609,12 @@ function bindGlobal() {
     const [group, key] = field.dataset.adminCheck.split(":");
     state.adminDrafts[group][key] = field.checked;
   }));
+  document.querySelectorAll("[data-admin-panel]").forEach((button) => button.addEventListener("click", () => {
+    state.adminPanel = button.dataset.adminPanel;
+    render();
+  }));
   document.querySelectorAll("[data-admin-jump]").forEach((button) => button.addEventListener("click", () => {
     const map = {
-      "Add Client": "admin-clients-new",
-      "Add Coach": "createInviteButton",
-      "Add Exercise": "admin-exercise-library-new",
-      "Add Workout": "admin-workouts-new",
-      "Add Plan Offering": "admin-plan-offerings-new",
-      "Add Package": "admin-packages-new",
-      "Add Assessment Template": "admin-clients-new",
       "View Alerts": "admin-alerts",
       "View Chats": "admin-chats"
     };

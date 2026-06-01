@@ -41,6 +41,10 @@ body {
   width: 1px;
 }
 
+.hidden {
+  display: none !important;
+}
+
 button,
 input,
 select,
@@ -60,6 +64,12 @@ button {
 
 button:hover {
   border-color: #9fb1aa;
+}
+
+button.active {
+  background: var(--black);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 button:disabled {
