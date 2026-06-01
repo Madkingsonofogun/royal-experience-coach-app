@@ -1386,6 +1386,60 @@ export function adminResetUserPin(store, adminUser, targetUserId) {
   return { user, temporaryPin: tempPin };
 }
 
+export function submitPinResetRequest(store, input) {
+  const nameOrEmail = String(input.nameOrEmail || input.name || input.email || "").trim();
+  const phone = String(input.phone || "").trim();
+  const note = String(input.note || "").trim();
+  if (!nameOrEmail && !phone) throw new Error("Enter your name, email, or phone number so Admin can find your account.");
+  const normalized = nameOrEmail.toLowerCase();
+  const matchedUser = store.users.find((user) => {
+    return [user.name, user.email, user.phone].filter(Boolean).some((value) => String(value).toLowerCase() === normalized)
+      || (phone && String(user.phone) === phone);
+  });
+  const request = {
+    id: makeId("pin_reset"),
+    userId: matchedUser?.id || null,
+    nameOrEmail,
+    phone,
+    note,
+    status: "New",
+    adminMessage: "",
+    temporaryPinSent: false,
+    createdAt: nowIso(),
+    resolvedAt: null
+  };
+  store.pinResetRequests = store.pinResetRequests || [];
+  store.pinResetRequests.push(request);
+  store.notifications.push({
+    id: makeId("notification"),
+    userId: "admin_1",
+    clientId: matchedUser?.linkedId || null,
+    type: "PIN Reset Request",
+    title: "New forgot PIN request",
+    body: `${nameOrEmail || phone} requested a PIN reset.`,
+    read: false,
+    createdAt: request.createdAt
+  });
+  logAdminAction(store, { id: "public", role: "Public", name: nameOrEmail || phone }, `Submitted PIN reset request for ${nameOrEmail || phone}`);
+  return request;
+}
+
+export function adminResolvePinResetRequest(store, adminUser, requestId, deliveryMethod = "Email") {
+  requireAdmin(adminUser);
+  const request = findById(store.pinResetRequests || [], requestId, "PIN reset request");
+  const user = request.userId ? store.users.find((item) => item.id === request.userId) : null;
+  if (!user) throw new Error("No matching user was found. Admin must contact the person manually.");
+  const reset = adminResetUserPin(store, adminUser, user.id);
+  const contact = deliveryMethod === "Text" ? user.phone : user.email;
+  request.status = "Resolved";
+  request.resolvedAt = nowIso();
+  request.temporaryPinSent = true;
+  request.deliveryMethod = deliveryMethod;
+  request.adminMessage = `${deliveryMethod} to ${contact}: Your temporary Mad King Conditioning PIN is ${reset.temporaryPin}. Please log in and change it.`;
+  logAdminAction(store, adminUser, `Resolved PIN reset request for ${user.name} by ${deliveryMethod}`);
+  return { ...reset, request };
+}
+
 export function adminSetLoginDisabled(store, adminUser, targetUserId, disabled) {
   if (adminUser?.role !== "Admin") throw new Error("Only admins can disable or reactivate logins");
   const user = store.users.find((item) => item.id === targetUserId);

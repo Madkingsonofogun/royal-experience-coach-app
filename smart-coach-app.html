@@ -30928,6 +30928,60 @@ function adminResetUserPin(store, adminUser, targetUserId) {
   return { user, temporaryPin: tempPin };
 }
 
+function submitPinResetRequest(store, input) {
+  const nameOrEmail = String(input.nameOrEmail || input.name || input.email || "").trim();
+  const phone = String(input.phone || "").trim();
+  const note = String(input.note || "").trim();
+  if (!nameOrEmail && !phone) throw new Error("Enter your name, email, or phone number so Admin can find your account.");
+  const normalized = nameOrEmail.toLowerCase();
+  const matchedUser = store.users.find((user) => {
+    return [user.name, user.email, user.phone].filter(Boolean).some((value) => String(value).toLowerCase() === normalized)
+      || (phone && String(user.phone) === phone);
+  });
+  const request = {
+    id: makeId("pin_reset"),
+    userId: matchedUser?.id || null,
+    nameOrEmail,
+    phone,
+    note,
+    status: "New",
+    adminMessage: "",
+    temporaryPinSent: false,
+    createdAt: nowIso(),
+    resolvedAt: null
+  };
+  store.pinResetRequests = store.pinResetRequests || [];
+  store.pinResetRequests.push(request);
+  store.notifications.push({
+    id: makeId("notification"),
+    userId: "admin_1",
+    clientId: matchedUser?.linkedId || null,
+    type: "PIN Reset Request",
+    title: "New forgot PIN request",
+    body: `${nameOrEmail || phone} requested a PIN reset.`,
+    read: false,
+    createdAt: request.createdAt
+  });
+  logAdminAction(store, { id: "public", role: "Public", name: nameOrEmail || phone }, `Submitted PIN reset request for ${nameOrEmail || phone}`);
+  return request;
+}
+
+function adminResolvePinResetRequest(store, adminUser, requestId, deliveryMethod = "Email") {
+  requireAdmin(adminUser);
+  const request = findById(store.pinResetRequests || [], requestId, "PIN reset request");
+  const user = request.userId ? store.users.find((item) => item.id === request.userId) : null;
+  if (!user) throw new Error("No matching user was found. Admin must contact the person manually.");
+  const reset = adminResetUserPin(store, adminUser, user.id);
+  const contact = deliveryMethod === "Text" ? user.phone : user.email;
+  request.status = "Resolved";
+  request.resolvedAt = nowIso();
+  request.temporaryPinSent = true;
+  request.deliveryMethod = deliveryMethod;
+  request.adminMessage = `${deliveryMethod} to ${contact}: Your temporary Mad King Conditioning PIN is ${reset.temporaryPin}. Please log in and change it.`;
+  logAdminAction(store, adminUser, `Resolved PIN reset request for ${user.name} by ${deliveryMethod}`);
+  return { ...reset, request };
+}
+
 function adminSetLoginDisabled(store, adminUser, targetUserId, disabled) {
   if (adminUser?.role !== "Admin") throw new Error("Only admins can disable or reactivate logins");
   const user = store.users.find((item) => item.id === targetUserId);
@@ -32211,6 +32265,7 @@ function createStore() {
     weeklyCheckIns: [],
     dailyCheckIns: [],
     painCheckIns: [],
+    pinResetRequests: [],
     progressImages: [],
     coachAlerts: [],
     todayWorkoutAdjustments: [],
@@ -32635,6 +32690,14 @@ const state = {
   loginRole: "Client",
   loginPin: "",
   signupOpen: false,
+  forgotPinOpen: false,
+  forgotPinError: "",
+  forgotPinSuccess: "",
+  forgotPin: {
+    nameOrEmail: "",
+    phone: "",
+    note: ""
+  },
   signupError: "",
   signupSuccess: "",
   signup: {
@@ -32907,10 +32970,10 @@ function loginPage() {
         <img class="login-logo" src="./assets/mad-king-conditioning-logo.png" alt="Mad King Conditioning logo" />
         <div>
           <p class="eyebrow">A Royal Experience</p>
-          <h1>${state.signupOpen ? "Create Account Request" : "Log in with your numeric PIN"}</h1>
-          <p class="muted">${state.signupOpen ? "Your account will stay locked until Admin reviews and unlocks it." : "Demo PINs: Coach 2222, Client Ada 1111, Client Marcus 3333, Admin 9999."}</p>
+          <h1>${state.signupOpen ? "Create Account Request" : state.forgotPinOpen ? "Forgot PIN" : "Log in with your numeric PIN"}</h1>
+          <p class="muted">${state.signupOpen ? "Your account will stay locked until Admin reviews and unlocks it." : state.forgotPinOpen ? "Tell Admin who you are so they can reset your PIN and send it by email or text." : "Demo PINs: Coach 2222, Client Ada 1111, Client Marcus 3333, Admin 9999."}</p>
         </div>
-        ${state.signupOpen ? signupForm() : `
+        ${state.signupOpen ? signupForm() : state.forgotPinOpen ? forgotPinForm() : `
           <label>Account type
             <select id="loginRole">
               ${["Client", "Coach", "Admin"].map((role) => `<option ${state.loginRole === role ? "selected" : ""}>${role}</option>`).join("")}
@@ -32929,6 +32992,18 @@ function loginPage() {
         `}
       </section>
     </main>
+  `;
+}
+
+function forgotPinForm() {
+  return `
+    <label>Name or email <input data-forgot-pin-field="nameOrEmail" value="${state.forgotPin.nameOrEmail}" placeholder="Name or email" /></label>
+    <label>Phone number <input data-forgot-pin-field="phone" value="${state.forgotPin.phone}" placeholder="Phone number" /></label>
+    <label>Note optional <textarea data-forgot-pin-field="note" placeholder="Anything Admin should know">${state.forgotPin.note}</textarea></label>
+    <button class="primary full" id="submitForgotPinRequest">Send Reset Request To Admin</button>
+    <button class="ghost full" id="backFromForgotPin">Back to Login</button>
+    <p class="login-error">${state.forgotPinError}</p>
+    <p class="login-success">${state.forgotPinSuccess}</p>
   `;
 }
 
@@ -33958,6 +34033,9 @@ function adminView() {
         </article>
         <article class="card ${adminPanelClass("security")}">
           <h3>User Passwords</h3>
+          <h4>Forgot PIN Requests</h4>
+          ${(store.pinResetRequests || []).map((request) => `<div class="admin-row"><span>${request.nameOrEmail || request.phone} / ${request.status}${request.adminMessage ? ` / ${request.adminMessage}` : ""}</span><button data-resolve-pin-request="${request.id}:Email">Reset and Email PIN</button><button data-resolve-pin-request="${request.id}:Text">Reset and Text PIN</button></div>`).join("") || `<p class="muted">No forgot PIN requests yet.</p>`}
+          <h4>Manual PIN Controls</h4>
           ${store.users.map((user) => `<div class="admin-row"><span>${user.name} / ${user.role}${user.forcePinChange ? " / must change PIN" : ""}${user.disabled ? " / disabled" : ""}</span><input data-pin-user="${user.id}" inputmode="numeric" placeholder="New numeric PIN" /><button data-save-pin="${user.id}">Set PIN</button><button data-temp-pin="${user.id}">Temp PIN</button><button data-toggle-login="${user.id}">${user.disabled ? "Reactivate" : "Disable"}</button></div>`).join("")}
           <h3>Coaches</h3>
           ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name}</span><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
@@ -34335,10 +34413,33 @@ function bindLogin() {
     render();
   });
   document.querySelector("#forgotPinButton")?.addEventListener("click", () => {
-    document.querySelector("#loginError").textContent = "PIN reset needs email or SMS setup. Contact your coach or admin for now.";
+    state.forgotPinOpen = true;
+    state.forgotPinError = "";
+    state.forgotPinSuccess = "";
+    render();
+  });
+  document.querySelector("#backFromForgotPin")?.addEventListener("click", () => {
+    state.forgotPinOpen = false;
+    render();
+  });
+  document.querySelectorAll("[data-forgot-pin-field]").forEach((input) => input.addEventListener("input", () => {
+    state.forgotPin[input.dataset.forgotPinField] = input.value;
+  }));
+  document.querySelector("#submitForgotPinRequest")?.addEventListener("click", () => {
+    try {
+      submitPinResetRequest(store, state.forgotPin);
+      state.forgotPinSuccess = "Your PIN reset request was sent to Admin.";
+      state.forgotPinError = "";
+      state.forgotPin = { nameOrEmail: "", phone: "", note: "" };
+      render();
+    } catch (error) {
+      state.forgotPinError = error.message;
+      render();
+    }
   });
   document.querySelector("#openSignupButton")?.addEventListener("click", () => {
     state.signupOpen = true;
+    state.forgotPinOpen = false;
     state.signupError = "";
     state.signupSuccess = "";
     render();
@@ -34921,6 +35022,16 @@ function bindGlobal() {
     const result = adminResetUserPin(store, state.currentUser, button.dataset.tempPin);
     window.alert(`Temporary PIN for ${result.user.name}: ${result.temporaryPin}`);
     render();
+  }));
+  document.querySelectorAll("[data-resolve-pin-request]").forEach((button) => button.addEventListener("click", () => {
+    const [requestId, method] = button.dataset.resolvePinRequest.split(":");
+    try {
+      const result = adminResolvePinResetRequest(store, state.currentUser, requestId, method);
+      window.alert(result.request.adminMessage);
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
   }));
   document.querySelectorAll("[data-toggle-login]").forEach((button) => button.addEventListener("click", () => {
     const user = store.users.find((item) => item.id === button.dataset.toggleLogin);

@@ -79,6 +79,7 @@ export function createStore() {
     weeklyCheckIns: [],
     dailyCheckIns: [],
     painCheckIns: [],
+    pinResetRequests: [],
     progressImages: [],
     coachAlerts: [],
     todayWorkoutAdjustments: [],

@@ -30,6 +30,7 @@ import {
   adminResetUserPin,
   adminSetUserPin,
   adminSetLoginDisabled,
+  adminResolvePinResetRequest,
   adminUpdateWorkout,
   approveMonthlyPlan,
   authenticateUser,
@@ -63,6 +64,7 @@ import {
   saveWeeklyCheckIn,
   searchExerciseLibrary,
   suggestMonthlyPlanLevel,
+  submitPinResetRequest,
   unreadNotificationCount,
   uploadProfileImage,
   uploadProgressImage,
@@ -725,6 +727,19 @@ test("notifications can be marked read", () => {
   assert.ok(unreadNotificationCount(store, user.id) > 0);
   markNotificationsRead(store, user.id);
   assert.equal(unreadNotificationCount(store, user.id), 0);
+});
+
+test("forgot PIN request notifies Admin and can be resolved by email or text", () => {
+  const store = createStore();
+  const request = submitPinResetRequest(store, { nameOrEmail: "ada@example.com", phone: "55511111", note: "Forgot my PIN" });
+  assert.equal(request.status, "New");
+  assert.equal(request.userId, "client_user_ada");
+  assert.equal(store.notifications.some((item) => item.userId === "admin_1" && item.type === "PIN Reset Request"), true);
+  const admin = authenticateUser(store, "Admin", "9999");
+  const result = adminResolvePinResetRequest(store, admin, request.id, "Text");
+  assert.equal(result.request.status, "Resolved");
+  assert.match(result.request.adminMessage, /Text to 55511111/);
+  assert.equal(authenticateUser(store, "ada@example.com", result.temporaryPin).id, "client_user_ada");
 });
 
 test("admin can change coach password", () => {
