@@ -14,6 +14,7 @@ import {
   adminCreatePackage,
   adminCreatePlanOffering,
   adminCreateWorkoutTemplate,
+  adminDuplicateExercise,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
   adminInterveneInChat,
@@ -234,6 +235,19 @@ const state = {
   editModal: null,
   editModalDirty: false,
   clientEditTab: "Profile",
+  exercisePopupMode: "view",
+  exercisePopupTab: "Overview",
+  exerciseLibraryFilters: {
+    search: "",
+    category: "All",
+    sportFocus: "All",
+    trainingLevel: "All",
+    difficulty: "All",
+    equipment: "",
+    bodyArea: "",
+    sessionPart: "All",
+    status: "Active"
+  },
   chatDraft: "",
   assessment: blankAssessment("client_ada", today),
   assessmentStep: 0,
@@ -1402,7 +1416,7 @@ function adminView() {
           <button class="primary full" id="adminCreateExercise">Add New Exercise</button>
           <input id="adminExerciseExcelInput" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/tab-separated-values" />
           <button class="success full" id="adminImportExcel">Import Excel Exercise Library</button>
-          <div class="admin-list">${store.exercises.slice(-8).map((exercise) => `<div class="admin-row"><span>${exercise.exerciseName || exercise.name} / ${exercise.trainingLevel || exercise.planLevel}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span><button data-open-exercise-editor="${exercise.id}">Edit</button><button data-archive-exercise="${exercise.id}">Archive</button><button data-delete-exercise="${exercise.id}">Delete</button></div>`).join("")}</div>
+          ${exerciseLibraryAdminList()}
         </article>
         <article class="card admin-card ${adminPanelClass("workouts")}" id="admin-workouts-new">
           <h3>Add Workout Template</h3>
@@ -1530,6 +1544,59 @@ function adminEditModal() {
   if (state.editModal.type === "assessmentTemplate") return assessmentTemplateEditModal(state.editModal.id);
   if (state.editModal.type === "account") return accountReviewModal(state.editModal.id);
   return "";
+}
+
+function exerciseLibraryAdminList() {
+  const f = state.exerciseLibraryFilters;
+  const categories = ["All", ...uniqueValues(store.exercises.map((exercise) => exercise.category))];
+  const sports = ["All", ...uniqueValues(store.exercises.map((exercise) => exercise.sportFocus))];
+  const levels = ["All", "Beginner", "Intermediate", "Advanced", "Pro"];
+  const difficulties = ["All", "Easy", "Medium", "Hard"];
+  const parts = ["All", "Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"];
+  const filtered = store.exercises.filter((exercise) => {
+    const text = `${exercise.exerciseName || exercise.name} ${exercise.description || ""} ${exercise.category || ""}`.toLowerCase();
+    if (f.search && !text.includes(f.search.toLowerCase())) return false;
+    if (f.category !== "All" && exercise.category !== f.category) return false;
+    if (f.sportFocus !== "All" && exercise.sportFocus !== f.sportFocus) return false;
+    if (f.trainingLevel !== "All" && (exercise.trainingLevel || exercise.planLevel) !== f.trainingLevel) return false;
+    if (f.difficulty !== "All" && exercise.difficulty !== f.difficulty) return false;
+    if (f.sessionPart !== "All" && exercise.sessionPart !== f.sessionPart) return false;
+    if (f.status === "Active" && (exercise.active === false || exercise.archived)) return false;
+    if (f.status === "Archived" && !exercise.archived) return false;
+    if (f.equipment && !listValue(exercise.equipment).toLowerCase().includes(f.equipment.toLowerCase())) return false;
+    if (f.bodyArea && !listValue(exercise.bodyArea).toLowerCase().includes(f.bodyArea.toLowerCase())) return false;
+    return true;
+  });
+  return `
+    <div class="section-title"><h3>Workout Library Exercises</h3><span>${filtered.length} shown / ${store.exercises.length} total</span></div>
+    <div class="form-grid compact-form">
+      <label>Search exercises<input data-exercise-filter="search" value="${escapeHtml(f.search)}" placeholder="Search by name or notes" /></label>
+      ${filterSelect("category", "Category", categories, f.category)}
+      ${filterSelect("sportFocus", "Sport focus", sports, f.sportFocus)}
+      ${filterSelect("trainingLevel", "Training level", levels, f.trainingLevel)}
+      ${filterSelect("difficulty", "Difficulty", difficulties, f.difficulty)}
+      <label>Equipment<input data-exercise-filter="equipment" value="${escapeHtml(f.equipment)}" placeholder="Bands, bag, dumbbells" /></label>
+      <label>Body area<input data-exercise-filter="bodyArea" value="${escapeHtml(f.bodyArea)}" placeholder="Shoulder, knee, core" /></label>
+      ${filterSelect("sessionPart", "Session part", parts, f.sessionPart)}
+      ${filterSelect("status", "Status", ["Active", "Archived", "All"], f.status)}
+    </div>
+    <div class="admin-list exercise-library-list">
+      ${filtered.map((exercise) => `
+        <button class="admin-row clickable-row exercise-row" data-open-exercise-editor="${exercise.id}">
+          <span>${exercise.exerciseName || exercise.name} / ${exercise.category || "Uncategorized"} / ${exercise.trainingLevel || exercise.planLevel || "No level"}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span>
+          <small>${exercise.sessionPart || "Any block"} / ${exercise.difficulty || "No difficulty"} / ${exercise.archived ? "Archived" : "Active"}</small>
+        </button>
+      `).join("") || `<div class="empty">No exercises match these filters.</div>`}
+    </div>
+  `;
+}
+
+function filterSelect(key, label, options, value) {
+  return `<label>${label}<select data-exercise-filter="${key}">${options.map((option) => `<option value="${option}" ${String(option) === String(value) ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
 }
 
 function clientEditModal(clientId) {
@@ -1802,21 +1869,124 @@ function accountReviewModal(userId) {
 function exerciseEditModal(exerciseId) {
   const exercise = store.exercises.find((item) => item.id === exerciseId);
   if (!exercise) return "";
+  const workoutItem = state.editModal?.workoutItemId ? store.workoutTemplateItems.find((item) => item.id === state.editModal.workoutItemId) : null;
+  const usage = exerciseUsageSummary(exerciseId);
+  if (state.exercisePopupMode === "edit") return exerciseEditModeModal(exercise, workoutItem, usage);
+  const tabs = ["Overview", "Instructions", "Safety", "Alternatives", "Video", "Admin Notes"];
+  const tabClass = (tab) => tab === state.exercisePopupTab ? "client-edit-panel active-client-edit-panel" : "client-edit-panel hidden";
+  const detail = (label, value) => `<div><dt>${label}</dt><dd>${escapeHtml(listValue(value) || "Not set")}</dd></div>`;
   return `
     <div class="modal-backdrop" role="dialog" aria-modal="true">
-      <section class="modal-card large-modal">
+      <section class="modal-card large-modal exercise-detail-modal">
         <div class="modal-head">
-          <div><p class="eyebrow">Edit Exercise</p><h2>${escapeHtml(exercise.exerciseName || exercise.name)}</h2></div>
+          <div><p class="eyebrow">Exercise Library Record</p><h2>${escapeHtml(exercise.exerciseName || exercise.name)}</h2><p class="muted">View details first. Use Edit only when you want to change the master library record.</p></div>
           <button class="ghost" id="closeEditModal">Close</button>
         </div>
+        ${workoutItem ? `<div class="result-band"><strong>Workout item context</strong><span>Editing the Exercise Library record may affect future workouts. Editing this workout item only affects this workout.</span></div>` : ""}
+        ${usage.used ? `<div class="result-band"><strong>Connected exercise</strong><span>This exercise is connected to existing workouts or history. Archive is recommended instead of delete.</span></div>` : ""}
+        <div class="tab-row client-edit-tabs">
+          ${tabs.map((tab) => `<button class="${state.exercisePopupTab === tab ? "active" : ""}" data-exercise-popup-tab="${tab}">${tab}</button>`).join("")}
+        </div>
+        <div class="${tabClass("Overview")}">
+          <div class="grid-3 stat-strip">
+            ${infoCard("Training level", exercise.trainingLevel || exercise.planLevel || "Not set")}
+            ${infoCard("Difficulty", exercise.difficulty || "Not set")}
+            ${infoCard("Status", exercise.archived || exercise.active === false ? "Archived" : "Active")}
+          </div>
+          <p>${escapeHtml(exercise.description || "No description added yet.")}</p>
+          <dl class="detail-grid">
+            ${detail("Purpose", exercise.purpose || exercise.goal)}
+            ${detail("Category", exercise.category)}
+            ${detail("Sport focus", exercise.sportFocus)}
+            ${detail("Goal", exercise.goal)}
+            ${detail("Recovery alternative", exercise.recoveryAlternative ? "Yes" : "No")}
+            ${detail("Session part", exercise.sessionPart)}
+            ${detail("Equipment", exercise.equipment)}
+            ${detail("Body area", exercise.bodyArea)}
+            ${detail("Stress area", exercise.stressArea)}
+            ${detail("Low impact", exercise.lowImpact ? "Yes" : "No")}
+            ${detail("Sets", exercise.sets)}
+            ${detail("Reps", exercise.reps)}
+            ${detail("Time", exercise.time)}
+            ${detail("Rest", exercise.rest)}
+            ${detail("Rounds", exercise.rounds)}
+          </dl>
+        </div>
+        <div class="${tabClass("Instructions")}">
+          <dl class="detail-grid">
+            ${detail("Setup", exercise.setupInstructions)}
+            ${detail("Step-by-step", exercise.howToPerform || exercise.stepByStepInstructions || exercise.instructions)}
+            ${detail("Breathing", exercise.breathingInstructions)}
+            ${detail("Tempo / pace", exercise.tempo || exercise.pace)}
+            ${detail("Coaching cues", exercise.coachingCues)}
+            ${detail("Common mistakes", exercise.commonMistakes)}
+          </dl>
+        </div>
+        <div class="${tabClass("Safety")}">
+          <dl class="detail-grid">
+            ${detail("Safety warnings", exercise.safetyWarnings)}
+            ${detail("Pain warnings", exercise.painWarnings)}
+            ${detail("Contraindications", exercise.contraindications)}
+            ${detail("Stress area", exercise.stressArea)}
+            ${detail("Low impact", exercise.lowImpact ? "Yes" : "No")}
+          </dl>
+        </div>
+        <div class="${tabClass("Alternatives")}">
+          <dl class="detail-grid">
+            ${detail("Regression / easier version", exercise.regressionExerciseId || exercise.easierVersion)}
+            ${detail("Progression / harder version", exercise.progressionExerciseId || exercise.harderVersion)}
+            ${detail("Low-impact option", exercise.lowImpactOption)}
+            ${detail("Safe alternative", exercise.safeAlternativeExerciseId || exercise.safeAlternative)}
+            ${detail("Replacement category", exercise.replacementCategory)}
+          </dl>
+        </div>
+        <div class="${tabClass("Video")}">
+          ${exercise.imageUrl ? `<img class="exercise-preview-image" src="${escapeHtml(exercise.imageUrl)}" alt="${escapeHtml(exercise.exerciseName || exercise.name)} preview" />` : ""}
+          ${youtubeEmbed(exercise.youtubeUrl || exercise.videoUrl)}
+          ${exercise.youtubeUrl ? `<a class="button-link" target="_blank" rel="noreferrer" href="${escapeHtml(exercise.youtubeUrl)}">Open YouTube</a>` : ""}
+          ${exercise.videoUrl ? `<a class="button-link" target="_blank" rel="noreferrer" href="${escapeHtml(exercise.videoUrl)}">Watch Video</a>` : ""}
+          ${!exercise.youtubeUrl && !exercise.videoUrl ? `<p class="muted">No video added yet.</p>` : ""}
+        </div>
+        <div class="${tabClass("Admin Notes")}">
+          <dl class="detail-grid">
+            ${detail("Coach-only notes", exercise.coachOnlyNotes || exercise.coachNotes)}
+            ${detail("Client-facing notes", exercise.clientNotes || exercise.clientFacingNotes)}
+            ${detail("Internal notes", exercise.internalNotes)}
+            ${detail("Used in", usage.label)}
+          </dl>
+        </div>
+        ${workoutItem ? workoutItemOnlyPanel(workoutItem) : ""}
+        <div class="modal-actions sticky-modal-actions">
+          <button id="exercisePopupEdit" data-exercise-id="${exercise.id}">Edit Exercise Library Record</button>
+          ${workoutItem ? `<button id="exercisePopupItemOnly" data-workout-item-id="${workoutItem.id}">Edit This Workout Item Only</button>` : ""}
+          <button id="exercisePopupDuplicate" data-exercise-id="${exercise.id}">Duplicate</button>
+          <button id="exercisePopupArchive" data-exercise-id="${exercise.id}">Archive</button>
+          <button class="danger" id="exercisePopupDelete" data-exercise-id="${exercise.id}">Delete</button>
+          <button class="ghost" id="closeEditModalSecondary">Close</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function exerciseEditModeModal(exercise, workoutItem, usage) {
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal exercise-detail-modal">
+        <div class="modal-head">
+          <div><p class="eyebrow">Edit Exercise Library Record</p><h2>${escapeHtml(exercise.exerciseName || exercise.name)}</h2><p class="muted">Changes here update the master exercise record for future use.</p></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        ${usage.used ? `<div class="result-band"><strong>Connected exercise</strong><span>This exercise is connected to existing workouts or history. Archive is recommended instead of delete.</span></div>` : ""}
         <div class="form-grid">
           ${editInput("exercise", "exerciseName", "Exercise name", exercise.exerciseName || exercise.name)}
-          ${editInput("exercise", "description", "Description", exercise.description)}
+          ${editInput("exercise", "description", "Short description", exercise.description)}
+          ${editInput("exercise", "purpose", "Purpose", exercise.purpose || exercise.goal)}
           ${editSelect("exercise", "category", "Category", ["Strength", "Cardio", "Boxing", "Kickboxing", "Mobility", "Core", "Recovery"], exercise.category)}
           ${editSelect("exercise", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "General Fitness"], exercise.sportFocus)}
           ${editInput("exercise", "goal", "Goal", exercise.goal)}
-          ${editSelect("exercise", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], exercise.difficulty)}
           ${editSelect("exercise", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], exercise.trainingLevel || exercise.planLevel)}
+          ${editSelect("exercise", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], exercise.difficulty)}
           ${editSelect("exercise", "sessionPart", "Session part", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"], exercise.sessionPart)}
           ${editInput("exercise", "equipment", "Equipment needed", listValue(exercise.equipment))}
           ${editInput("exercise", "bodyArea", "Body area", listValue(exercise.bodyArea))}
@@ -1826,10 +1996,14 @@ function exerciseEditModal(exerciseId) {
           ${editInput("exercise", "time", "Time", exercise.time)}
           ${editInput("exercise", "rest", "Rest", exercise.rest)}
           ${editInput("exercise", "rounds", "Rounds", exercise.rounds, "number")}
-          ${editInput("exercise", "videoUrl", "Video URL", exercise.videoUrl || exercise.youtubeUrl)}
-          ${editInput("exercise", "regressionExerciseId", "Easier version ID", exercise.regressionExerciseId)}
-          ${editInput("exercise", "progressionExerciseId", "Harder version ID", exercise.progressionExerciseId)}
-          ${editInput("exercise", "safeAlternativeExerciseId", "Safe alternative ID", exercise.safeAlternativeExerciseId)}
+          ${editInput("exercise", "tempo", "Tempo or pace", exercise.tempo || exercise.pace)}
+          ${editInput("exercise", "videoUrl", "Video URL", exercise.videoUrl || "")}
+          ${editInput("exercise", "youtubeUrl", "YouTube URL", exercise.youtubeUrl || "")}
+          ${editInput("exercise", "imageUrl", "Image URL", exercise.imageUrl || "")}
+          ${editInput("exercise", "regressionExerciseId", "Regression exercise", exercise.regressionExerciseId)}
+          ${editInput("exercise", "progressionExerciseId", "Progression exercise", exercise.progressionExerciseId)}
+          ${editInput("exercise", "lowImpactOption", "Low-impact option", exercise.lowImpactOption)}
+          ${editInput("exercise", "safeAlternativeExerciseId", "Safe alternative exercise", exercise.safeAlternativeExerciseId)}
           ${editInput("exercise", "replacementCategory", "Replacement category", exercise.replacementCategory)}
         </div>
         <div class="check-grid">
@@ -1838,18 +2012,66 @@ function exerciseEditModal(exerciseId) {
           <label><input class="inline-check" id="editExerciseActive" type="checkbox" ${exercise.active !== false ? "checked" : ""} /> Active</label>
         </div>
         <label>Setup instructions <textarea data-edit-exercise-field="setupInstructions">${escapeHtml(exercise.setupInstructions || "")}</textarea></label>
-        <label>How to perform <textarea data-edit-exercise-field="howToPerform">${escapeHtml(exercise.howToPerform || exercise.instructions || "")}</textarea></label>
+        <label>Step-by-step instructions <textarea data-edit-exercise-field="howToPerform">${escapeHtml(exercise.howToPerform || exercise.stepByStepInstructions || exercise.instructions || "")}</textarea></label>
+        <label>Breathing instructions <textarea data-edit-exercise-field="breathingInstructions">${escapeHtml(exercise.breathingInstructions || "")}</textarea></label>
         <label>Coaching cues <textarea data-edit-exercise-field="coachingCues">${escapeHtml(listValue(exercise.coachingCues))}</textarea></label>
         <label>Common mistakes <textarea data-edit-exercise-field="commonMistakes">${escapeHtml(listValue(exercise.commonMistakes))}</textarea></label>
-        <label>Safety / pain warnings <textarea data-edit-exercise-field="safetyWarnings">${escapeHtml(listValue(exercise.safetyWarnings || exercise.painWarnings))}</textarea></label>
+        <label>Safety warnings <textarea data-edit-exercise-field="safetyWarnings">${escapeHtml(listValue(exercise.safetyWarnings))}</textarea></label>
+        <label>Pain warnings <textarea data-edit-exercise-field="painWarnings">${escapeHtml(listValue(exercise.painWarnings))}</textarea></label>
         <label>Contraindications <textarea data-edit-exercise-field="contraindications">${escapeHtml(listValue(exercise.contraindications))}</textarea></label>
-        <div class="modal-actions">
-          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
-          <button class="primary" id="saveExerciseModal" data-exercise-id="${exercise.id}">Save Exercise</button>
+        <label>Coach-only notes <textarea data-edit-exercise-field="coachNotes">${escapeHtml(exercise.coachNotes || exercise.coachOnlyNotes || "")}</textarea></label>
+        <label>Client-facing notes <textarea data-edit-exercise-field="clientNotes">${escapeHtml(exercise.clientNotes || exercise.clientFacingNotes || "")}</textarea></label>
+        ${workoutItem ? workoutItemOnlyPanel(workoutItem) : ""}
+        <div class="modal-actions sticky-modal-actions">
+          <button class="ghost" id="exercisePopupCancelEdit">Cancel</button>
+          <button class="primary" id="saveExerciseModal" data-exercise-id="${exercise.id}">Save Changes</button>
+          <button id="exercisePopupArchive" data-exercise-id="${exercise.id}">Archive</button>
+          <button class="danger" id="exercisePopupDelete" data-exercise-id="${exercise.id}">Delete</button>
         </div>
       </section>
     </div>
   `;
+}
+
+function workoutItemOnlyPanel(item) {
+  return `
+    <div class="result-band"><strong>Edit This Workout Item Only</strong><span>This changes sets, reps, time, rest, rounds, notes, and order only for this workout item.</span></div>
+    <div class="form-grid compact-form">
+      ${modalInput(`popupItemSets-${item.id}`, "Sets", item.sets || "", "number")}
+      ${modalInput(`popupItemReps-${item.id}`, "Reps", item.reps || "", "number")}
+      ${modalInput(`popupItemTime-${item.id}`, "Time", item.time || "")}
+      ${modalInput(`popupItemRest-${item.id}`, "Rest", item.rest || "")}
+      ${modalInput(`popupItemRounds-${item.id}`, "Rounds", item.rounds || "", "number")}
+      ${modalInput(`popupItemOrder-${item.id}`, "Display order", item.displayOrder || "", "number")}
+    </div>
+    <label>Workout item coaching notes <textarea id="popupItemCoachNotes-${item.id}">${escapeHtml(item.coachingNotes || "")}</textarea></label>
+    <label>Workout item client notes <textarea id="popupItemClientNotes-${item.id}">${escapeHtml(item.clientNotes || "")}</textarea></label>
+    <button class="success" data-save-popup-workout-item="${item.id}">Save Workout Item Only</button>
+  `;
+}
+
+function exerciseUsageSummary(exerciseId) {
+  const templateItems = store.workoutTemplateItems.filter((item) => item.exerciseId === exerciseId);
+  const monthlyItems = store.monthlyPlanItems.filter((item) => (item.items || []).some((exercise) => exercise.exerciseId === exerciseId));
+  const adjustments = store.todayWorkoutAdjustments.filter((adjustment) => JSON.stringify(adjustment).includes(exerciseId));
+  const count = templateItems.length + monthlyItems.length + adjustments.length;
+  return {
+    used: count > 0,
+    count,
+    label: count ? `${templateItems.length} workout template item(s), ${monthlyItems.length} monthly plan item(s), ${adjustments.length} adjustment record(s)` : "No current workout connections found."
+  };
+}
+
+function youtubeEmbed(url) {
+  const id = youtubeId(url);
+  if (!id) return "";
+  return `<iframe class="video-frame" src="https://www.youtube.com/embed/${id}" title="Exercise video" loading="lazy" allowfullscreen></iframe>`;
+}
+
+function youtubeId(url) {
+  const text = String(url || "");
+  const match = text.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{6,})/);
+  return match?.[1] || "";
 }
 
 function workoutEditModal(workoutId) {
@@ -1905,6 +2127,7 @@ function workoutEditModal(workoutId) {
 function workoutItemEditRow(item) {
   return `
     <div class="admin-row modal-item-row">
+      <button data-open-workout-exercise="${item.exerciseId}:${item.id}">View Exercise</button>
       ${modalSelect(`itemExercise-${item.id}`, "Exercise", store.exercises.map((exercise) => ({ value: exercise.id, label: exercise.exerciseName || exercise.name })), item.exerciseId)}
       ${modalSelect(`itemPart-${item.id}`, "Block", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"], item.sessionPart)}
       ${modalInput(`itemSets-${item.id}`, "Sets", item.sets || "", "number")}
@@ -2342,12 +2565,33 @@ function bindGlobal() {
     const [group, key] = field.dataset.adminCheck.split(":");
     state.adminDrafts[group][key] = field.checked;
   }));
+  document.querySelectorAll("[data-exercise-filter]").forEach((field) => {
+    const updateFilter = () => {
+      state.exerciseLibraryFilters[field.dataset.exerciseFilter] = field.value;
+      render();
+    };
+    field.addEventListener("change", updateFilter);
+    if (field.tagName === "INPUT") field.addEventListener("input", updateFilter);
+  });
   document.querySelectorAll("[data-admin-panel]").forEach((button) => button.addEventListener("click", () => {
     state.adminPanel = button.dataset.adminPanel;
     render();
   }));
   document.querySelectorAll("[data-open-exercise-editor]").forEach((button) => button.addEventListener("click", () => {
     state.editModal = { type: "exercise", id: button.dataset.openExerciseEditor };
+    state.exercisePopupMode = "view";
+    state.exercisePopupTab = "Overview";
+    state.editModalDirty = false;
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Opened exercise popup for ${button.dataset.openExerciseEditor}`, createdAt: new Date().toISOString() });
+    render();
+  }));
+  document.querySelectorAll("[data-open-workout-exercise]").forEach((button) => button.addEventListener("click", () => {
+    const [exerciseId, workoutItemId] = button.dataset.openWorkoutExercise.split(":");
+    state.editModal = { type: "exercise", id: exerciseId, workoutItemId, returnWorkoutId: state.editModal?.id };
+    state.exercisePopupMode = "view";
+    state.exercisePopupTab = "Overview";
+    state.editModalDirty = false;
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Opened exercise popup from workout item ${workoutItemId}`, createdAt: new Date().toISOString() });
     render();
   }));
   document.querySelectorAll("[data-open-client-editor]").forEach((button) => button.addEventListener("click", () => {
@@ -2393,6 +2637,7 @@ function bindGlobal() {
   });
   document.querySelectorAll("#closeEditModal, #closeEditModalSecondary").forEach((button) => button.addEventListener("click", () => {
     if (state.editModal?.type === "client" && state.editModalDirty && !window.confirm("Close without saving your client changes?")) return;
+    if (state.editModal?.type === "exercise" && state.exercisePopupMode === "edit" && state.editModalDirty && !window.confirm("Close without saving your exercise changes?")) return;
     state.editModal = null;
     state.editModalDirty = false;
     render();
@@ -2405,12 +2650,34 @@ function bindGlobal() {
     state.clientEditTab = button.dataset.clientEditTab;
     render();
   }));
+  document.querySelectorAll("[data-edit-exercise-field]").forEach((field) => {
+    field.addEventListener("input", () => state.editModalDirty = true);
+    field.addEventListener("change", () => state.editModalDirty = true);
+  });
+  document.querySelectorAll("[data-exercise-popup-tab]").forEach((button) => button.addEventListener("click", () => {
+    state.exercisePopupTab = button.dataset.exercisePopupTab;
+    render();
+  }));
+  document.querySelector("#exercisePopupEdit")?.addEventListener("click", () => {
+    state.exercisePopupMode = "edit";
+    state.editModalDirty = false;
+    render();
+  });
+  document.querySelector("#exercisePopupItemOnly")?.addEventListener("click", () => {
+    window.alert("Use the workout item fields in this popup to change only sets, reps, time, rest, rounds, notes, or order.");
+  });
+  document.querySelector("#exercisePopupCancelEdit")?.addEventListener("click", () => {
+    if (state.editModalDirty && !window.confirm("Cancel without saving exercise changes?")) return;
+    state.exercisePopupMode = "view";
+    state.editModalDirty = false;
+    render();
+  });
   document.querySelector("#saveExerciseModal")?.addEventListener("click", (event) => {
     const exerciseId = event.currentTarget.dataset.exerciseId;
     const patch = collectEditFields("exercise");
     patch.name = patch.exerciseName;
     patch.planLevel = patch.trainingLevel;
-    patch.youtubeUrl = patch.videoUrl;
+    patch.youtubeUrl = patch.youtubeUrl || patch.videoUrl;
     patch.equipment = csvValue(patch.equipment);
     patch.bodyArea = csvValue(patch.bodyArea);
     patch.stressArea = csvValue(patch.stressArea);
@@ -2424,9 +2691,55 @@ function bindGlobal() {
     patch.active = document.querySelector("#editExerciseActive")?.checked || false;
     patch.archived = !patch.active;
     adminUpdateExercise(store, state.currentUser, exerciseId, patch);
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Edited exercise from popup ${exerciseId}`, createdAt: new Date().toISOString() });
+    if (patch.youtubeUrl || patch.videoUrl) store.adminAuditLog.push({ id: `audit_${Date.now()}_video`, adminUserId: state.currentUser.id, action: `Added or updated video link from popup ${exerciseId}`, createdAt: new Date().toISOString() });
+    state.exercisePopupMode = "view";
+    state.editModalDirty = false;
+    window.alert("Exercise changes saved.");
+    render();
+  });
+  document.querySelector("#exercisePopupDuplicate")?.addEventListener("click", (event) => {
+    const duplicate = adminDuplicateExercise(store, state.currentUser, event.currentTarget.dataset.exerciseId);
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Duplicated exercise from popup ${event.currentTarget.dataset.exerciseId}`, createdAt: new Date().toISOString() });
+    state.editModal = { type: "exercise", id: duplicate.id };
+    state.exercisePopupMode = "view";
+    state.exercisePopupTab = "Overview";
+    render();
+  });
+  document.querySelector("#exercisePopupArchive")?.addEventListener("click", (event) => {
+    if (!window.confirm("Are you sure you want to archive this exercise? It will no longer be active, but workout history will be kept.")) return;
+    adminArchiveExercise(store, state.currentUser, event.currentTarget.dataset.exerciseId);
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Archived exercise from popup ${event.currentTarget.dataset.exerciseId}`, createdAt: new Date().toISOString() });
+    state.exercisePopupMode = "view";
+    render();
+  });
+  document.querySelector("#exercisePopupDelete")?.addEventListener("click", (event) => {
+    const usage = exerciseUsageSummary(event.currentTarget.dataset.exerciseId);
+    if (usage.used) {
+      window.alert("This exercise is connected to existing workouts or history. Archive is recommended instead of delete.");
+      if (!window.confirm("Are you sure you still want to permanently delete this exercise? This cannot be undone.")) return;
+    } else if (!window.confirm("Are you sure you want to permanently delete this exercise? This cannot be undone.")) return;
+    adminDeleteExercise(store, state.currentUser, event.currentTarget.dataset.exerciseId);
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Deleted exercise from popup ${event.currentTarget.dataset.exerciseId}`, createdAt: new Date().toISOString() });
     state.editModal = null;
     render();
   });
+  document.querySelectorAll("[data-save-popup-workout-item]").forEach((button) => button.addEventListener("click", () => {
+    const itemId = button.dataset.savePopupWorkoutItem;
+    adminUpdateWorkoutTemplateItem(store, state.currentUser, itemId, {
+      sets: document.getElementById(`popupItemSets-${itemId}`)?.value,
+      reps: document.getElementById(`popupItemReps-${itemId}`)?.value,
+      time: document.getElementById(`popupItemTime-${itemId}`)?.value,
+      rest: document.getElementById(`popupItemRest-${itemId}`)?.value,
+      rounds: document.getElementById(`popupItemRounds-${itemId}`)?.value,
+      displayOrder: Number(document.getElementById(`popupItemOrder-${itemId}`)?.value || 0),
+      coachingNotes: document.getElementById(`popupItemCoachNotes-${itemId}`)?.value || "",
+      clientNotes: document.getElementById(`popupItemClientNotes-${itemId}`)?.value || ""
+    });
+    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Edited workout item from exercise popup ${itemId}`, createdAt: new Date().toISOString() });
+    window.alert("Workout item updated without changing the master exercise.");
+    render();
+  }));
   document.querySelector("#saveWorkoutModal")?.addEventListener("click", (event) => {
     const workoutId = event.currentTarget.dataset.workoutId;
     const patch = collectEditFields("workout");

@@ -1203,6 +1203,43 @@ dd {
   padding-right: 4px;
 }
 
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-grid div {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 215, 102, 0.18);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.detail-grid dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}
+
+.detail-grid dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.exercise-library-list .clickable-row {
+  width: 100%;
+  text-align: left;
+}
+
+.exercise-preview-image {
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 215, 102, 0.22);
+}
+
 .modal-item-row {
   grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto;
   align-items: end;
@@ -1237,6 +1274,7 @@ dd {
   .progress,
   .grid-3,
   .grid-4,
+  .detail-grid,
   .dashboard-grid,
   .chat-layout,
   .summary-row,

@@ -24,12 +24,14 @@ import {
   adminDeletePackage,
   adminDeletePlanOffering,
   adminDeleteWorkoutTemplate,
+  adminDuplicateExercise,
   adminUpdateCoach,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
   adminReorderWorkoutTemplateItems,
   adminUpdateClient,
   adminUpdateExercise,
+  adminUpdateWorkoutTemplateItem,
   adminResetUserPin,
   adminSetUserPin,
   adminSetLoginDisabled,
@@ -1107,6 +1109,40 @@ test("admin can create, edit, and archive an exercise", () => {
   assert.equal(store.exercises.find((item) => item.id === exercise.id).trainingLevel, "Intermediate");
   adminArchiveExercise(store, admin, exercise.id);
   assert.equal(store.exercises.find((item) => item.id === exercise.id).archived, true);
+});
+
+test("admin exercise popup workflow supports duplicate, archive, video edits, and workout-item-only edits", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const exercise = store.exercises.find((item) => item.id === "push_up");
+  const workout = adminCreateWorkoutTemplate(store, admin, { workoutName: "Popup Workout" });
+  const item = adminAddExerciseToWorkoutTemplate(store, admin, workout.id, {
+    exerciseId: exercise.id,
+    sets: 3,
+    reps: 8,
+    rest: "60 sec"
+  });
+  const duplicate = adminDuplicateExercise(store, admin, exercise.id);
+  assert.match(duplicate.exerciseName, /Copy/);
+  adminUpdateExercise(store, admin, exercise.id, {
+    exerciseName: "Push-Up Master Updated",
+    videoUrl: "https://youtu.be/example123",
+    youtubeUrl: "https://youtu.be/example123"
+  });
+  assert.equal(store.exercises.find((entry) => entry.id === exercise.id).exerciseName, "Push-Up Master Updated");
+  assert.equal(store.exercises.find((entry) => entry.id === exercise.id).videoUrl, "https://youtu.be/example123");
+  adminUpdateWorkoutTemplateItem(store, admin, item.id, {
+    sets: 2,
+    reps: 5,
+    rest: "90 sec",
+    coachingNotes: "Popup item-only change"
+  });
+  const updatedItem = store.workoutTemplateItems.find((entry) => entry.id === item.id);
+  assert.equal(updatedItem.sets, 2);
+  assert.equal(updatedItem.coachingNotes, "Popup item-only change");
+  assert.equal(store.exercises.find((entry) => entry.id === exercise.id).sets, exercise.sets);
+  adminArchiveExercise(store, admin, duplicate.id);
+  assert.equal(store.exercises.find((entry) => entry.id === duplicate.id).archived, true);
 });
 
 test("admin can delete exercises, workout templates, plan offerings, packages, and coaches", () => {
