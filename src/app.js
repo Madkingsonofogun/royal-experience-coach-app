@@ -1955,6 +1955,10 @@ function packageConnectModal(packageId) {
 
 function packageAssignModal(packageId = "") {
   const pkg = store.packages.find((item) => item.id === packageId) || store.packages[0];
+  const connectedOfferingIds = pkg?.planOfferingIds?.length ? pkg.planOfferingIds : [pkg?.planOfferingId].filter(Boolean);
+  const connectedOfferings = connectedOfferingIds
+    .map((id) => store.planOfferings.find((offering) => offering.id === id))
+    .filter(Boolean);
   return `
     <div class="modal-backdrop" role="dialog" aria-modal="true">
       <section class="modal-card">
@@ -1973,8 +1977,13 @@ function packageAssignModal(packageId = "") {
               ${store.clients.map((client) => `<option value="${client.id}" ${client.id === state.clientId ? "selected" : ""}>${client.name}</option>`).join("")}
             </select>
           </label>
+          <label>Plan offering for this client
+            <select id="assignPackageOfferingId">
+              ${connectedOfferings.map((offering) => `<option value="${offering.id}" ${offering.id === pkg?.planOfferingId ? "selected" : ""}>${offering.planName} / ${offering.trainingLevel || offering.planLevel} / $${offering.price || 0}</option>`).join("")}
+            </select>
+          </label>
         </div>
-        <div class="result-band"><strong>After assigning</strong><span>The selected client gets this package, its main plan offering, sessions, training days, and session length.</span></div>
+        <div class="result-band"><strong>After assigning</strong><span>The selected client gets this package and the exact connected plan offering chosen above.</span></div>
         <div class="modal-actions">
           <button class="ghost" id="closeEditModalSecondary">Cancel</button>
           <button class="primary" id="saveAssignPackageModal">Assign Package</button>
@@ -3037,8 +3046,9 @@ function bindGlobal() {
   document.querySelector("#saveAssignPackageModal")?.addEventListener("click", () => {
     const packageId = document.querySelector("#assignPackageId")?.value;
     const clientId = document.querySelector("#assignPackageClientId")?.value;
+    const planOfferingId = document.querySelector("#assignPackageOfferingId")?.value || null;
     if (!packageId || !clientId) return window.alert("Choose both a package and a client.");
-    adminAssignPackageToClient(store, state.currentUser, clientId, packageId);
+    adminAssignPackageToClient(store, state.currentUser, clientId, packageId, planOfferingId);
     state.clientId = clientId;
     window.alert("Package assigned to client.");
     state.editModal = null;

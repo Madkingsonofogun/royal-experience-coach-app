@@ -1287,10 +1287,12 @@ test("admin can create plan offering, assign it to package, and assign package t
     price: 199,
     sessionsIncluded: 10
   });
-  adminAssignPackageToClient(store, admin, "client_ada", pkg.id);
+  adminAssignPackageToClient(store, admin, "client_ada", pkg.id, secondOffering.id);
   const client = store.clients.find((item) => item.id === "client_ada");
   assert.equal(client.packageId, pkg.id);
-  assert.equal(client.planOfferingId, offering.id);
+  assert.equal(client.planOfferingId, secondOffering.id);
+  assert.equal(client.trainingDaysPerWeek, 3);
+  assert.equal(client.sessionLength, 45);
   assert.equal(client.packageType, "Edited Recovery Package");
   assert.deepEqual(store.packages.find((item) => item.id === pkg.id).planOfferingIds, [offering.id, secondOffering.id]);
 });

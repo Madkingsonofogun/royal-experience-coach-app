@@ -2233,11 +2233,16 @@ export function adminAssignPlanOfferingToPackage(store, adminUser, packageId, pl
   return pkg;
 }
 
-export function adminAssignPackageToClient(store, adminUser, clientId, packageId) {
+export function adminAssignPackageToClient(store, adminUser, clientId, packageId, planOfferingId = null) {
   requireAdmin(adminUser);
   const client = findById(store.clients, clientId, "Client");
   const pkg = findById(store.packages, packageId, "Package");
-  const offering = store.planOfferings.find((item) => item.id === pkg.planOfferingId);
+  const connectedOfferingIds = pkg.planOfferingIds?.length ? pkg.planOfferingIds : [pkg.planOfferingId].filter(Boolean);
+  if (planOfferingId && connectedOfferingIds.length && !connectedOfferingIds.includes(planOfferingId)) {
+    throw new Error("Selected plan offering is not connected to this package.");
+  }
+  const selectedOfferingId = planOfferingId || pkg.planOfferingId || connectedOfferingIds[0] || null;
+  const offering = selectedOfferingId ? findById(store.planOfferings, selectedOfferingId, "Plan offering") : null;
   client.packageId = pkg.id;
   client.packageType = pkg.packageName;
   client.planOfferingId = offering?.id || null;
