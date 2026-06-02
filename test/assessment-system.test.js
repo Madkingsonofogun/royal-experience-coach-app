@@ -1233,6 +1233,27 @@ test("admin can create and delete assessment templates", () => {
   assert.equal(store.assessmentTemplates.some((item) => item.id === template.id), false);
 });
 
+test("focus-based workbook assessment templates are imported with coach test details", () => {
+  const store = createStore();
+  const imported = store.assessmentTemplates.filter((item) => item.sourceWorkbook === "focus_based_assessment_templates_no_bjj_youth.xlsx");
+  const boxing = store.assessmentTemplates.find((item) => item.id === "assessment_template_boxing");
+  const recovery = store.assessmentTemplates.find((item) => item.id === "assessment_template_recovery_mobility");
+  assert.equal(imported.length, 8);
+  assert.ok(boxing);
+  assert.equal(boxing.sportFocus, "Boxing");
+  assert.ok(boxing.customTests.some((testItem) => testItem.testName.toLowerCase().includes("jab")));
+  assert.ok(boxing.movementTestIds.includes("push"));
+  assert.ok(boxing.movementTestIds.includes("conditioning"));
+  assert.ok(recovery.customTests.some((testItem) => testItem.testName.toLowerCase().includes("pain")));
+  assert.ok(recovery.movementTestIds.includes("pain"));
+  const summary = summarizeAssessment({
+    ...blankAssessment("client_ada"),
+    movementTestIds: boxing.movementTestIds,
+    movementScores: allScores(4)
+  });
+  assert.equal(summary.movementTestIds.length, boxing.movementTestIds.length);
+});
+
 test("admin can create a workout, add exercises, and reorder workout items", () => {
   const store = createStore();
   const admin = authenticateUser(store, "Admin", "9999");
