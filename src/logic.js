@@ -1381,6 +1381,43 @@ export function adminSetUserPin(store, adminUser, targetUserId, newPin) {
   return user;
 }
 
+export function adminEnsureClientLogin(store, adminUser, clientId, pin) {
+  requireAdmin(adminUser);
+  const client = findById(store.clients, clientId, "Client");
+  const existing = store.users.find((item) => item.role === "Client" && item.linkedId === client.id);
+  if (existing) return existing;
+  validateNumericPin(pin);
+  const pinSalt = makeId("salt");
+  const user = {
+    id: makeId("client_user"),
+    role: "Client",
+    name: client.name,
+    firstName: client.firstName || client.name.split(" ")[0] || "",
+    lastName: client.lastName || client.name.split(" ").slice(1).join(" "),
+    email: String(client.email || "").toLowerCase(),
+    phone: String(client.phone || ""),
+    pinSalt,
+    pinHash: hashPin(pin, pinSalt),
+    linkedId: client.id,
+    accountLocked: false,
+    accountStatus: "Active",
+    profileLocked: Boolean(client.profileLocked),
+    requestedRole: "Client",
+    requestNote: "Login created by Admin from client profile.",
+    emailVerified: false,
+    forcePinChange: true,
+    temporaryPinExpiresAt: futureIsoHours(24),
+    disabled: false,
+    profileImageUrl: client.profileImageUrl || "",
+    profileImageStorageKey: client.profileImageStorageKey || "",
+    profileImageUploadedAt: client.profileImageUploadedAt || null,
+    createdAt: nowIso()
+  };
+  store.users.push(user);
+  logAdminAction(store, adminUser, `Created login for client ${client.name}`);
+  return user;
+}
+
 export function adminResetUserPin(store, adminUser, targetUserId) {
   const tempPin = String(Math.floor(1000 + Math.random() * 9000));
   const user = adminSetUserPin(store, adminUser, targetUserId, tempPin);

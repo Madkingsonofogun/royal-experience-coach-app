@@ -15,6 +15,7 @@ import {
   adminCreatePlanOffering,
   adminCreateWorkoutTemplate,
   adminDuplicateExercise,
+  adminEnsureClientLogin,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
   adminInterveneInChat,
@@ -2949,11 +2950,11 @@ function bindGlobal() {
   });
   document.querySelector("#clientModalSetPin")?.addEventListener("click", (event) => {
     try {
-      const user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
-      if (!user) throw new Error("Client login not found.");
       const pin = document.querySelector("#clientModalNewPin")?.value || "";
       const confirmPin = document.querySelector("#clientModalConfirmPin")?.value || "";
       if (pin !== confirmPin) throw new Error("PIN and Confirm PIN must match.");
+      let user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
+      user = user || adminEnsureClientLogin(store, state.currentUser, event.currentTarget.dataset.clientId, pin);
       adminSetUserPin(store, state.currentUser, user.id, pin);
       window.alert(`PIN updated for ${user.name}. They must use the new PIN next login.`);
       render();
@@ -3053,8 +3054,9 @@ function bindGlobal() {
     render();
   }));
   document.querySelector("#clientModalResetPin")?.addEventListener("click", (event) => {
-    const user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
-    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    let user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
+    user = user || adminEnsureClientLogin(store, state.currentUser, event.currentTarget.dataset.clientId, "0000");
+    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
     render();
   });
   document.querySelector("#clientModalToggleLock")?.addEventListener("click", (event) => {
@@ -3102,8 +3104,9 @@ function bindGlobal() {
     render();
   }));
   document.querySelectorAll("[data-reset-client-pin]").forEach((button) => button.addEventListener("click", () => {
-    const user = store.users.find((item) => item.linkedId === button.dataset.resetClientPin);
-    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    let user = store.users.find((item) => item.role === "Client" && item.linkedId === button.dataset.resetClientPin);
+    user = user || adminEnsureClientLogin(store, state.currentUser, button.dataset.resetClientPin, "0000");
+    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
     render();
   }));
   document.querySelector("#adminCreateExercise")?.addEventListener("click", () => {

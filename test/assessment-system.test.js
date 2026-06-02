@@ -25,6 +25,7 @@ import {
   adminDeletePlanOffering,
   adminDeleteWorkoutTemplate,
   adminDuplicateExercise,
+  adminEnsureClientLogin,
   adminUpdateCoach,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
@@ -933,6 +934,29 @@ test("admin can reset client and coach PINs without seeing current PIN", () => {
   assert.equal(clientReset.user.forcePinChange, true);
   assert.equal(coachReset.user.forcePinChange, true);
   assert.equal(authenticateUser(store, "ada@example.com", clientReset.temporaryPin).id, "client_user_ada");
+});
+
+test("admin can create a client login when setting PIN for a new client profile", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const client = adminCreateClient(store, admin, {
+    firstName: "New",
+    lastName: "Client",
+    email: "new.client@example.com",
+    phone: "5559090000",
+    goal: "Boxing basics",
+    sportFocus: "Boxing",
+    trainingDaysPerWeek: 2,
+    sessionLength: 30,
+    status: "Active"
+  });
+  assert.equal(store.users.some((user) => user.linkedId === client.id), false);
+  const user = adminEnsureClientLogin(store, admin, client.id, "4321");
+  assert.equal(user.linkedId, client.id);
+  assert.equal(user.accountStatus, "Active");
+  assert.equal(user.pin, undefined);
+  assert.notEqual(user.pinHash, "4321");
+  assert.equal(authenticateUser(store, "new.client@example.com", "4321").id, user.id);
 });
 
 test("admin can disable and reactivate login", () => {
