@@ -1761,11 +1761,26 @@ test("client can update own injury notes and emergency contact", () => {
   const store = createStore();
   const clientUser = authenticateUser(store, "Client", "1111");
   const updated = updateClientSelfProfile(store, clientUser, {
+    email: "ada.updated@example.com",
+    phone: "555-444-1212",
+    goal: "Improve boxing footwork",
+    age: 39,
     injuryNotes: "Left knee is sore after stairs.",
-    emergencyContact: "Jordan Smith / 555-1200"
+    emergencyContact: "Jordan Smith / 555-1200",
+    pin: "2468",
+    confirmPin: "2468"
   });
+  const linkedUser = store.users.find((user) => user.id === clientUser.id);
+  assert.equal(updated.email, "ada.updated@example.com");
+  assert.equal(linkedUser.email, "ada.updated@example.com");
+  assert.equal(updated.phone, "555-444-1212");
+  assert.equal(linkedUser.phone, "555-444-1212");
+  assert.equal(updated.goal, "Improve boxing footwork");
+  assert.equal(updated.age, 39);
   assert.equal(updated.injuryNotes, "Left knee is sore after stairs.");
   assert.equal(updated.emergencyContact, "Jordan Smith / 555-1200");
+  assert.notEqual(linkedUser.pinHash, "2468");
+  assert.equal(authenticateUser(store, "Client", "2468").id, clientUser.id);
 });
 
 test("admin can use 2 hour session length for clients, workouts, and plan offerings", () => {

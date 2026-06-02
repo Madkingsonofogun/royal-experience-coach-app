@@ -576,11 +576,21 @@ function clientSafetyInfoPanel(client) {
   if (state.currentUser.role === "Client") {
     return `
       <article class="card">
-        <h3>Injury notes and emergency contact</h3>
-        <p class="muted">You can keep these two safety details updated even when other profile fields are locked.</p>
+        <h3>My editable profile info</h3>
+        <p class="muted">You can update these personal details. Coach, package, training level, workouts, and assessments stay controlled by Admin or coach.</p>
+        <div class="form-grid">
+          <label>Email <input id="clientEmail" value="${escapeHtml(client.email || "")}" /></label>
+          <label>Phone number <input id="clientPhone" value="${escapeHtml(client.phone || "")}" /></label>
+          <label>Age <input id="clientAge" type="number" min="0" max="120" value="${escapeHtml(client.age || "")}" /></label>
+          <label>Goal <input id="clientGoal" value="${escapeHtml(client.goal || "")}" /></label>
+        </div>
         <label>Injury notes <textarea id="clientInjuryNotes">${escapeHtml(client.injuryNotes || "")}</textarea></label>
         <label>Emergency contact <input id="clientEmergencyContact" value="${escapeHtml(client.emergencyContact || "")}" placeholder="Name / phone" /></label>
-        <button class="primary" id="saveClientSafetyInfo">Save Safety Info</button>
+        <div class="form-grid">
+          <label>New 4-digit PIN <input id="clientNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="Leave blank to keep current PIN" /></label>
+          <label>Confirm new PIN <input id="clientConfirmPin" inputmode="numeric" maxlength="4" type="password" /></label>
+        </div>
+        <button class="primary" id="saveClientSafetyInfo">Save My Profile Info</button>
       </article>
     `;
   }
@@ -2560,15 +2570,27 @@ function bindGlobal() {
   bindLibraryFilter("#libraryRecoveryOnly", "recoveryAlternative", "change");
   document.querySelector("#saveClientSafetyInfo")?.addEventListener("click", () => {
     try {
+      const pin = document.querySelector("#clientNewPin")?.value || "";
+      const confirmPin = document.querySelector("#clientConfirmPin")?.value || "";
       updateClientSelfProfile(store, state.currentUser, {
+        email: document.querySelector("#clientEmail")?.value || "",
+        phone: document.querySelector("#clientPhone")?.value || "",
+        age: document.querySelector("#clientAge")?.value || "",
+        goal: document.querySelector("#clientGoal")?.value || "",
         injuryNotes: document.querySelector("#clientInjuryNotes")?.value || "",
-        emergencyContact: document.querySelector("#clientEmergencyContact")?.value || ""
+        emergencyContact: document.querySelector("#clientEmergencyContact")?.value || "",
+        ...(pin || confirmPin ? { pin, confirmPin } : {})
       });
-      window.alert("Safety info saved.");
+      window.alert("Profile info saved.");
       render();
     } catch (error) {
       window.alert(error.message);
     }
+  });
+  ["#clientNewPin", "#clientConfirmPin"].forEach((selector) => {
+    document.querySelector(selector)?.addEventListener("input", (event) => {
+      event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
+    });
   });
   document.querySelector("#uploadProfileImageButton")?.addEventListener("click", () => {
     const file = document.querySelector("#profileImageInput")?.files?.[0];

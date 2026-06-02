@@ -1657,13 +1657,37 @@ export function adminUpdateClient(store, adminUser, clientId, patch) {
 export function updateClientSelfProfile(store, clientUser, patch) {
   if (!clientUser || clientUser.role !== "Client") throw new Error("Only clients can update their own profile details.");
   const client = findById(store.clients, clientUser.linkedId, "Client");
+  const user = findById(store.users, clientUser.id, "User");
+  if (patch.email !== undefined) {
+    const email = String(patch.email || "").trim().toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+    client.email = email;
+    user.email = email;
+  }
+  if (patch.phone !== undefined) {
+    client.phone = String(patch.phone || "").trim();
+    user.phone = client.phone;
+  }
+  if (patch.goal !== undefined) client.goal = String(patch.goal || "").trim();
+  if (patch.age !== undefined) {
+    const age = Number(patch.age || 0);
+    if (!Number.isInteger(age) || age < 0 || age > 120) throw new Error("Enter a valid age.");
+    client.age = age;
+  }
   if (patch.injuryNotes !== undefined) {
     client.injuryNotes = String(patch.injuryNotes || "");
     client.injuryRestrictionNotes = client.injuryNotes;
   }
   if (patch.emergencyContact !== undefined) client.emergencyContact = String(patch.emergencyContact || "");
+  if (patch.pin || patch.confirmPin) {
+    validateNumericPin(patch.pin, patch.confirmPin);
+    user.pinSalt = makeId("salt");
+    user.pinHash = hashPin(patch.pin, user.pinSalt);
+    user.forcePinChange = false;
+    user.temporaryPinExpiresAt = null;
+  }
   client.updatedAt = nowIso();
-  logAdminAction(store, clientUser, `Client updated injury notes or emergency contact for ${client.name}`);
+  logAdminAction(store, clientUser, `Client updated editable profile fields for ${client.name}`);
   return client;
 }
 
