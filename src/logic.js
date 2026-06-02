@@ -1619,7 +1619,7 @@ export function adminUpdateClient(store, adminUser, clientId, patch) {
   const client = findById(store.clients, clientId, "Client");
   if (patch.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(patch.email))) throw new Error("Enter a valid email address.");
   if (patch.trainingDaysPerWeek !== undefined && ![2, 3, 4, 5].includes(Number(patch.trainingDaysPerWeek))) throw new Error("Training days must be 2, 3, 4, or 5.");
-  if (patch.sessionLength !== undefined && ![30, 45, 60].includes(Number(patch.sessionLength))) throw new Error("Session length must be 30, 45, or 60.");
+  if (patch.sessionLength !== undefined && ![30, 45, 60, 120].includes(Number(patch.sessionLength))) throw new Error("Session length must be 30, 45, 60, or 120.");
   if (patch.currentTrainingLevel !== undefined && !["Beginner", "Intermediate", "Advanced", "Pro"].includes(patch.currentTrainingLevel)) throw new Error("Choose a valid training level.");
   if (patch.planOfferingId) findById(store.planOfferings, patch.planOfferingId, "Plan offering");
   if (patch.packageId) findById(store.packages, patch.packageId, "Package");
@@ -1651,6 +1651,19 @@ export function adminUpdateClient(store, adminUser, clientId, patch) {
     }
   }
   logAdminAction(store, adminUser, `Updated client ${client.name}`);
+  return client;
+}
+
+export function updateClientSelfProfile(store, clientUser, patch) {
+  if (!clientUser || clientUser.role !== "Client") throw new Error("Only clients can update their own profile details.");
+  const client = findById(store.clients, clientUser.linkedId, "Client");
+  if (patch.injuryNotes !== undefined) {
+    client.injuryNotes = String(patch.injuryNotes || "");
+    client.injuryRestrictionNotes = client.injuryNotes;
+  }
+  if (patch.emergencyContact !== undefined) client.emergencyContact = String(patch.emergencyContact || "");
+  client.updatedAt = nowIso();
+  logAdminAction(store, clientUser, `Client updated injury notes or emergency contact for ${client.name}`);
   return client;
 }
 

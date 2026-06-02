@@ -70,6 +70,7 @@ import {
   searchExerciseLibrary,
   suggestMonthlyPlanLevel,
   submitPinResetRequest,
+  updateClientSelfProfile,
   unreadNotificationCount,
   uploadProfileImage,
   uploadProgressImage,
@@ -1754,5 +1755,33 @@ test("Exercise Library filters work by category, sport, level, equipment, body a
   assert.ok(filterExerciseLibrary(store.exercises, { equipment: "Bodyweight" }).length > 0);
   assert.ok(filterExerciseLibrary(store.exercises, { bodyArea: "Shoulder" }).length > 0);
   assert.ok(filterExerciseLibrary(store.exercises, { recoveryAlternative: true }).length > 0);
+});
+
+test("client can update own injury notes and emergency contact", () => {
+  const store = createStore();
+  const clientUser = authenticateUser(store, "Client", "1111");
+  const updated = updateClientSelfProfile(store, clientUser, {
+    injuryNotes: "Left knee is sore after stairs.",
+    emergencyContact: "Jordan Smith / 555-1200"
+  });
+  assert.equal(updated.injuryNotes, "Left knee is sore after stairs.");
+  assert.equal(updated.emergencyContact, "Jordan Smith / 555-1200");
+});
+
+test("admin can use 2 hour session length for clients, workouts, and plan offerings", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const workout = adminCreateWorkoutTemplate(store, admin, { workoutName: "Two Hour Boxing Camp", trainingLevel: "Advanced", sessionLength: 120 });
+  const offering = adminCreatePlanOffering(store, admin, {
+    planName: "2 Hour Boxing Plan",
+    trainingLevel: "Advanced",
+    trainingDaysPerWeek: 3,
+    sessionLength: 120,
+    workoutTemplateIds: [workout.id]
+  });
+  const client = adminUpdateClient(store, admin, "client_ada", { sessionLength: 120 });
+  assert.equal(workout.sessionLength, 120);
+  assert.equal(offering.sessionLength, 120);
+  assert.equal(client.sessionLength, 120);
 });
 

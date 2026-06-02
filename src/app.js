@@ -77,6 +77,7 @@ import {
   scoreColor,
   scoreGuide,
   submitPinResetRequest,
+  updateClientSelfProfile,
   unreadNotificationCount,
   visibleClientsForUser,
   summarizeAssessment
@@ -500,7 +501,7 @@ function homeDashboard() {
         ${infoCard("Training schedule", `${client.trainingDaysPerWeek} days / ${client.sessionLength} min`)}
       </div>
       <div class="dashboard-grid">
-        ${smartDecisionPanel(client, latestAssessment, lastCheckIn)}
+        ${state.currentUser.role === "Client" ? "" : smartDecisionPanel(client, latestAssessment, lastCheckIn)}
         ${todayPreviewPanel(client)}
         ${quickLinksPanel()}
       </div>
@@ -531,15 +532,32 @@ function profilePage() {
         ${infoCard("Start date", client.startDate)}
       </div>
       <div class="split">
-        <article class="card"><h3>Injury notes</h3><p>${client.injuryNotes}</p></article>
-        <article class="card"><h3>Client emergency contact</h3><p>${client.emergencyContact || "No emergency contact saved."}</p></article>
-        <article class="card"><h3>Assigned coach emergency contact</h3><p>${assignedCoach?.emergencyContact || "No coach emergency contact saved."}</p></article>
+        ${clientSafetyInfoPanel(client)}
+        ${state.currentUser.role !== "Client" ? `<article class="card"><h3>Assigned coach emergency contact</h3><p>${assignedCoach?.emergencyContact || "No coach emergency contact saved."}</p></article>` : ""}
         <article class="card"><h3>Equipment available</h3>${chipSection("Available", client.equipmentAvailable)}</article>
         <article class="card"><h3>Progress notes</h3><p>${client.progressNotes}</p></article>
         ${ownCoach ? `<article class="card"><h3>My coach profile emergency contact</h3><p>${ownCoach.emergencyContact || "No emergency contact saved."}</p></article>` : ""}
       </div>
       ${progressImagePanel(client, progressImages)}
     </section>
+  `;
+}
+
+function clientSafetyInfoPanel(client) {
+  if (state.currentUser.role === "Client") {
+    return `
+      <article class="card">
+        <h3>Injury notes and emergency contact</h3>
+        <p class="muted">You can keep these two safety details updated even when other profile fields are locked.</p>
+        <label>Injury notes <textarea id="clientInjuryNotes">${escapeHtml(client.injuryNotes || "")}</textarea></label>
+        <label>Emergency contact <input id="clientEmergencyContact" value="${escapeHtml(client.emergencyContact || "")}" placeholder="Name / phone" /></label>
+        <button class="primary" id="saveClientSafetyInfo">Save Safety Info</button>
+      </article>
+    `;
+  }
+  return `
+    <article class="card"><h3>Injury notes</h3><p>${client.injuryNotes || "No injury notes saved."}</p></article>
+    <article class="card"><h3>Client emergency contact</h3><p>${client.emergencyContact || "No emergency contact saved."}</p></article>
   `;
 }
 
@@ -1359,7 +1377,7 @@ function adminView() {
             ${adminInput("client", "goal", "Goal")}
             ${adminSelect("client", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
             ${adminInput("client", "trainingDaysPerWeek", "Training days per week", "number")}
-            ${adminSelect("client", "sessionLength", "Session length", [30, 45, 60])}
+            ${adminSelect("client", "sessionLength", "Session length", [30, 45, 60, 120])}
             ${adminInput("client", "package", "Package")}
             ${adminSelect("client", "assignedCoach", "Assigned coach", store.coaches.map((coach) => ({ value: coach.id, label: coach.name })))}
             ${adminInput("client", "startDate", "Start date", "date")}
@@ -1427,7 +1445,7 @@ function adminView() {
             ${adminInput("workout", "goal", "Goal")}
             ${adminSelect("workout", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"])}
             ${adminSelect("workout", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"])}
-            ${adminSelect("workout", "sessionLength", "Session length", [30, 45, 60])}
+            ${adminSelect("workout", "sessionLength", "Session length", [30, 45, 60, 120])}
             ${adminSelect("workout", "trainingDayType", "Training day type", ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"])}
             ${adminSelect("workout", "workoutCategory", "Workout category", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "Conditioning", "Recovery", "General Fitness"])}
           </div>
@@ -1455,7 +1473,7 @@ function adminView() {
             ${adminInput("planOffering", "goal", "Goal")}
             ${adminSelect("planOffering", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"])}
             ${adminInput("planOffering", "trainingDaysPerWeek", "Training days per week", "number")}
-            ${adminSelect("planOffering", "sessionLength", "Session length", [30, 45, 60])}
+            ${adminSelect("planOffering", "sessionLength", "Session length", [30, 45, 60, 120])}
             ${adminInput("planOffering", "price", "Price", "number")}
             ${adminInput("planOffering", "sessionsIncluded", "Sessions included", "number")}
             ${adminInput("planOffering", "packageType", "Package type")}
@@ -1675,7 +1693,7 @@ function clientEditModal(clientId) {
             ${editInput("client", "goal", "Goal", client.goal || "")}
             ${editSelect("client", "currentTrainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], client.currentTrainingLevel || "Beginner")}
             ${editSelect("client", "trainingDaysPerWeek", "Training days per week", [2, 3, 4, 5], client.trainingDaysPerWeek)}
-            ${editSelect("client", "sessionLength", "Session length", [30, 45, 60], client.sessionLength)}
+            ${editSelect("client", "sessionLength", "Session length", [30, 45, 60, 120], client.sessionLength)}
             ${editInput("client", "startDate", "Start date", client.startDate || "", "date")}
           </div>
           <label>Restrictions <textarea data-edit-client-field="currentRestrictions">${escapeHtml(listValue(client.currentRestrictions))}</textarea></label>
@@ -1792,7 +1810,7 @@ function planOfferingEditModal(offeringId) {
           ${editInput("offering", "goal", "Goal", offering.goal)}
           ${editSelect("offering", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], offering.trainingLevel || offering.planLevel)}
           ${editInput("offering", "trainingDaysPerWeek", "Training days per week", offering.trainingDaysPerWeek, "number")}
-          ${editSelect("offering", "sessionLength", "Session length", [30, 45, 60], offering.sessionLength)}
+          ${editSelect("offering", "sessionLength", "Session length", [30, 45, 60, 120], offering.sessionLength)}
           ${editInput("offering", "price", "Price", offering.price, "number")}
           ${editInput("offering", "sessionsIncluded", "Sessions included", offering.sessionsIncluded, "number")}
           ${editInput("offering", "packageType", "Package type", offering.packageType)}
@@ -2113,7 +2131,7 @@ function workoutEditModal(workoutId) {
           ${editInput("workout", "goal", "Goal", workout.goal)}
           ${editSelect("workout", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], workout.trainingLevel || workout.planLevel)}
           ${editSelect("workout", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], workout.difficulty)}
-          ${editSelect("workout", "sessionLength", "Session length", [30, 45, 60], workout.sessionLength)}
+          ${editSelect("workout", "sessionLength", "Session length", [30, 45, 60, 120], workout.sessionLength)}
           ${editSelect("workout", "trainingDayType", "Training day type", ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"], workout.trainingDayType)}
           ${editSelect("workout", "workoutCategory", "Workout category", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "Conditioning", "Recovery", "General Fitness"], workout.workoutCategory)}
         </div>
@@ -2511,6 +2529,18 @@ function bindGlobal() {
   bindLibraryFilter("#libraryEquipment", "equipment");
   bindLibraryFilter("#libraryBodyArea", "bodyArea");
   bindLibraryFilter("#libraryRecoveryOnly", "recoveryAlternative", "change");
+  document.querySelector("#saveClientSafetyInfo")?.addEventListener("click", () => {
+    try {
+      updateClientSelfProfile(store, state.currentUser, {
+        injuryNotes: document.querySelector("#clientInjuryNotes")?.value || "",
+        emergencyContact: document.querySelector("#clientEmergencyContact")?.value || ""
+      });
+      window.alert("Safety info saved.");
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
   document.querySelector("#uploadProfileImageButton")?.addEventListener("click", () => {
     const file = document.querySelector("#profileImageInput")?.files?.[0];
     const targetUser = userForProfile(selectedClient());
