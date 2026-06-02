@@ -1,5 +1,6 @@
 import { hashPin, movementTests } from "./logic.js";
 import { workbookExercises } from "./imported-exercises.js";
+import { workbookSummaryTemplates } from "./workout-summary-templates.js";
 
 export function createStore() {
   return {
@@ -195,7 +196,8 @@ export function createStore() {
         createdByAdminId: "admin_1",
         createdAt: "2026-05-29T09:00:00.000Z",
         updatedAt: "2026-05-29T09:00:00.000Z"
-      }
+      },
+      ...workbookSummaryTemplates
     ],
     workoutTemplateItems: [
       workoutTemplateItem("wti_1", "template_boxing_baseline", "Warm-Up", "jump_rope", "Jump rope intervals", null, null, "3 min", "60 sec", 3, "Stay relaxed.", "Relax shoulders.", 1),

@@ -1309,6 +1309,16 @@ test("workout templates can use exercises from Exercise Library and workbook row
   assert.ok(store.workoutTemplateItems.some((item) => item.workoutTemplateId === imported.id && item.exerciseName === "Jump Rope"));
 });
 
+test("workout summary workbook rows are added as template records without importing exercises", () => {
+  const store = createStore();
+  const summaryTemplates = store.workoutTemplates.filter((template) => template.sourceWorkbook === "mad_king_conditioning_workout_summary_only.xlsx");
+  assert.equal(summaryTemplates.length, 90);
+  assert.equal(summaryTemplates.some((template) => template.workoutName === "Mad King Jab Lab"), true);
+  assert.equal(summaryTemplates.some((template) => template.sessionLength === 120), true);
+  assert.equal(store.workoutTemplateItems.some((item) => summaryTemplates.some((template) => template.id === item.workoutTemplateId)), false);
+  assert.equal(store.exercises.some((exercise) => exercise.exerciseName === "Mad King Jab Lab"), false);
+});
+
 test("monthly plan generator can pull from Admin-created plan offerings and workout templates", () => {
   const store = createStore();
   const admin = authenticateUser(store, "Admin", "9999");
