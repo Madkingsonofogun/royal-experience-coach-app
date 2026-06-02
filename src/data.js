@@ -1,6 +1,7 @@
 import { hashPin, movementTests } from "./logic.js";
 import { workbookExercises } from "./imported-exercises.js";
 import { workbookSummaryTemplates } from "./workout-summary-templates.js";
+import { workbookWorkoutTemplateItems } from "./workout-template-items-90.js";
 
 export function createStore() {
   return {
@@ -202,7 +203,8 @@ export function createStore() {
     workoutTemplateItems: [
       workoutTemplateItem("wti_1", "template_boxing_baseline", "Warm-Up", "jump_rope", "Jump rope intervals", null, null, "3 min", "60 sec", 3, "Stay relaxed.", "Relax shoulders.", 1),
       workoutTemplateItem("wti_2", "template_boxing_baseline", "Skill / Technique", "light_shadowboxing", "Light shadowboxing", null, null, "2 min", "60 sec", 4, "Stance, jab, cross.", "Smooth technique.", 2),
-      workoutTemplateItem("wti_3", "template_boxing_baseline", "Strength", "push_up", "Push-ups", 3, 10, null, "60 sec", null, "Clean bracing.", "Use incline if needed.", 3)
+      workoutTemplateItem("wti_3", "template_boxing_baseline", "Strength", "push_up", "Push-ups", 3, 10, null, "60 sec", null, "Clean bracing.", "Use incline if needed.", 3),
+      ...workbookWorkoutTemplateItems
     ],
     adminPermissions: {
       coachCanCreateWorkouts: false,

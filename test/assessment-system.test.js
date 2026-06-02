@@ -1309,14 +1309,19 @@ test("workout templates can use exercises from Exercise Library and workbook row
   assert.ok(store.workoutTemplateItems.some((item) => item.workoutTemplateId === imported.id && item.exerciseName === "Jump Rope"));
 });
 
-test("workout summary workbook rows are added as template records without importing exercises", () => {
+test("progressive workout workbook rows are added to summary templates without importing new exercises", () => {
   const store = createStore();
-  const summaryTemplates = store.workoutTemplates.filter((template) => template.sourceWorkbook === "mad_king_conditioning_workout_summary_only.xlsx");
+  const summaryTemplates = store.workoutTemplates.filter((template) => template.sourceWorkbook === "mad_king_conditioning_90_workouts_progressive_variety (1).xlsx");
   assert.equal(summaryTemplates.length, 90);
   assert.equal(summaryTemplates.some((template) => template.workoutName === "Mad King Jab Lab"), true);
   assert.equal(summaryTemplates.some((template) => template.sessionLength === 120), true);
-  assert.equal(store.workoutTemplateItems.some((item) => summaryTemplates.some((template) => template.id === item.workoutTemplateId)), false);
+  const summaryItems = store.workoutTemplateItems.filter((item) => summaryTemplates.some((template) => template.id === item.workoutTemplateId));
+  assert.equal(summaryItems.length, 2070);
+  assert.equal(summaryItems.filter((item) => item.exerciseId).length, 1714);
+  assert.equal(summaryItems.some((item) => item.workoutTemplateId === "template_summary_w001" && item.exerciseName === "Chair Sit-to-Stand" && item.exerciseId === "EX0021"), true);
+  assert.equal(summaryItems.some((item) => item.workoutTemplateId === "template_summary_w001" && item.sessionPart === "Recovery / Alternative"), true);
   assert.equal(store.exercises.some((exercise) => exercise.exerciseName === "Mad King Jab Lab"), false);
+  assert.equal(store.exercises.some((exercise) => exercise.id === "ADD001"), false);
 });
 
 test("monthly plan generator can pull from Admin-created plan offerings and workout templates", () => {
