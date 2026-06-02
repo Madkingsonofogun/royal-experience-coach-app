@@ -1717,8 +1717,11 @@ function clientEditModal(clientId) {
             ${editSelect("client", "coachId", "Assigned coach", [{ value: "", label: "No coach assigned" }, ...store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => ({ value: coach.id, label: coach.name }))], client.coachId || "")}
             ${editSelect("client", "accountLocked", "Account access", [{ value: "false", label: "Unlocked" }, { value: "true", label: "Locked" }], String(Boolean(user?.accountLocked)))}
             ${editSelect("client", "profileLocked", "Profile editing", [{ value: "false", label: "Unlocked" }, { value: "true", label: "Locked" }], String(Boolean(client.profileLocked || user?.profileLocked)))}
+            <label>Set new 4-digit PIN <input id="clientModalNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="New PIN" /></label>
+            <label>Confirm new PIN <input id="clientModalConfirmPin" inputmode="numeric" maxlength="4" type="password" placeholder="Confirm PIN" /></label>
           </div>
           <div class="modal-actions left-actions">
+            <button id="clientModalSetPin" data-client-id="${client.id}">Set Client PIN</button>
             <button id="clientModalResetPin" data-client-id="${client.id}">Reset 4-digit PIN</button>
             <button id="clientModalToggleLock" data-client-id="${client.id}">${user?.accountLocked ? "Unlock Account" : "Lock Account"}</button>
             <button id="clientModalToggleProfileLock" data-client-id="${client.id}">${client.profileLocked || user?.profileLocked ? "Unlock Profile Editing" : "Lock Profile Editing"}</button>
@@ -1822,9 +1825,13 @@ function coachEditModal(coachId) {
           ${editInput("coach", "specialty", "Coach title / specialty", coach.specialty || "")}
           ${editInput("coach", "emergencyContact", "Emergency contact", coach.emergencyContact || "")}
           ${editSelect("coach", "status", "Status", ["Active", "Inactive", "Suspended", "Archived"], coach.status || user?.accountStatus || "Active")}
+          <label>Set new 4-digit PIN <input id="coachModalNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="New PIN" /></label>
+          <label>Confirm new PIN <input id="coachModalConfirmPin" inputmode="numeric" maxlength="4" type="password" placeholder="Confirm PIN" /></label>
         </div>
         <label>Bio <textarea data-edit-coach-field="bio">${escapeHtml(coach.bio || "")}</textarea></label>
         <div class="modal-actions">
+          <button id="coachModalSetPin" data-coach-id="${coach.id}">Set Coach PIN</button>
+          <button id="coachModalResetPin" data-coach-id="${coach.id}">Reset Coach PIN</button>
           <button class="ghost" id="closeEditModalSecondary">Cancel</button>
           <button class="primary" id="saveCoachModal" data-coach-id="${coach.id}">Save Coach</button>
         </div>
@@ -2889,6 +2896,25 @@ function bindGlobal() {
     state.editModal = null;
     render();
   });
+  document.querySelector("#coachModalSetPin")?.addEventListener("click", (event) => {
+    try {
+      const user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
+      if (!user) throw new Error("Coach login not found.");
+      const pin = document.querySelector("#coachModalNewPin")?.value || "";
+      const confirmPin = document.querySelector("#coachModalConfirmPin")?.value || "";
+      if (pin !== confirmPin) throw new Error("PIN and Confirm PIN must match.");
+      adminSetUserPin(store, state.currentUser, user.id, pin);
+      window.alert(`PIN updated for ${user.name}. They must use the new PIN next login.`);
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+  document.querySelector("#coachModalResetPin")?.addEventListener("click", (event) => {
+    const user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
+    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    render();
+  });
   document.querySelector("#saveClientModal")?.addEventListener("click", (event) => {
     try {
       const clientId = event.currentTarget.dataset.clientId;
@@ -2913,6 +2939,20 @@ function bindGlobal() {
       window.alert("Client changes saved.");
       state.editModal = null;
       state.editModalDirty = false;
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+  document.querySelector("#clientModalSetPin")?.addEventListener("click", (event) => {
+    try {
+      const user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
+      if (!user) throw new Error("Client login not found.");
+      const pin = document.querySelector("#clientModalNewPin")?.value || "";
+      const confirmPin = document.querySelector("#clientModalConfirmPin")?.value || "";
+      if (pin !== confirmPin) throw new Error("PIN and Confirm PIN must match.");
+      adminSetUserPin(store, state.currentUser, user.id, pin);
+      window.alert(`PIN updated for ${user.name}. They must use the new PIN next login.`);
       render();
     } catch (error) {
       window.alert(error.message);
@@ -3043,6 +3083,11 @@ function bindGlobal() {
   document.querySelector("#clientModalScheduleAssessment")?.addEventListener("click", () => window.alert("Assessment scheduling note saved for Admin follow-up."));
   document.querySelector("#clientModalScheduleReassessment")?.addEventListener("click", () => window.alert("Reassessment scheduling note saved for Admin follow-up."));
   document.querySelector("#clientModalViewHistory")?.addEventListener("click", () => window.alert("Assessment and workout history is shown in the client profile and plan history sections."));
+  ["#clientModalNewPin", "#clientModalConfirmPin", "#coachModalNewPin", "#coachModalConfirmPin"].forEach((selector) => {
+    document.querySelector(selector)?.addEventListener("input", (event) => {
+      event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
+    });
+  });
   document.querySelectorAll("[data-archive-client]").forEach((button) => button.addEventListener("click", () => {
     adminArchiveClient(store, state.currentUser, button.dataset.archiveClient);
     render();
