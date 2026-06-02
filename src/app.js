@@ -84,7 +84,8 @@ import {
 } from "./logic.js";
 import { blankAssessment, createStore } from "./data.js";
 
-const store = createStore();
+const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
+const store = loadSavedStore(createStore());
 const today = "2026-05-29";
 const state = {
   currentUser: null,
@@ -311,6 +312,7 @@ const app = document.querySelector("#app");
 render();
 
 function render() {
+  saveStore();
   if (!state.currentUser) {
     app.innerHTML = loginPage();
     bindLogin();
@@ -347,6 +349,33 @@ function render() {
     ${adminEditModal()}
   `;
   bindGlobal();
+}
+
+function loadSavedStore(defaultStore) {
+  try {
+    const saved = window.localStorage?.getItem(STORE_STORAGE_KEY);
+    if (!saved) return defaultStore;
+    const parsed = JSON.parse(saved);
+    return mergeStore(defaultStore, parsed);
+  } catch (error) {
+    console.warn("Could not load saved app data.", error);
+    return defaultStore;
+  }
+}
+
+function mergeStore(defaultStore, savedStore) {
+  const merged = { ...defaultStore, ...savedStore };
+  merged.settings = { ...defaultStore.settings, ...(savedStore.settings || {}) };
+  merged.adminPermissions = { ...(defaultStore.adminPermissions || {}), ...(savedStore.adminPermissions || {}) };
+  return merged;
+}
+
+function saveStore() {
+  try {
+    window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+  } catch (error) {
+    console.warn("Could not save app data.", error);
+  }
 }
 
 function route() {
