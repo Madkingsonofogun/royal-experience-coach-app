@@ -1,5 +1,6 @@
 import { hashPin, movementTests } from "./logic.js";
 import { workbookExercises } from "./imported-exercises.js";
+import { workbookPlanOfferings } from "./plan-offerings-imported.js";
 import { workbookSummaryTemplates } from "./workout-summary-templates.js";
 import { workbookWorkoutTemplateItems } from "./workout-template-items-90.js";
 
@@ -134,7 +135,8 @@ export function createStore() {
         createdByAdminId: "admin_1",
         createdAt: "2026-05-29T09:00:00.000Z",
         updatedAt: "2026-05-29T09:00:00.000Z"
-      }
+      },
+      ...workbookPlanOfferings
     ],
     packages: [
       {

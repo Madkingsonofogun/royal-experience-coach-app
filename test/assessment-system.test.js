@@ -1275,6 +1275,19 @@ test("admin can create plan offering, assign it to package, and assign package t
   assert.equal(client.planOfferingId, offering.id);
 });
 
+test("plan offering workbook rows are imported and connected to workout templates", () => {
+  const store = createStore();
+  const imported = store.planOfferings.filter((offering) => offering.sourceWorkbook === "mad_king_conditioning_plan_offerings_only.xlsx");
+  assert.equal(imported.length, 96);
+  const jabLab = imported.find((offering) => offering.sourcePlanId === "MKP-001");
+  assert.equal(jabLab.planName, "Jab Lab - Beginner Quick Session");
+  assert.equal(jabLab.trainingLevel, "Beginner");
+  assert.equal(jabLab.sessionLength, 30);
+  assert.equal(jabLab.trainingDaysPerWeek, 3);
+  assert.ok(jabLab.workoutTemplateIds.includes("template_summary_w001"));
+  assert.equal(store.workoutTemplates.some((template) => template.id === jabLab.workoutTemplateIds[0]), true);
+});
+
 test("coach cannot create workouts unless Admin permission allows it", () => {
   const store = createStore();
   const coach = authenticateUser(store, "Coach", "2222");
@@ -1341,6 +1354,17 @@ test("monthly plan generator can pull from Admin-created plan offerings and work
   assert.equal(plan.sourcePlanOfferingId, offering.id);
   assert.equal(plan.trainingLevel, "Beginner");
   assert.ok(store.monthlyPlanItems.some((item) => item.monthlyPlanId === plan.id && item.title === "Admin Beginner Session"));
+});
+
+test("monthly plan generator can use imported plan offerings", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const offering = store.planOfferings.find((item) => item.sourcePlanId === "MKP-001");
+  const plan = generateMonthlyPlanFromPlanOffering(store, admin, "client_marcus", offering.id, { month: "2026-07", startDate: "2026-07-01" });
+  assert.equal(plan.status, "Draft");
+  assert.equal(plan.sourcePlanOfferingId, offering.id);
+  assert.equal(plan.trainingLevel, "Beginner");
+  assert.ok(store.monthlyPlanItems.some((item) => item.monthlyPlanId === plan.id && item.title === "Mad King Jab Lab" && item.items.some((exercise) => exercise.name === "Chair Sit-to-Stand")));
 });
 
 test("assessment recommends Beginner, Intermediate, Advanced, and Pro", () => {
