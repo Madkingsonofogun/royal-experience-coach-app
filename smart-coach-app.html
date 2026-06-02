@@ -1236,6 +1236,13 @@ dd {
 .exercise-library-list .clickable-row {
   width: 100%;
   text-align: left;
+  cursor: pointer;
+}
+
+.exercise-library-list .clickable-row:hover,
+.exercise-library-list .clickable-row:focus {
+  background: rgba(255, 215, 102, 0.08);
+  outline: 1px solid rgba(255, 215, 102, 0.35);
 }
 
 .exercise-preview-image {
@@ -34073,7 +34080,7 @@ function adminView() {
     { label: "Add Client", panel: "clients" },
     { label: "Add Coach", panel: "coaches" },
     { label: "Account Requests", panel: "accountRequests" },
-    { label: "Add Exercise", panel: "exercises" },
+    { label: "Exercise Library", panel: "exercises" },
     { label: "Add Workout", panel: "workouts" },
     { label: "Add Plan Offering", panel: "offerings" },
     { label: "Add Package", panel: "packages" },
@@ -34349,10 +34356,11 @@ function exerciseLibraryAdminList() {
     </div>
     <div class="admin-list exercise-library-list">
       ${filtered.map((exercise) => `
-        <button class="admin-row clickable-row exercise-row" data-open-exercise-editor="${exercise.id}">
-          <span>${exercise.exerciseName || exercise.name} / ${exercise.category || "Uncategorized"} / ${exercise.trainingLevel || exercise.planLevel || "No level"}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</span>
+        <div class="admin-row clickable-row exercise-row" data-open-exercise-row="${exercise.id}" role="button" tabindex="0">
+          <span><strong>${exercise.exerciseName || exercise.name}</strong><br><small>${exercise.category || "Uncategorized"} / ${exercise.trainingLevel || exercise.planLevel || "No level"}${exercise.recoveryAlternative ? " / Recovery alt" : ""}</small></span>
           <small>${exercise.sessionPart || "Any block"} / ${exercise.difficulty || "No difficulty"} / ${exercise.archived ? "Archived" : "Active"}</small>
-        </button>
+          <button class="primary" data-open-exercise-editor="${exercise.id}">View / Edit</button>
+        </div>
       `).join("") || `<div class="empty">No exercises match these filters.</div>`}
     </div>
   `;
@@ -34364,6 +34372,24 @@ function filterSelect(key, label, options, value) {
 
 function uniqueValues(values) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function openExercisePopup(exerciseId, options = {}) {
+  state.editModal = {
+    type: "exercise",
+    id: exerciseId,
+    workoutItemId: options.workoutItemId || null,
+    returnWorkoutId: options.returnWorkoutId || null
+  };
+  state.exercisePopupMode = "view";
+  state.exercisePopupTab = "Overview";
+  state.editModalDirty = false;
+  store.adminAuditLog.push({
+    id: `audit_${Date.now()}`,
+    adminUserId: state.currentUser.id,
+    action: options.workoutItemId ? `Opened exercise popup from workout item ${options.workoutItemId}` : `Opened exercise popup for ${exerciseId}`,
+    createdAt: new Date().toISOString()
+  });
 }
 
 function clientEditModal(clientId) {
@@ -35344,21 +35370,24 @@ function bindGlobal() {
     state.adminPanel = button.dataset.adminPanel;
     render();
   }));
-  document.querySelectorAll("[data-open-exercise-editor]").forEach((button) => button.addEventListener("click", () => {
-    state.editModal = { type: "exercise", id: button.dataset.openExerciseEditor };
-    state.exercisePopupMode = "view";
-    state.exercisePopupTab = "Overview";
-    state.editModalDirty = false;
-    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Opened exercise popup for ${button.dataset.openExerciseEditor}`, createdAt: new Date().toISOString() });
+  document.querySelectorAll("[data-open-exercise-editor]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openExercisePopup(button.dataset.openExerciseEditor);
+    render();
+  }));
+  document.querySelectorAll("[data-open-exercise-row]").forEach((row) => row.addEventListener("click", () => {
+    openExercisePopup(row.dataset.openExerciseRow);
+    render();
+  }));
+  document.querySelectorAll("[data-open-exercise-row]").forEach((row) => row.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    openExercisePopup(row.dataset.openExerciseRow);
     render();
   }));
   document.querySelectorAll("[data-open-workout-exercise]").forEach((button) => button.addEventListener("click", () => {
     const [exerciseId, workoutItemId] = button.dataset.openWorkoutExercise.split(":");
-    state.editModal = { type: "exercise", id: exerciseId, workoutItemId, returnWorkoutId: state.editModal?.id };
-    state.exercisePopupMode = "view";
-    state.exercisePopupTab = "Overview";
-    state.editModalDirty = false;
-    store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Opened exercise popup from workout item ${workoutItemId}`, createdAt: new Date().toISOString() });
+    openExercisePopup(exerciseId, { workoutItemId, returnWorkoutId: state.editModal?.id });
     render();
   }));
   document.querySelectorAll("[data-open-client-editor]").forEach((button) => button.addEventListener("click", () => {

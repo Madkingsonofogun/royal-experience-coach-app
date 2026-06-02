@@ -1230,6 +1230,13 @@ dd {
 .exercise-library-list .clickable-row {
   width: 100%;
   text-align: left;
+  cursor: pointer;
+}
+
+.exercise-library-list .clickable-row:hover,
+.exercise-library-list .clickable-row:focus {
+  background: rgba(255, 215, 102, 0.08);
+  outline: 1px solid rgba(255, 215, 102, 0.35);
 }
 
 .exercise-preview-image {
