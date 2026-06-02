@@ -1418,6 +1418,47 @@ export function adminEnsureClientLogin(store, adminUser, clientId, pin) {
   return user;
 }
 
+export function adminEnsureCoachLogin(store, adminUser, coachId, pin) {
+  requireAdmin(adminUser);
+  const coach = findById(store.coaches, coachId, "Coach");
+  const existing = store.users.find((item) => item.role === "Coach" && item.linkedId === coach.id);
+  if (existing) return existing;
+  validateNumericPin(pin);
+  const pinSalt = makeId("salt");
+  const user = {
+    id: makeId("coach_user"),
+    role: "Coach",
+    name: coach.name,
+    firstName: coach.firstName || coach.name.split(" ")[0] || "",
+    lastName: coach.lastName || coach.name.split(" ").slice(1).join(" "),
+    email: String(coach.email || "").toLowerCase(),
+    phone: String(coach.phone || ""),
+    pinSalt,
+    pinHash: hashPin(pin, pinSalt),
+    linkedId: coach.id,
+    accountLocked: false,
+    accountUnlockedByAdminId: adminUser.id,
+    accountUnlockedAt: nowIso(),
+    accountLockReason: "",
+    accountStatus: "Active",
+    requestedRole: "Coach",
+    requestNote: "Login created by Admin from coach profile.",
+    profileLocked: Boolean(coach.profileLocked),
+    emailVerified: false,
+    forcePinChange: true,
+    temporaryPinExpiresAt: futureIsoHours(24),
+    disabled: false,
+    coachPermissions: coach.coachPermissions || {},
+    profileImageUrl: coach.profileImageUrl || "",
+    profileImageStorageKey: coach.profileImageStorageKey || "",
+    profileImageUploadedAt: coach.profileImageUploadedAt || null,
+    createdAt: nowIso()
+  };
+  store.users.push(user);
+  logAdminAction(store, adminUser, `Created login for coach ${coach.name}`);
+  return user;
+}
+
 export function adminResetUserPin(store, adminUser, targetUserId) {
   const tempPin = String(Math.floor(1000 + Math.random() * 9000));
   const user = adminSetUserPin(store, adminUser, targetUserId, tempPin);

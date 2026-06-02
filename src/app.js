@@ -15,6 +15,7 @@ import {
   adminCreatePlanOffering,
   adminCreateWorkoutTemplate,
   adminDuplicateExercise,
+  adminEnsureCoachLogin,
   adminEnsureClientLogin,
   adminImportExercisesFromRows,
   adminImportWorkoutTemplatesFromRows,
@@ -2901,11 +2902,11 @@ function bindGlobal() {
   });
   document.querySelector("#coachModalSetPin")?.addEventListener("click", (event) => {
     try {
-      const user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
-      if (!user) throw new Error("Coach login not found.");
       const pin = document.querySelector("#coachModalNewPin")?.value || "";
       const confirmPin = document.querySelector("#coachModalConfirmPin")?.value || "";
       if (pin !== confirmPin) throw new Error("PIN and Confirm PIN must match.");
+      let user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
+      user = user || adminEnsureCoachLogin(store, state.currentUser, event.currentTarget.dataset.coachId, pin);
       adminSetUserPin(store, state.currentUser, user.id, pin);
       window.alert(`PIN updated for ${user.name}. They must use the new PIN next login.`);
       render();
@@ -2914,8 +2915,9 @@ function bindGlobal() {
     }
   });
   document.querySelector("#coachModalResetPin")?.addEventListener("click", (event) => {
-    const user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
-    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    let user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
+    user = user || adminEnsureCoachLogin(store, state.currentUser, event.currentTarget.dataset.coachId, "0000");
+    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
     render();
   });
   document.querySelector("#saveClientModal")?.addEventListener("click", (event) => {
@@ -3224,8 +3226,9 @@ function bindGlobal() {
     render();
   }));
   document.querySelectorAll("[data-reset-coach-pin]").forEach((button) => button.addEventListener("click", () => {
-    const user = store.users.find((item) => item.role === "Coach" && item.linkedId === button.dataset.resetCoachPin);
-    if (user) window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    let user = store.users.find((item) => item.role === "Coach" && item.linkedId === button.dataset.resetCoachPin);
+    user = user || adminEnsureCoachLogin(store, state.currentUser, button.dataset.resetCoachPin, "0000");
+    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
     render();
   }));
   document.querySelectorAll("[data-resolve-pin-request]").forEach((button) => button.addEventListener("click", () => {
