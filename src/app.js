@@ -761,7 +761,7 @@ function exerciseLibraryPage() {
         ${visible.map((exercise) => {
           const allowed = usable.some((item) => item.id === exercise.id);
           return `
-            <article class="card library-card ${allowed ? "" : "muted-card"}">
+            <article class="card library-card clickable-library-card ${allowed ? "" : "muted-card"}" data-open-library-exercise="${exercise.id}" role="${state.currentUser.role === "Admin" ? "button" : "article"}" tabindex="${state.currentUser.role === "Admin" ? "0" : "-1"}">
               <div class="section-head">
                 <div><p class="eyebrow">${exercise.replacementCategory}</p><h3>${exercise.name}</h3></div>
                 <span class="badge ${allowed ? "green" : "orange"}">${allowed ? "Available" : "Filtered"}</span>
@@ -775,6 +775,7 @@ function exerciseLibraryPage() {
               <p><strong>Body area:</strong> ${exercise.bodyArea.join(", ")}</p>
               <p><strong>Warnings:</strong> ${exercise.contraindications.join(", ") || "None"}</p>
               <p><strong>Progression / regression:</strong> ${exercise.progression ? "Progression" : exercise.regression ? "Regression" : "Standard"}${exercise.recoveryAlternative ? " / Recovery alternative" : ""}${exercise.regressionExerciseId ? ` from ${exercise.regressionExerciseId}` : ""}</p>
+              ${state.currentUser.role === "Admin" ? `<button class="primary full" data-open-library-exercise-button="${exercise.id}">View / Edit Exercise</button>` : ""}
             </article>
           `;
         }).join("")}
@@ -2609,6 +2610,22 @@ function bindGlobal() {
     if (!["Enter", " "].includes(event.key)) return;
     event.preventDefault();
     openExercisePopup(row.dataset.openExerciseRow);
+    render();
+  }));
+  document.querySelectorAll("[data-open-library-exercise]").forEach((card) => card.addEventListener("click", () => {
+    if (state.currentUser.role !== "Admin") return;
+    openExercisePopup(card.dataset.openLibraryExercise);
+    render();
+  }));
+  document.querySelectorAll("[data-open-library-exercise]").forEach((card) => card.addEventListener("keydown", (event) => {
+    if (state.currentUser.role !== "Admin" || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    openExercisePopup(card.dataset.openLibraryExercise);
+    render();
+  }));
+  document.querySelectorAll("[data-open-library-exercise-button]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openExercisePopup(button.dataset.openLibraryExerciseButton);
     render();
   }));
   document.querySelectorAll("[data-open-workout-exercise]").forEach((button) => button.addEventListener("click", () => {

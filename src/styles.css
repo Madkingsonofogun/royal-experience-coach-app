@@ -746,6 +746,18 @@ dd {
   color: var(--muted);
 }
 
+.clickable-library-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.clickable-library-card:hover,
+.clickable-library-card:focus {
+  border-color: rgba(255, 215, 102, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 215, 102, 0.16);
+  transform: translateY(-1px);
+}
+
 .muted-card {
   background: #f8f6f0;
 }
