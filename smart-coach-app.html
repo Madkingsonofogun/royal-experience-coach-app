@@ -34235,6 +34235,7 @@ function adminView() {
             ${adminInput("client", "lastName", "Last name")}
             ${adminInput("client", "email", "Email")}
             ${adminInput("client", "phone", "Phone number")}
+            ${adminInput("client", "age", "Age", "number")}
             ${adminInput("client", "goal", "Goal")}
             ${adminSelect("client", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
             ${adminInput("client", "trainingDaysPerWeek", "Training days per week", "number")}
@@ -34525,6 +34526,7 @@ function clientEditModal(clientId) {
             ${editInput("client", "name", "Full name", client.name || "")}
             ${editInput("client", "email", "Email", client.email || user?.email || "")}
             ${editInput("client", "phone", "Phone", client.phone || user?.phone || "")}
+            ${editInput("client", "age", "Age", client.age || "", "number")}
             ${editInput("client", "dateOfBirth", "Date of birth", client.dateOfBirth || "", "date")}
             ${editInput("client", "emergencyContact", "Emergency contact", client.emergencyContact || "")}
             ${editSelect("client", "status", "Status", ["Pending", "Active", "Locked", "Suspended", "Archived"], client.status || user?.accountStatus || "Active")}
@@ -35743,6 +35745,7 @@ function bindGlobal() {
       const patch = collectEditFields("client");
       patch.fullName = patch.name;
       patch.assignedCoach = patch.coachId;
+      patch.age = Number(patch.age || 0);
       patch.trainingDaysPerWeek = Number(patch.trainingDaysPerWeek || 0);
       patch.sessionLength = Number(patch.sessionLength || 0);
       patch.sessionsPurchased = Number(patch.sessionsPurchased || 0);
