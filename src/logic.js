@@ -2139,13 +2139,17 @@ export function adminDeletePlanOffering(store, adminUser, offeringId) {
 
 export function adminCreatePackage(store, adminUser, input) {
   requireAdmin(adminUser);
+  const primaryOfferingId = input.planOfferingId || input.planOfferingIds?.[0] || null;
+  const primaryOffering = primaryOfferingId ? findById(store.planOfferings, primaryOfferingId, "Plan offering") : null;
+  const sessionsIncluded = Number(input.sessionsIncluded || primaryOffering?.sessionsIncluded || 0);
   const pkg = {
     id: input.id || makeId("package"),
     packageName: input.packageName || input.name || "New Package",
-    planOfferingId: input.planOfferingId || null,
-    planOfferingIds: input.planOfferingIds?.length ? [...input.planOfferingIds] : [input.planOfferingId].filter(Boolean),
-    price: Number(input.price || 0),
-    sessionsIncluded: Number(input.sessionsIncluded || 0),
+    planOfferingId: primaryOfferingId,
+    planOfferingIds: input.planOfferingIds?.length ? [...input.planOfferingIds] : [primaryOfferingId].filter(Boolean),
+    price: calculatePackagePrice(primaryOffering, sessionsIncluded, input.price),
+    pricePerSession: getOfferingPricePerSession(primaryOffering),
+    sessionsIncluded,
     active: input.active !== false,
     archived: Boolean(input.archived),
     createdByAdminId: adminUser.id,
@@ -2167,8 +2171,12 @@ export function adminUpdatePackage(store, adminUser, packageId, patch) {
     findById(store.planOfferings, patch.planOfferingId, "Plan offering");
     patch.planOfferingIds = patch.planOfferingIds?.length ? patch.planOfferingIds : [patch.planOfferingId];
   }
-  if (patch.price !== undefined) patch.price = Number(patch.price || 0);
-  if (patch.sessionsIncluded !== undefined) patch.sessionsIncluded = Number(patch.sessionsIncluded || 0);
+  const nextOfferingId = patch.planOfferingId !== undefined ? patch.planOfferingId : pkg.planOfferingId;
+  const nextOffering = nextOfferingId ? findById(store.planOfferings, nextOfferingId, "Plan offering") : null;
+  const nextSessions = patch.sessionsIncluded !== undefined ? Number(patch.sessionsIncluded || 0) : Number(pkg.sessionsIncluded || nextOffering?.sessionsIncluded || 0);
+  patch.sessionsIncluded = nextSessions;
+  patch.pricePerSession = getOfferingPricePerSession(nextOffering) || Number(pkg.pricePerSession || 0);
+  patch.price = calculatePackagePrice(nextOffering, nextSessions, patch.price ?? pkg.price);
   Object.assign(pkg, patch, { updatedAt: nowIso() });
   logAdminAction(store, adminUser, `Updated package ${pkg.packageName}`);
   return pkg;
@@ -2227,10 +2235,23 @@ export function adminAssignPlanOfferingToPackage(store, adminUser, packageId, pl
   const offering = findById(store.planOfferings, planOfferingId, "Plan offering");
   pkg.planOfferingId = offering.id;
   pkg.planOfferingIds = [...new Set([offering.id, ...(pkg.planOfferingIds || []).filter(Boolean)])];
-  pkg.price = offering.price;
-  pkg.sessionsIncluded = offering.sessionsIncluded;
+  pkg.sessionsIncluded = Number(pkg.sessionsIncluded || offering.sessionsIncluded || 0);
+  pkg.pricePerSession = getOfferingPricePerSession(offering);
+  pkg.price = calculatePackagePrice(offering, pkg.sessionsIncluded, offering.price);
   pkg.updatedAt = nowIso();
   return pkg;
+}
+
+function calculatePackagePrice(offering, sessionsIncluded, fallbackPrice = 0) {
+  const sessionPrice = getOfferingPricePerSession(offering);
+  const sessions = Number(sessionsIncluded || 0);
+  if (sessionPrice > 0 && sessions > 0) return Math.round(sessionPrice * sessions * 100) / 100;
+  return Math.round(Number(fallbackPrice || 0) * 100) / 100;
+}
+
+function getOfferingPricePerSession(offering) {
+  if (!offering) return 0;
+  return Number(offering.pricePerSession || (offering.sessionsIncluded ? Number(offering.price || 0) / Number(offering.sessionsIncluded) : 0));
 }
 
 export function adminAssignPackageToClient(store, adminUser, clientId, packageId, planOfferingId = null) {
@@ -2246,9 +2267,11 @@ export function adminAssignPackageToClient(store, adminUser, clientId, packageId
   client.packageId = pkg.id;
   client.packageType = pkg.packageName;
   client.planOfferingId = offering?.id || null;
+  client.packagePrice = calculatePackagePrice(offering, pkg.sessionsIncluded, pkg.price);
+  client.packagePricePerSession = Number(offering?.pricePerSession || pkg.pricePerSession || 0);
   client.trainingDaysPerWeek = offering?.trainingDaysPerWeek || client.trainingDaysPerWeek;
   client.sessionLength = offering?.sessionLength || client.sessionLength;
-  client.packageHistory = [...(client.packageHistory || []), { packageId: pkg.id, planOfferingId: offering?.id || null, assignedAt: nowIso() }];
+  client.packageHistory = [...(client.packageHistory || []), { packageId: pkg.id, planOfferingId: offering?.id || null, packagePrice: client.packagePrice, sessionsIncluded: pkg.sessionsIncluded, assignedAt: nowIso() }];
   return client;
 }
 

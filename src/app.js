@@ -3055,6 +3055,10 @@ function bindGlobal() {
     state.editModalDirty = false;
     render();
   });
+  document.querySelector("#assignPackageId")?.addEventListener("change", (event) => {
+    state.editModal = { type: "packageAssign", id: event.currentTarget.value };
+    render();
+  });
   document.querySelector("#saveCoachModal")?.addEventListener("click", (event) => {
     const coachId = event.currentTarget.dataset.coachId;
     const patch = collectEditFields("coach");

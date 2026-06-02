@@ -1284,7 +1284,6 @@ test("admin can create plan offering, assign it to package, and assign package t
   adminUpdatePackage(store, admin, pkg.id, {
     packageName: "Edited Recovery Package",
     planOfferingIds: [offering.id, secondOffering.id],
-    price: 199,
     sessionsIncluded: 10
   });
   adminAssignPackageToClient(store, admin, "client_ada", pkg.id, secondOffering.id);
@@ -1293,8 +1292,26 @@ test("admin can create plan offering, assign it to package, and assign package t
   assert.equal(client.planOfferingId, secondOffering.id);
   assert.equal(client.trainingDaysPerWeek, 3);
   assert.equal(client.sessionLength, 45);
+  assert.equal(store.packages.find((item) => item.id === pkg.id).price, 186.25);
+  assert.equal(client.packagePrice, 182.5);
   assert.equal(client.packageType, "Edited Recovery Package");
   assert.deepEqual(store.packages.find((item) => item.id === pkg.id).planOfferingIds, [offering.id, secondOffering.id]);
+});
+
+test("workbook packages are imported and priced from connected offering sessions", () => {
+  const store = createStore();
+  const imported = store.packages.filter((pkg) => pkg.sourceWorkbook === "mad_king_conditioning_plan_offerings_updated_prices.xlsx");
+  assert.equal(imported.length, 96);
+  const jabLab = imported.find((pkg) => pkg.sourcePlanId === "MKP-001");
+  assert.equal(jabLab.planOfferingId, "offering_mkp_001");
+  assert.deepEqual(jabLab.planOfferingIds, ["offering_mkp_001"]);
+  assert.equal(jabLab.sessionsIncluded, 12);
+  assert.equal(jabLab.pricePerSession, 17.5);
+  assert.equal(jabLab.price, 210);
+  const proCamp = imported.find((pkg) => pkg.sourcePlanId === "MKP-096");
+  assert.equal(proCamp.sessionsIncluded, 20);
+  assert.equal(proCamp.pricePerSession, 80);
+  assert.equal(proCamp.price, 1600);
 });
 
 test("plan offering workbook rows are imported and connected to workout templates", () => {
