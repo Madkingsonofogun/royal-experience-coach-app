@@ -2143,6 +2143,7 @@ export function adminCreatePackage(store, adminUser, input) {
     id: input.id || makeId("package"),
     packageName: input.packageName || input.name || "New Package",
     planOfferingId: input.planOfferingId || null,
+    planOfferingIds: input.planOfferingIds?.length ? [...input.planOfferingIds] : [input.planOfferingId].filter(Boolean),
     price: Number(input.price || 0),
     sessionsIncluded: Number(input.sessionsIncluded || 0),
     active: input.active !== false,
@@ -2152,6 +2153,24 @@ export function adminCreatePackage(store, adminUser, input) {
     updatedAt: nowIso()
   };
   store.packages.push(pkg);
+  return pkg;
+}
+
+export function adminUpdatePackage(store, adminUser, packageId, patch) {
+  requireAdmin(adminUser);
+  const pkg = findById(store.packages, packageId, "Package");
+  if (patch.planOfferingIds) {
+    patch.planOfferingIds = [...patch.planOfferingIds];
+    patch.planOfferingId = patch.planOfferingIds[0] || patch.planOfferingId || null;
+  }
+  if (patch.planOfferingId) {
+    findById(store.planOfferings, patch.planOfferingId, "Plan offering");
+    patch.planOfferingIds = patch.planOfferingIds?.length ? patch.planOfferingIds : [patch.planOfferingId];
+  }
+  if (patch.price !== undefined) patch.price = Number(patch.price || 0);
+  if (patch.sessionsIncluded !== undefined) patch.sessionsIncluded = Number(patch.sessionsIncluded || 0);
+  Object.assign(pkg, patch, { updatedAt: nowIso() });
+  logAdminAction(store, adminUser, `Updated package ${pkg.packageName}`);
   return pkg;
 }
 
@@ -2207,6 +2226,7 @@ export function adminAssignPlanOfferingToPackage(store, adminUser, packageId, pl
   const pkg = findById(store.packages, packageId, "Package");
   const offering = findById(store.planOfferings, planOfferingId, "Plan offering");
   pkg.planOfferingId = offering.id;
+  pkg.planOfferingIds = [...new Set([offering.id, ...(pkg.planOfferingIds || []).filter(Boolean)])];
   pkg.price = offering.price;
   pkg.sessionsIncluded = offering.sessionsIncluded;
   pkg.updatedAt = nowIso();

@@ -38,6 +38,7 @@ import {
   adminUpdateClient,
   adminUpdateAssessmentTemplate,
   adminUpdateExercise,
+  adminUpdatePackage,
   adminUpdatePlanOffering,
   adminUpdateWorkout,
   adminUpdateWorkoutTemplate,
@@ -1532,8 +1533,13 @@ function adminView() {
             ${adminInput("package", "sessionsIncluded", "Sessions included", "number")}
           </div>
           <button class="primary full" id="adminCreatePackage">Add Package</button>
-          <button class="success full" id="adminAssignPackage">Assign Selected Package To Selected Client</button>
-          <div class="admin-list">${store.packages.map((pkg) => `<div class="admin-row"><span>${pkg.packageName} / ${store.planOfferings.find((offering) => offering.id === pkg.planOfferingId)?.planName || "No offering"}</span><button data-package-offering="${pkg.id}">Connect Offering</button><button data-delete-package="${pkg.id}">Delete</button></div>`).join("")}</div>
+          <button class="success full" id="adminAssignPackage">Assign Package To Client</button>
+          <div class="admin-list">${store.packages.map((pkg) => {
+            const connectedOfferings = (pkg.planOfferingIds?.length ? pkg.planOfferingIds : [pkg.planOfferingId].filter(Boolean))
+              .map((id) => store.planOfferings.find((offering) => offering.id === id)?.planName)
+              .filter(Boolean);
+            return `<div class="admin-row"><span>${pkg.packageName} / ${connectedOfferings.length ? connectedOfferings.join(", ") : "No offering"} / $${pkg.price || 0}</span><button data-open-package-editor="${pkg.id}">Edit</button><button data-package-offering="${pkg.id}">Connect Offerings</button><button data-assign-package="${pkg.id}">Assign to Client</button><button data-delete-package="${pkg.id}">Delete</button></div>`;
+          }).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("assessmentTemplates")}" id="admin-assessment-templates-new">
           <h3>Add Assessment Template</h3>
@@ -1601,6 +1607,9 @@ function adminEditModal() {
   if (state.editModal.type === "exercise") return exerciseEditModal(state.editModal.id);
   if (state.editModal.type === "workout") return workoutEditModal(state.editModal.id);
   if (state.editModal.type === "offering") return planOfferingEditModal(state.editModal.id);
+  if (state.editModal.type === "package") return packageEditModal(state.editModal.id);
+  if (state.editModal.type === "packageConnect") return packageConnectModal(state.editModal.id);
+  if (state.editModal.type === "packageAssign") return packageAssignModal(state.editModal.id);
   if (state.editModal.type === "coach") return coachEditModal(state.editModal.id);
   if (state.editModal.type === "assessmentTemplate") return assessmentTemplateEditModal(state.editModal.id);
   if (state.editModal.type === "account") return accountReviewModal(state.editModal.id);
@@ -1874,6 +1883,101 @@ function planOfferingEditModal(offeringId) {
         <div class="modal-actions">
           <button class="ghost" id="closeEditModalSecondary">Cancel</button>
           <button class="primary" id="saveOfferingModal" data-offering-id="${offering.id}">Save Plan Offering</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function packageEditModal(packageId) {
+  const pkg = store.packages.find((item) => item.id === packageId);
+  if (!pkg) return "";
+  const connectedIds = pkg.planOfferingIds?.length ? pkg.planOfferingIds : [pkg.planOfferingId].filter(Boolean);
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card">
+        <div class="modal-head">
+          <div><p class="eyebrow">Edit Package</p><h2>${escapeHtml(pkg.packageName)}</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="form-grid">
+          ${editInput("package", "packageName", "Package name", pkg.packageName)}
+          ${editInput("package", "price", "Price", pkg.price || 0, "number")}
+          ${editInput("package", "sessionsIncluded", "Sessions included", pkg.sessionsIncluded || 0, "number")}
+          ${editSelect("package", "active", "Status", [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }], String(pkg.active !== false))}
+        </div>
+        <label>Main plan offering
+          <select data-edit-package-field="planOfferingId">
+            <option value="">No main offering</option>
+            ${store.planOfferings.map((offering) => `<option value="${offering.id}" ${offering.id === pkg.planOfferingId ? "selected" : ""}>${offering.planName}</option>`).join("")}
+          </select>
+        </label>
+        <label>Connected plan offerings
+          <select id="editPackageOfferings" multiple size="8">
+            ${store.planOfferings.map((offering) => `<option value="${offering.id}" ${connectedIds.includes(offering.id) ? "selected" : ""}>${offering.planName}</option>`).join("")}
+          </select>
+        </label>
+        <p class="muted">The first selected offering becomes the main offering used for price, sessions, and client assignment.</p>
+        <div class="modal-actions">
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="savePackageModal" data-package-id="${pkg.id}">Save Package</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function packageConnectModal(packageId) {
+  const pkg = store.packages.find((item) => item.id === packageId);
+  if (!pkg) return "";
+  const connectedIds = pkg.planOfferingIds?.length ? pkg.planOfferingIds : [pkg.planOfferingId].filter(Boolean);
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card">
+        <div class="modal-head">
+          <div><p class="eyebrow">Connect Plan Offerings</p><h2>${escapeHtml(pkg.packageName)}</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <p class="muted">Select one or more plan offerings this package can use. The first selected offering controls the package price and sessions.</p>
+        <label>Plan offerings
+          <select id="connectPackageOfferings" multiple size="12">
+            ${store.planOfferings.map((offering) => `<option value="${offering.id}" ${connectedIds.includes(offering.id) ? "selected" : ""}>${offering.planName} / ${offering.trainingLevel || offering.planLevel} / $${offering.price || 0}</option>`).join("")}
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="savePackageOfferingsModal" data-package-id="${pkg.id}">Save Connected Offerings</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function packageAssignModal(packageId = "") {
+  const pkg = store.packages.find((item) => item.id === packageId) || store.packages[0];
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card">
+        <div class="modal-head">
+          <div><p class="eyebrow">Assign Package</p><h2>Package to client</h2></div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="form-grid">
+          <label>Package
+            <select id="assignPackageId">
+              ${store.packages.map((item) => `<option value="${item.id}" ${item.id === pkg?.id ? "selected" : ""}>${item.packageName}</option>`).join("")}
+            </select>
+          </label>
+          <label>Client
+            <select id="assignPackageClientId">
+              ${store.clients.map((client) => `<option value="${client.id}" ${client.id === state.clientId ? "selected" : ""}>${client.name}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <div class="result-band"><strong>After assigning</strong><span>The selected client gets this package, its main plan offering, sessions, training days, and session length.</span></div>
+        <div class="modal-actions">
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+          <button class="primary" id="saveAssignPackageModal">Assign Package</button>
         </div>
       </section>
     </div>
@@ -2740,6 +2844,15 @@ function bindGlobal() {
     state.editModal = { type: "offering", id: button.dataset.openOfferingEditor };
     render();
   }));
+  document.querySelectorAll("[data-open-package-editor]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "package", id: button.dataset.openPackageEditor };
+    state.editModalDirty = false;
+    render();
+  }));
+  document.querySelectorAll("[data-assign-package]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "packageAssign", id: button.dataset.assignPackage };
+    render();
+  }));
   document.querySelectorAll("[data-open-coach-editor]").forEach((button) => button.addEventListener("click", () => {
     state.editModal = { type: "coach", id: button.dataset.openCoachEditor };
     render();
@@ -2767,7 +2880,7 @@ function bindGlobal() {
     render();
   });
   document.querySelectorAll("#closeEditModal, #closeEditModalSecondary").forEach((button) => button.addEventListener("click", () => {
-    if (state.editModal?.type === "client" && state.editModalDirty && !window.confirm("Close without saving your client changes?")) return;
+    if (["client", "package", "packageConnect", "packageAssign"].includes(state.editModal?.type) && state.editModalDirty && !window.confirm("Close without saving your changes?")) return;
     if (state.editModal?.type === "exercise" && state.exercisePopupMode === "edit" && state.editModalDirty && !window.confirm("Close without saving your exercise changes?")) return;
     state.editModal = null;
     state.editModalDirty = false;
@@ -2890,6 +3003,46 @@ function bindGlobal() {
     patch.workoutTemplateIds = Array.from(document.querySelector("#editOfferingTemplates")?.selectedOptions || []).map((option) => option.value);
     adminUpdatePlanOffering(store, state.currentUser, offeringId, patch);
     state.editModal = null;
+    render();
+  });
+  document.querySelector("#savePackageModal")?.addEventListener("click", (event) => {
+    const packageId = event.currentTarget.dataset.packageId;
+    const patch = collectEditFields("package");
+    const selectedOfferingIds = Array.from(document.querySelector("#editPackageOfferings")?.selectedOptions || []).map((option) => option.value);
+    if (patch.planOfferingId && !selectedOfferingIds.includes(patch.planOfferingId)) selectedOfferingIds.unshift(patch.planOfferingId);
+    patch.planOfferingIds = selectedOfferingIds;
+    patch.planOfferingId = patch.planOfferingId || selectedOfferingIds[0] || null;
+    patch.active = patch.active === "true";
+    adminUpdatePackage(store, state.currentUser, packageId, patch);
+    state.editModal = null;
+    state.editModalDirty = false;
+    render();
+  });
+  document.querySelector("#savePackageOfferingsModal")?.addEventListener("click", (event) => {
+    const packageId = event.currentTarget.dataset.packageId;
+    const selectedOfferingIds = Array.from(document.querySelector("#connectPackageOfferings")?.selectedOptions || []).map((option) => option.value);
+    if (!selectedOfferingIds.length) return window.alert("Choose at least one plan offering to connect.");
+    const mainOffering = store.planOfferings.find((offering) => offering.id === selectedOfferingIds[0]);
+    adminUpdatePackage(store, state.currentUser, packageId, {
+      planOfferingId: mainOffering.id,
+      planOfferingIds: selectedOfferingIds,
+      price: mainOffering.price || 0,
+      sessionsIncluded: mainOffering.sessionsIncluded || 0
+    });
+    window.alert("Plan offerings connected to package.");
+    state.editModal = null;
+    state.editModalDirty = false;
+    render();
+  });
+  document.querySelector("#saveAssignPackageModal")?.addEventListener("click", () => {
+    const packageId = document.querySelector("#assignPackageId")?.value;
+    const clientId = document.querySelector("#assignPackageClientId")?.value;
+    if (!packageId || !clientId) return window.alert("Choose both a package and a client.");
+    adminAssignPackageToClient(store, state.currentUser, clientId, packageId);
+    state.clientId = clientId;
+    window.alert("Package assigned to client.");
+    state.editModal = null;
+    state.editModalDirty = false;
     render();
   });
   document.querySelector("#saveCoachModal")?.addEventListener("click", (event) => {
@@ -3201,7 +3354,7 @@ function bindGlobal() {
     render();
   });
   document.querySelectorAll("[data-package-offering]").forEach((button) => button.addEventListener("click", () => {
-    adminAssignPlanOfferingToPackage(store, state.currentUser, button.dataset.packageOffering, state.adminDrafts.package.planOfferingId);
+    state.editModal = { type: "packageConnect", id: button.dataset.packageOffering };
     render();
   }));
   document.querySelectorAll("[data-delete-package]").forEach((button) => button.addEventListener("click", () => {
@@ -3210,8 +3363,7 @@ function bindGlobal() {
     render();
   }));
   document.querySelector("#adminAssignPackage")?.addEventListener("click", () => {
-    const pkg = store.packages.at(-1);
-    if (pkg) adminAssignPackageToClient(store, state.currentUser, state.clientId, pkg.id);
+    state.editModal = { type: "packageAssign", id: store.packages[0]?.id || "" };
     render();
   });
   document.querySelectorAll("[data-save-pin]").forEach((button) => button.addEventListener("click", () => {

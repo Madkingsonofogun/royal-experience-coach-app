@@ -33,6 +33,7 @@ import {
   adminReorderWorkoutTemplateItems,
   adminUpdateClient,
   adminUpdateExercise,
+  adminUpdatePackage,
   adminUpdateWorkoutTemplateItem,
   adminResetUserPin,
   adminSetUserPin,
@@ -1267,12 +1268,31 @@ test("admin can create plan offering, assign it to package, and assign package t
     packageType: "Recovery coaching",
     workoutTemplateIds: ["template_boxing_baseline"]
   });
+  const secondOffering = adminCreatePlanOffering(store, admin, {
+    planName: "3-Day Beginner Plan",
+    sportFocus: "Boxing",
+    goal: "Conditioning",
+    trainingLevel: "Beginner",
+    trainingDaysPerWeek: 3,
+    sessionLength: 45,
+    price: 219,
+    sessionsIncluded: 12,
+    packageType: "Boxing coaching"
+  });
   const pkg = adminCreatePackage(store, admin, { packageName: "Recovery Package" });
   adminAssignPlanOfferingToPackage(store, admin, pkg.id, offering.id);
+  adminUpdatePackage(store, admin, pkg.id, {
+    packageName: "Edited Recovery Package",
+    planOfferingIds: [offering.id, secondOffering.id],
+    price: 199,
+    sessionsIncluded: 10
+  });
   adminAssignPackageToClient(store, admin, "client_ada", pkg.id);
   const client = store.clients.find((item) => item.id === "client_ada");
   assert.equal(client.packageId, pkg.id);
   assert.equal(client.planOfferingId, offering.id);
+  assert.equal(client.packageType, "Edited Recovery Package");
+  assert.deepEqual(store.packages.find((item) => item.id === pkg.id).planOfferingIds, [offering.id, secondOffering.id]);
 });
 
 test("plan offering workbook rows are imported and connected to workout templates", () => {
