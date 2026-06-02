@@ -13,7 +13,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Jab Lab - Beginner Quick Session",
     "workoutTemplateIds": [
@@ -26,13 +34,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-001. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-001. Weekly frequency: 2-3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_002",
@@ -48,7 +56,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Jab Lab - Beginner Standard Plan",
     "workoutTemplateIds": [
@@ -60,13 +76,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-002. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-002. Weekly frequency: 2-3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_003",
@@ -82,7 +98,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Jab Lab - Beginner Full Session",
     "workoutTemplateIds": [
@@ -94,13 +118,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-003. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-003. Weekly frequency: 2-3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_004",
@@ -116,7 +140,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Jab Lab - Beginner Camp Day",
     "workoutTemplateIds": [
@@ -131,13 +163,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-004. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-004. Weekly frequency: 2-3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_005",
@@ -153,7 +185,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Guard Boxing - Intermediate Quick Session",
     "workoutTemplateIds": [
@@ -165,13 +205,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-005. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-005. Weekly frequency: 3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_006",
@@ -187,7 +227,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Guard Boxing - Intermediate Standard Plan",
     "workoutTemplateIds": [
@@ -200,13 +248,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-006. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-006. Weekly frequency: 3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_007",
@@ -222,7 +270,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Guard Boxing - Intermediate Full Session",
     "workoutTemplateIds": [
@@ -234,13 +290,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-007. Weekly frequency: 3 days/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-007. Weekly frequency: 3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_008",
@@ -256,7 +312,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Guard Boxing - Intermediate Camp Day",
     "workoutTemplateIds": [
@@ -268,13 +332,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-008. Weekly frequency: 3 days/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-008. Weekly frequency: 3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_009",
@@ -290,7 +354,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 280.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Combo - Advanced Quick Session",
     "workoutTemplateIds": [
@@ -302,13 +374,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-009. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-009. Weekly frequency: 3-4 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $280 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_010",
@@ -324,7 +396,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 420.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Combo - Advanced Standard Plan",
     "workoutTemplateIds": [
@@ -338,13 +418,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-010. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-010. Weekly frequency: 3-4 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $420 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_011",
@@ -360,7 +440,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 640.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Combo - Advanced Full Session",
     "workoutTemplateIds": [
@@ -372,13 +460,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-011. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-011. Weekly frequency: 3-4 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $640 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_012",
@@ -394,7 +482,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1280.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Combo - Advanced Camp Day",
     "workoutTemplateIds": [
@@ -406,13 +502,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-012. Weekly frequency: 3-4 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-012. Weekly frequency: 3-4 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1280 for 4x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_013",
@@ -428,7 +524,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 350.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Ring - Pro Quick Session",
     "workoutTemplateIds": [
@@ -442,13 +546,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-013. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-013. Weekly frequency: 4-5 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $350 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_014",
@@ -464,7 +568,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 525.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Ring - Pro Standard Plan",
     "workoutTemplateIds": [
@@ -476,13 +588,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-014. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-014. Weekly frequency: 4-5 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $525 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_015",
@@ -498,7 +610,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 800.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Ring - Pro Full Session",
     "workoutTemplateIds": [
@@ -510,13 +630,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-015. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-015. Weekly frequency: 4-5 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $800 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_016",
@@ -532,7 +652,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1600.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Ring - Pro Camp Day",
     "workoutTemplateIds": [
@@ -544,13 +672,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-016. Weekly frequency: 4-5 days/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-016. Weekly frequency: 4-5 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1600 for 5x/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_017",
@@ -566,7 +694,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Kickstart - Beginner Quick Session",
     "workoutTemplateIds": [
@@ -579,13 +715,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-017. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-017. Weekly frequency: 2-3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_018",
@@ -601,7 +737,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Kickstart - Beginner Standard Plan",
     "workoutTemplateIds": [
@@ -613,13 +757,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-018. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-018. Weekly frequency: 2-3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_019",
@@ -635,7 +779,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Kickstart - Beginner Full Session",
     "workoutTemplateIds": [
@@ -647,13 +799,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-019. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-019. Weekly frequency: 2-3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_020",
@@ -669,7 +821,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Kickstart - Beginner Camp Day",
     "workoutTemplateIds": [
@@ -684,13 +844,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-020. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-020. Weekly frequency: 2-3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_021",
@@ -706,7 +866,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Kick Burn - Intermediate Quick Session",
     "workoutTemplateIds": [
@@ -718,13 +886,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-021. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-021. Weekly frequency: 3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_022",
@@ -740,7 +908,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Kick Burn - Intermediate Standard Plan",
     "workoutTemplateIds": [
@@ -753,13 +929,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-022. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-022. Weekly frequency: 3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_023",
@@ -775,7 +951,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Kick Burn - Intermediate Full Session",
     "workoutTemplateIds": [
@@ -787,13 +971,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-023. Weekly frequency: 3 days/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-023. Weekly frequency: 3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_024",
@@ -809,7 +993,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Kick Burn - Intermediate Camp Day",
     "workoutTemplateIds": [
@@ -821,13 +1013,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-024. Weekly frequency: 3 days/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-024. Weekly frequency: 3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_025",
@@ -843,7 +1035,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 280.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Strike - Advanced Quick Session",
     "workoutTemplateIds": [
@@ -855,13 +1055,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-025. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-025. Weekly frequency: 3-4 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $280 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_026",
@@ -877,7 +1077,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 420.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Strike - Advanced Standard Plan",
     "workoutTemplateIds": [
@@ -891,13 +1099,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-026. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-026. Weekly frequency: 3-4 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $420 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_027",
@@ -913,7 +1121,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 640.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Strike - Advanced Full Session",
     "workoutTemplateIds": [
@@ -925,13 +1141,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-027. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-027. Weekly frequency: 3-4 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $640 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_028",
@@ -947,7 +1163,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1280.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Strike - Advanced Camp Day",
     "workoutTemplateIds": [
@@ -959,13 +1183,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-028. Weekly frequency: 3-4 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-028. Weekly frequency: 3-4 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1280 for 4x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_029",
@@ -981,7 +1205,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 350.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Kick Camp - Pro Quick Session",
     "workoutTemplateIds": [
@@ -995,13 +1227,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-029. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-029. Weekly frequency: 4-5 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $350 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_030",
@@ -1017,7 +1249,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 525.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Kick Camp - Pro Standard Plan",
     "workoutTemplateIds": [
@@ -1029,13 +1269,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-030. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-030. Weekly frequency: 4-5 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $525 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_031",
@@ -1051,7 +1291,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 800.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Kick Camp - Pro Full Session",
     "workoutTemplateIds": [
@@ -1063,13 +1311,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-031. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-031. Weekly frequency: 4-5 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $800 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_032",
@@ -1085,7 +1333,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1600.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Kick Camp - Pro Camp Day",
     "workoutTemplateIds": [
@@ -1097,13 +1353,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-032. Weekly frequency: 4-5 days/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-032. Weekly frequency: 4-5 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1600 for 5x/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_033",
@@ -1119,7 +1375,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Cage Foundation - Beginner Quick Session",
     "workoutTemplateIds": [
@@ -1132,13 +1396,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-033. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-033. Weekly frequency: 2-3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_034",
@@ -1154,7 +1418,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Cage Foundation - Beginner Standard Plan",
     "workoutTemplateIds": [
@@ -1166,13 +1438,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-034. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-034. Weekly frequency: 2-3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_035",
@@ -1188,7 +1460,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Cage Foundation - Beginner Full Session",
     "workoutTemplateIds": [
@@ -1200,13 +1480,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-035. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-035. Weekly frequency: 2-3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_036",
@@ -1222,7 +1502,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Cage Foundation - Beginner Camp Day",
     "workoutTemplateIds": [
@@ -1237,13 +1525,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-036. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-036. Weekly frequency: 2-3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_037",
@@ -1259,7 +1547,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Cage Conditioning - Intermediate Quick Session",
     "workoutTemplateIds": [
@@ -1271,13 +1567,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-037. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-037. Weekly frequency: 3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_038",
@@ -1293,7 +1589,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Cage Conditioning - Intermediate Standard Plan",
     "workoutTemplateIds": [
@@ -1306,13 +1610,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-038. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-038. Weekly frequency: 3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_039",
@@ -1328,7 +1632,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Cage Conditioning - Intermediate Full Session",
     "workoutTemplateIds": [
@@ -1340,13 +1652,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-039. Weekly frequency: 3 days/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-039. Weekly frequency: 3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_040",
@@ -1362,7 +1674,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Cage Conditioning - Intermediate Camp Day",
     "workoutTemplateIds": [
@@ -1374,13 +1694,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-040. Weekly frequency: 3 days/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
+    "coachNotes": "Source plan ID: MKP-040. Weekly frequency: 3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Works as combat-style fitness without sparring or contact.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_041",
@@ -1396,7 +1716,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 280.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Combat Builder - Advanced Quick Session",
     "workoutTemplateIds": [
@@ -1408,13 +1736,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-041. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-041. Weekly frequency: 3-4 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $280 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_042",
@@ -1430,7 +1758,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 420.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Combat Builder - Advanced Standard Plan",
     "workoutTemplateIds": [
@@ -1444,13 +1780,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-042. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-042. Weekly frequency: 3-4 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $420 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_043",
@@ -1466,7 +1802,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 640.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Combat Builder - Advanced Full Session",
     "workoutTemplateIds": [
@@ -1478,13 +1822,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-043. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-043. Weekly frequency: 3-4 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $640 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_044",
@@ -1500,7 +1844,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1280.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Combat Builder - Advanced Camp Day",
     "workoutTemplateIds": [
@@ -1512,13 +1864,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-044. Weekly frequency: 3-4 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-044. Weekly frequency: 3-4 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1280 for 4x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_045",
@@ -1534,7 +1886,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 350.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Warrior MMA - Pro Quick Session",
     "workoutTemplateIds": [
@@ -1548,13 +1908,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-045. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-045. Weekly frequency: 4-5 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $350 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_046",
@@ -1570,7 +1930,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 525.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Warrior MMA - Pro Standard Plan",
     "workoutTemplateIds": [
@@ -1582,13 +1950,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-046. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-046. Weekly frequency: 4-5 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $525 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_047",
@@ -1604,7 +1972,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 800.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Warrior MMA - Pro Full Session",
     "workoutTemplateIds": [
@@ -1616,13 +1992,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-047. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-047. Weekly frequency: 4-5 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $800 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_048",
@@ -1638,7 +2014,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1600.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Warrior MMA - Pro Camp Day",
     "workoutTemplateIds": [
@@ -1650,13 +2034,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-048. Weekly frequency: 4-5 days/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
+    "coachNotes": "Source plan ID: MKP-048. Weekly frequency: 4-5 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1600 for 5x/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Can be used for fighters; scale contact, sparring, and impact based on client readiness.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_049",
@@ -1672,7 +2056,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Reset - Beginner Quick Session",
     "workoutTemplateIds": [
@@ -1685,13 +2077,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-049. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-049. Weekly frequency: 2-3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_050",
@@ -1707,7 +2099,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Reset - Beginner Standard Plan",
     "workoutTemplateIds": [
@@ -1719,13 +2119,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-050. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-050. Weekly frequency: 2-3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_051",
@@ -1741,7 +2141,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Reset - Beginner Full Session",
     "workoutTemplateIds": [
@@ -1753,13 +2161,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-051. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-051. Weekly frequency: 2-3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_052",
@@ -1775,7 +2183,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Reset - Beginner Camp Day",
     "workoutTemplateIds": [
@@ -1790,13 +2206,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-052. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-052. Weekly frequency: 2-3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_053",
@@ -1812,7 +2228,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Everyday Athlete - Intermediate Quick Session",
     "workoutTemplateIds": [
@@ -1824,13 +2248,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-053. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-053. Weekly frequency: 3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_054",
@@ -1846,7 +2270,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Everyday Athlete - Intermediate Standard Plan",
     "workoutTemplateIds": [
@@ -1859,13 +2291,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-054. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-054. Weekly frequency: 3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_055",
@@ -1881,7 +2313,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Everyday Athlete - Intermediate Full Session",
     "workoutTemplateIds": [
@@ -1893,13 +2333,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-055. Weekly frequency: 3 days/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-055. Weekly frequency: 3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_056",
@@ -1915,7 +2355,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Everyday Athlete - Intermediate Camp Day",
     "workoutTemplateIds": [
@@ -1927,13 +2375,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-056. Weekly frequency: 3 days/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-056. Weekly frequency: 3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_057",
@@ -1949,7 +2397,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 280.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Performance - Advanced Quick Session",
     "workoutTemplateIds": [
@@ -1961,13 +2417,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-057. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-057. Weekly frequency: 3-4 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $280 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_058",
@@ -1983,7 +2439,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 420.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Performance - Advanced Standard Plan",
     "workoutTemplateIds": [
@@ -1997,13 +2461,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-058. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-058. Weekly frequency: 3-4 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $420 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_059",
@@ -2019,7 +2483,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 640.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Performance - Advanced Full Session",
     "workoutTemplateIds": [
@@ -2031,13 +2503,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-059. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-059. Weekly frequency: 3-4 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $640 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_060",
@@ -2053,7 +2525,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1280.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Performance - Advanced Camp Day",
     "workoutTemplateIds": [
@@ -2065,13 +2545,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-060. Weekly frequency: 3-4 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-060. Weekly frequency: 3-4 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1280 for 4x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_061",
@@ -2087,7 +2567,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 350.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Elite Performance - Pro Quick Session",
     "workoutTemplateIds": [
@@ -2101,13 +2589,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-061. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-061. Weekly frequency: 4-5 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $350 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_062",
@@ -2123,7 +2611,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 525.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Elite Performance - Pro Standard Plan",
     "workoutTemplateIds": [
@@ -2135,13 +2631,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-062. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-062. Weekly frequency: 4-5 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $525 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_063",
@@ -2157,7 +2653,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 800.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Elite Performance - Pro Full Session",
     "workoutTemplateIds": [
@@ -2169,13 +2673,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-063. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-063. Weekly frequency: 4-5 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $800 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_064",
@@ -2191,7 +2695,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1600.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Elite Performance - Pro Camp Day",
     "workoutTemplateIds": [
@@ -2203,13 +2715,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-064. Weekly frequency: 4-5 days/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
+    "coachNotes": "Source plan ID: MKP-064. Weekly frequency: 4-5 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1600 for 5x/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Best general option for clients who want fitness without a fight-sport focus.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_065",
@@ -2225,7 +2737,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Iron Crown Foundation - Beginner Quick Session",
     "workoutTemplateIds": [
@@ -2238,13 +2758,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-065. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-065. Weekly frequency: 2-3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_066",
@@ -2260,7 +2780,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Iron Crown Foundation - Beginner Standard Plan",
     "workoutTemplateIds": [
@@ -2272,13 +2800,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-066. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-066. Weekly frequency: 2-3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_067",
@@ -2294,7 +2822,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Iron Crown Foundation - Beginner Full Session",
     "workoutTemplateIds": [
@@ -2306,13 +2842,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-067. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-067. Weekly frequency: 2-3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_068",
@@ -2328,7 +2864,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Iron Crown Foundation - Beginner Camp Day",
     "workoutTemplateIds": [
@@ -2343,13 +2887,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-068. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-068. Weekly frequency: 2-3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_069",
@@ -2365,7 +2909,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Strength Builder - Intermediate Quick Session",
     "workoutTemplateIds": [
@@ -2377,13 +2929,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-069. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-069. Weekly frequency: 3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_070",
@@ -2399,7 +2951,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Strength Builder - Intermediate Standard Plan",
     "workoutTemplateIds": [
@@ -2412,13 +2972,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-070. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-070. Weekly frequency: 3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_071",
@@ -2434,7 +2994,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Strength Builder - Intermediate Full Session",
     "workoutTemplateIds": [
@@ -2446,13 +3014,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-071. Weekly frequency: 3 days/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-071. Weekly frequency: 3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_072",
@@ -2468,7 +3036,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Strength Builder - Intermediate Camp Day",
     "workoutTemplateIds": [
@@ -2480,13 +3056,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-072. Weekly frequency: 3 days/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-072. Weekly frequency: 3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_073",
@@ -2502,7 +3078,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 280.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Power Builder - Advanced Quick Session",
     "workoutTemplateIds": [
@@ -2514,13 +3098,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-073. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-073. Weekly frequency: 3-4 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $280 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_074",
@@ -2536,7 +3120,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 420.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Power Builder - Advanced Standard Plan",
     "workoutTemplateIds": [
@@ -2550,13 +3142,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-074. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-074. Weekly frequency: 3-4 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $420 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_075",
@@ -2572,7 +3164,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 640.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Power Builder - Advanced Full Session",
     "workoutTemplateIds": [
@@ -2584,13 +3184,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-075. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-075. Weekly frequency: 3-4 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $640 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_076",
@@ -2606,7 +3206,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1280.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Royal Power Builder - Advanced Camp Day",
     "workoutTemplateIds": [
@@ -2618,13 +3226,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-076. Weekly frequency: 3-4 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-076. Weekly frequency: 3-4 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1280 for 4x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_077",
@@ -2640,7 +3248,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 350.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Iron Camp - Pro Quick Session",
     "workoutTemplateIds": [
@@ -2654,13 +3270,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-077. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-077. Weekly frequency: 4-5 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $350 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_078",
@@ -2676,7 +3292,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 525.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Iron Camp - Pro Standard Plan",
     "workoutTemplateIds": [
@@ -2688,13 +3312,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-078. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-078. Weekly frequency: 4-5 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $525 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_079",
@@ -2710,7 +3334,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 800.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Iron Camp - Pro Full Session",
     "workoutTemplateIds": [
@@ -2722,13 +3354,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-079. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-079. Weekly frequency: 4-5 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $800 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_080",
@@ -2744,7 +3376,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1600.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Kingdom Iron Camp - Pro Camp Day",
     "workoutTemplateIds": [
@@ -2756,13 +3396,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-080. Weekly frequency: 4-5 days/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
+    "coachNotes": "Source plan ID: MKP-080. Weekly frequency: 4-5 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1600 for 5x/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Increase load only when movement quality stays clean.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_081",
@@ -2778,7 +3418,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Sweat Start - Beginner Quick Session",
     "workoutTemplateIds": [
@@ -2791,13 +3439,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-081. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-081. Weekly frequency: 2-3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Easy. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_082",
@@ -2813,7 +3461,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Sweat Start - Beginner Standard Plan",
     "workoutTemplateIds": [
@@ -2825,13 +3481,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-082. Weekly frequency: 2-3 days/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-082. Weekly frequency: 2-3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Easy/Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_083",
@@ -2847,7 +3503,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Sweat Start - Beginner Full Session",
     "workoutTemplateIds": [
@@ -2859,13 +3523,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-083. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-083. Weekly frequency: 2-3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_084",
@@ -2881,7 +3545,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "2-3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Royal Sweat Start - Beginner Camp Day",
     "workoutTemplateIds": [
@@ -2896,13 +3568,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-084. Weekly frequency: 2-3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-084. Weekly frequency: 2-3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_085",
@@ -2918,7 +3590,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 210.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Fat Burn - Intermediate Quick Session",
     "workoutTemplateIds": [
@@ -2930,13 +3610,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-085. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-085. Weekly frequency: 3 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $210 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_086",
@@ -2952,7 +3632,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 315.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Fat Burn - Intermediate Standard Plan",
     "workoutTemplateIds": [
@@ -2965,13 +3653,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-086. Weekly frequency: 3 days/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-086. Weekly frequency: 3 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $315 for 3x/week. Original workbook difficulty: Medium. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_087",
@@ -2987,7 +3675,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 480.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Fat Burn - Intermediate Full Session",
     "workoutTemplateIds": [
@@ -2999,13 +3695,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-087. Weekly frequency: 3 days/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-087. Weekly frequency: 3 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $480 for 3x/week. Original workbook difficulty: Medium/Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_088",
@@ -3021,7 +3717,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 3,
     "weeklyFrequency": "3 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 960.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 12,
     "packageType": "Mad King Fat Burn - Intermediate Camp Day",
     "workoutTemplateIds": [
@@ -3033,13 +3737,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-088. Weekly frequency: 3 days/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-088. Weekly frequency: 3 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $960 for 3x/week. Original workbook difficulty: Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_089",
@@ -3055,7 +3759,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 280.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Cut Conditioning - Advanced Quick Session",
     "workoutTemplateIds": [
@@ -3067,13 +3779,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-089. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-089. Weekly frequency: 3-4 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $280 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_090",
@@ -3089,7 +3801,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 420.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Cut Conditioning - Advanced Standard Plan",
     "workoutTemplateIds": [
@@ -3103,13 +3823,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-090. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-090. Weekly frequency: 3-4 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $420 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_091",
@@ -3125,7 +3845,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 640.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Cut Conditioning - Advanced Full Session",
     "workoutTemplateIds": [
@@ -3137,13 +3865,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-091. Weekly frequency: 3-4 days/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-091. Weekly frequency: 3-4 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $640 for 4x/week. Original workbook difficulty: Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_092",
@@ -3159,7 +3887,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 4,
     "weeklyFrequency": "3-4 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1280.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 16,
     "packageType": "Crown Cut Conditioning - Advanced Camp Day",
     "workoutTemplateIds": [
@@ -3171,13 +3907,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-092. Weekly frequency: 3-4 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-092. Weekly frequency: 3-4 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1280 for 4x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_093",
@@ -3193,7 +3929,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 30,
-    "price": 0,
+    "price": 350.0,
+    "pricePerSession": 17.5,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 140.0,
+      "3": 210.0,
+      "4": 280.0,
+      "5": 350.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Transformation Camp - Pro Quick Session",
     "workoutTemplateIds": [
@@ -3207,13 +3951,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 1 - Short Skill/Cardio",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-093. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-093. Weekly frequency: 4-5 days/week. Price per session: $17.5. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $350 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 1 - Short Skill/Cardio. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_094",
@@ -3229,7 +3973,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 45,
-    "price": 0,
+    "price": 525.0,
+    "pricePerSession": 26.25,
+    "pricingRule": "$35/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 210.0,
+      "3": 315.0,
+      "4": 420.0,
+      "5": 525.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Transformation Camp - Pro Standard Plan",
     "workoutTemplateIds": [
@@ -3241,13 +3993,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 2 - Standard Conditioning",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-094. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-094. Weekly frequency: 4-5 days/week. Price per session: $26.25. Pricing rule: $35/hour \u00d7 session length. Monthly price used: $525 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 2 - Standard Conditioning. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_095",
@@ -3263,7 +4015,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 60,
-    "price": 0,
+    "price": 800.0,
+    "pricePerSession": 40.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 320.0,
+      "3": 480.0,
+      "4": 640.0,
+      "5": 800.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Transformation Camp - Pro Full Session",
     "workoutTemplateIds": [
@@ -3275,13 +4035,13 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 3 - Full Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-095. Weekly frequency: 4-5 days/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-095. Weekly frequency: 4-5 days/week. Price per session: $40. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $800 for 5x/week. Original workbook difficulty: Very Hard. Training day type: Day Type 3 - Full Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   },
   {
     "id": "offering_mkp_096",
@@ -3297,7 +4057,15 @@ export const workbookPlanOfferings = [
     "trainingDaysPerWeek": 5,
     "weeklyFrequency": "4-5 days/week",
     "sessionLength": 120,
-    "price": 0,
+    "price": 1600.0,
+    "pricePerSession": 80.0,
+    "pricingRule": "$40/hour \u00d7 session length",
+    "monthlyPriceEstimates": {
+      "2": 640.0,
+      "3": 960.0,
+      "4": 1280.0,
+      "5": 1600.0
+    },
     "sessionsIncluded": 20,
     "packageType": "Royal Transformation Camp - Pro Camp Day",
     "workoutTemplateIds": [
@@ -3309,12 +4077,12 @@ export const workbookPlanOfferings = [
     "trainingDayType": "Day Type 5 - Long Camp Session",
     "regularFitnessFriendly": true,
     "alternativeOptions": "Chair, seated, low-impact, pool, and injury-start swaps available",
-    "coachNotes": "Source plan ID: MKP-096. Weekly frequency: 4-5 days/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
+    "coachNotes": "Source plan ID: MKP-096. Weekly frequency: 4-5 days/week. Price per session: $80. Pricing rule: $40/hour \u00d7 session length. Monthly price used: $1600 for 5x/week. Original workbook difficulty: Elite. Training day type: Day Type 5 - Long Camp Session. Regular fitness friendly: Yes. Alternative options: Chair, seated, low-impact, pool, and injury-start swaps available. Keep impact low when needed; focus on consistency, sweat, and safe progression.",
     "active": true,
     "archived": false,
     "createdByAdminId": "admin_1",
     "createdAt": "2026-06-02T11:00:00.000Z",
-    "updatedAt": "2026-06-02T11:00:00.000Z",
-    "sourceWorkbook": "mad_king_conditioning_plan_offerings_only.xlsx"
+    "updatedAt": "2026-06-02T12:00:00.000Z",
+    "sourceWorkbook": "mad_king_conditioning_plan_offerings_updated_prices.xlsx"
   }
 ];

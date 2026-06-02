@@ -1277,15 +1277,21 @@ test("admin can create plan offering, assign it to package, and assign package t
 
 test("plan offering workbook rows are imported and connected to workout templates", () => {
   const store = createStore();
-  const imported = store.planOfferings.filter((offering) => offering.sourceWorkbook === "mad_king_conditioning_plan_offerings_only.xlsx");
+  const imported = store.planOfferings.filter((offering) => offering.sourceWorkbook === "mad_king_conditioning_plan_offerings_updated_prices.xlsx");
   assert.equal(imported.length, 96);
   const jabLab = imported.find((offering) => offering.sourcePlanId === "MKP-001");
   assert.equal(jabLab.planName, "Jab Lab - Beginner Quick Session");
   assert.equal(jabLab.trainingLevel, "Beginner");
   assert.equal(jabLab.sessionLength, 30);
   assert.equal(jabLab.trainingDaysPerWeek, 3);
+  assert.equal(jabLab.price, 210);
+  assert.equal(jabLab.pricePerSession, 17.5);
+  assert.equal(jabLab.monthlyPriceEstimates["2"], 140);
   assert.ok(jabLab.workoutTemplateIds.includes("template_summary_w001"));
   assert.equal(store.workoutTemplates.some((template) => template.id === jabLab.workoutTemplateIds[0]), true);
+  const proCamp = imported.find((offering) => offering.sourcePlanId === "MKP-096");
+  assert.equal(proCamp.price, 1600);
+  assert.equal(proCamp.pricePerSession, 80);
 });
 
 test("coach cannot create workouts unless Admin permission allows it", () => {
