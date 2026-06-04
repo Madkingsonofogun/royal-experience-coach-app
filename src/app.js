@@ -459,12 +459,27 @@ function firebaseDocumentId(item, fallback) {
   return String(item?.id || item?.assessmentId || item?.checkInId || item?.messageId || fallback).replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
+function parseFirebaseConfig(configText) {
+  let text = (configText || "").trim();
+  const configMatch = text.match(/firebaseConfig\s*=\s*({[\s\S]*?})\s*;?/);
+  if (configMatch) text = configMatch[1];
+  try {
+    return JSON.parse(text);
+  } catch {
+    const jsonLike = text
+      .replace(/\/\/.*$/gm, "")
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+      .replace(/,\s*}/g, "}");
+    return JSON.parse(jsonLike);
+  }
+}
+
 function cleanFirebaseValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
 }
 
 async function backupStoreToFirebase(configText) {
-  const config = JSON.parse(configText || "{}");
+  const config = parseFirebaseConfig(configText);
   if (!config.apiKey || !config.projectId || !config.appId) {
     throw new Error("Firebase config needs apiKey, projectId, and appId.");
   }
@@ -2970,19 +2985,24 @@ function bindGlobal() {
     importAppDataFile(file);
   });
   document.querySelector("#saveFirebaseConfig")?.addEventListener("click", () => {
-    store.settings.firebaseConfigText = document.querySelector("#firebaseConfigText")?.value.trim() || "";
-    saveStore();
-    state.syncStatus = "Firebase config saved on this device.";
+    try {
+      const config = parseFirebaseConfig(document.querySelector("#firebaseConfigText")?.value || "");
+      store.settings.firebaseConfigText = JSON.stringify(config, null, 2);
+      saveStore();
+      state.syncStatus = "Firebase config saved on this device.";
+    } catch {
+      state.syncStatus = "Firebase config could not be read. Paste the Firebase web config object or the full Firebase setup snippet.";
+    }
     render();
   });
   document.querySelector("#backupFirebaseData")?.addEventListener("click", async () => {
     const configText = document.querySelector("#firebaseConfigText")?.value.trim() || store.settings.firebaseConfigText || "";
-    store.settings.firebaseConfigText = configText;
-    saveStore();
     state.firebaseBackupBusy = true;
     state.syncStatus = "Starting Firebase backup...";
     render();
     try {
+      store.settings.firebaseConfigText = JSON.stringify(parseFirebaseConfig(configText), null, 2);
+      saveStore();
       const result = await backupStoreToFirebase(configText);
       state.syncStatus = `Firebase backup complete: ${result.backupId}. Backed up ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, and ${result.summary.chats || 0} chat records.`;
     } catch (error) {
