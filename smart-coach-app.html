@@ -97080,12 +97080,16 @@ let autoCloudBackupTimer = null;
 let autoCloudBackupRunning = false;
 let suppressAutomaticCloudBackup = false;
 let lastCloudBackupFingerprint = "";
+let lastCloudBackupId = "";
+let cloudDataMonitorTimer = null;
+let cloudDataMonitorRunning = false;
 let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
 
 const app = document.querySelector("#app");
 render();
 startLoginAccountAutoRefresh();
+startLoggedInCloudDataMonitor();
 
 function render() {
   saveStore();
@@ -97137,6 +97141,11 @@ function startLoginAccountAutoRefresh() {
   }
   if (loginAccountRefreshTimer) return;
   loginAccountRefreshTimer = setInterval(() => refreshLoginAccountsAutomatically(false), 15000);
+}
+
+function startLoggedInCloudDataMonitor() {
+  if (cloudDataMonitorTimer) return;
+  cloudDataMonitorTimer = setInterval(() => checkCloudDataUpdates(), 3000);
 }
 
 async function refreshLoginAccountsAutomatically(showResult) {
@@ -97315,6 +97324,12 @@ function scheduleAutomaticCloudBackup() {
   autoCloudBackupTimer = setTimeout(() => runAutomaticCloudBackup(fingerprint), 2500);
 }
 
+function canUseSupabaseBackup() {
+  return store.settings.automaticSupabaseBackup !== false
+    && Boolean(normalizeSupabaseUrl(store.settings.supabaseUrl))
+    && Boolean(String(store.settings.supabaseAnonKey || "").trim());
+}
+
 async function runAutomaticCloudBackup(expectedFingerprint) {
   autoCloudBackupTimer = null;
   if (autoCloudBackupRunning || state.supabaseBackupBusy || state.supabaseRestoreBusy) {
@@ -97332,6 +97347,7 @@ async function runAutomaticCloudBackup(expectedFingerprint) {
       table: store.settings.supabaseBackupTable
     });
     lastCloudBackupFingerprint = currentFingerprint === expectedFingerprint ? expectedFingerprint : currentFingerprint;
+    lastCloudBackupId = result.backupId;
     saved = true;
     state.syncStatus = `Automatically saved to Supabase at ${new Date().toLocaleTimeString()}. Backup ${result.backupId}.`;
   } catch (error) {
@@ -97341,6 +97357,50 @@ async function runAutomaticCloudBackup(expectedFingerprint) {
   } finally {
     autoCloudBackupRunning = false;
     if (saved && cloudBackupFingerprint() !== lastCloudBackupFingerprint) scheduleAutomaticCloudBackup();
+  }
+}
+
+async function getLatestSupabaseBackupId({ url, anonKey, table }) {
+  const projectUrl = normalizeSupabaseUrl(url);
+  const key = (anonKey || "").trim();
+  const tableName = (table || "smart_coach_backups").trim();
+  if (!projectUrl || !key) return "";
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
+  const response = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data,created_at&order=created_at.desc&limit=1`, {
+    headers: supabaseHeaders(key)
+  });
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  const rows = await response.json();
+  return rows[0]?.data?.backupId || "";
+}
+
+async function checkCloudDataUpdates() {
+  if (!state.currentUser || cloudDataMonitorRunning || autoCloudBackupRunning || state.supabaseBackupBusy || state.supabaseRestoreBusy || !canUseSupabaseBackup()) return;
+  cloudDataMonitorRunning = true;
+  try {
+    const currentFingerprint = cloudBackupFingerprint();
+    if (currentFingerprint !== lastCloudBackupFingerprint) {
+      await runAutomaticCloudBackup(currentFingerprint);
+      return;
+    }
+    const latestBackupId = await getLatestSupabaseBackupId({
+      url: store.settings.supabaseUrl,
+      anonKey: store.settings.supabaseAnonKey,
+      table: store.settings.supabaseBackupTable
+    });
+    if (latestBackupId && latestBackupId !== lastCloudBackupId) {
+      const restored = await syncLatestCloudData(false);
+      if (restored) {
+        state.syncStatus = `Loaded newer Supabase data at ${new Date().toLocaleTimeString()}.`;
+        render();
+      }
+    }
+  } catch (error) {
+    state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
+      ? "Supabase sync is blocked by Row Level Security. Run the Setup SQL in Admin Data Sync."
+      : `Supabase sync check failed: ${error.message}`;
+  } finally {
+    cloudDataMonitorRunning = false;
   }
 }
 
@@ -97540,6 +97600,7 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
     suppressAutomaticCloudBackup = false;
   }
   lastCloudBackupFingerprint = duplicateRowsRemoved ? "" : cloudBackupFingerprint();
+  lastCloudBackupId = backupId;
   if (duplicateRowsRemoved) scheduleAutomaticCloudBackup();
   return {
     restored: true,
@@ -99947,7 +100008,19 @@ function bindGlobal() {
   document.querySelector("#globalClientSelect")?.addEventListener("change", (event) => {
     changeSelectedClient(event.target.value);
   });
-  document.querySelector("#logoutButton")?.addEventListener("click", () => {
+  document.querySelector("#logoutButton")?.addEventListener("click", async () => {
+    const logoutButton = document.querySelector("#logoutButton");
+    if (logoutButton) {
+      logoutButton.disabled = true;
+      logoutButton.textContent = "Saving...";
+    }
+    if (canUseSupabaseBackup()) {
+      try {
+        await runAutomaticCloudBackup(cloudBackupFingerprint());
+      } catch (error) {
+        console.warn("Could not run logout backup.", error);
+      }
+    }
     state.currentUser = null;
     state.view = "home";
     render();
@@ -100326,6 +100399,7 @@ function bindGlobal() {
         table: store.settings.supabaseBackupTable
       });
       lastCloudBackupFingerprint = cloudBackupFingerprint();
+      lastCloudBackupId = result.backupId;
       state.syncStatus = `Supabase backup complete: ${result.backupId}. Saved ${result.rowCount} rows, including ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, ${result.summary.chatMessages || 0} chat messages, and all check-in/history records.`;
     } catch (error) {
       state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
