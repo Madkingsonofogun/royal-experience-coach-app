@@ -56,6 +56,7 @@ import {
   getChatMessages,
   getClientDashboard,
   getClientVisiblePlan,
+  getAssessmentSchedulesForUser,
   getCoachAlerts,
   getExerciseDetailForUser,
   ensureMonthlyPlanHasWorkouts,
@@ -2022,6 +2023,7 @@ function adminView() {
     { label: "Add Plan Offering", panel: "offerings" },
     { label: "Add Package", panel: "packages" },
     { label: "Add Assessment Template", panel: "assessmentTemplates" },
+    { label: "Assessment Scheduling", panel: "assessmentSchedules" },
     { label: "PINs / Security", panel: "security" },
     { label: "Data Sync", panel: "dataSync" }
   ];
@@ -2282,6 +2284,16 @@ function adminView() {
           <div class="admin-list">${getAccountRequests(store, state.currentUser, state.accountRequestFilter).map((user) => `<div class="admin-row"><span>${user.name} / ${user.email || user.phone} / ${user.requestedRole || user.role} / ${user.accountStatus || "Active"}${user.accountLocked ? " / Locked" : ""}</span><button data-review-account="${user.id}">Review</button><button data-account-action="${user.id}:Approve">Unlock / Approve</button><button data-account-action="${user.id}:Reject">Reject</button><button data-account-action="${user.id}:Archive">Archive</button></div>`).join("") || `<div class="empty">No account requests match this filter.</div>`}</div>
         </article>
         <article class="card ${adminPanelClass("clients")}"><h3>Current Client Details</h3>${adminClientDetail(selectedClient())}</article>
+        <article class="card ${adminPanelClass("assessmentSchedules")}">
+          <div class="section-head compact-head">
+            <div>
+              <p class="eyebrow">Assessment Scheduling</p>
+              <h3>Admin schedule oversight</h3>
+              <p class="muted">See every initial assessment and reassessment request. Admin can approve, move it to chat, or open the client/chat to intervene.</p>
+            </div>
+          </div>
+          ${adminAssessmentScheduleBoard()}
+        </article>
         <article class="card ${adminPanelClass("chats")}">
           <h3>Intervene in Chat</h3>
           <textarea id="adminIntervention" placeholder="Write an admin note to the coach about this client chat."></textarea>
@@ -3128,6 +3140,37 @@ function adminClientDetail(client) {
   `;
 }
 
+function adminAssessmentScheduleBoard() {
+  const schedules = getAssessmentSchedulesForUser(store, state.currentUser);
+  if (!schedules.length) {
+    return `<div class="empty">No assessment schedule requests yet. When a coach or client proposes a time, Admin will see it here.</div>`;
+  }
+  return `
+    <div class="admin-list schedule-admin-list">
+      ${schedules.map((schedule) => {
+        const client = store.clients.find((item) => item.id === schedule.clientId);
+        const coach = store.coaches.find((item) => item.id === schedule.coachId);
+        const needsApproval = schedule.status === "Pending Coach Approval" || schedule.status === "Pending Client Approval";
+        return `
+          <div class="admin-row schedule-admin-row">
+            <div>
+              <strong>${client?.name || "Unknown client"} / ${schedule.assessmentType}</strong>
+              <p>${formatScheduleDateTime(schedule.proposedDate, schedule.proposedTime)} / ${schedule.status}</p>
+              <p class="muted">Coach: ${coach?.name || "Not assigned"}${schedule.rejectionReason ? ` / ${escapeHtml(schedule.rejectionReason)}` : ""}</p>
+            </div>
+            <div class="actions">
+              <button data-admin-open-schedule-client="${schedule.clientId}">View Client Schedule</button>
+              ${needsApproval ? `<button class="success" data-admin-approve-schedule="${schedule.id}">Approve</button>` : ""}
+              ${schedule.status !== "Approved" ? `<button class="ghost" data-admin-schedule-chat="${schedule.id}">Send To Chat</button>` : ""}
+              <button data-admin-open-schedule-chat="${schedule.clientId}">Open Chat</button>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function bindLogin() {
   document.querySelector("#loginRole")?.addEventListener("change", (event) => {
     state.loginRole = event.target.value;
@@ -3645,6 +3688,31 @@ function bindGlobal() {
   });
   document.querySelectorAll("[data-admin-panel]").forEach((button) => button.addEventListener("click", () => {
     state.adminPanel = button.dataset.adminPanel;
+    render();
+  }));
+  document.querySelectorAll("[data-admin-open-schedule-client]").forEach((button) => button.addEventListener("click", () => {
+    changeSelectedClient(button.dataset.adminOpenScheduleClient, false);
+    state.view = "home";
+    state.planDraftNotice = "Admin is viewing this client's assessment scheduling card.";
+    render();
+  }));
+  document.querySelectorAll("[data-admin-open-schedule-chat]").forEach((button) => button.addEventListener("click", () => {
+    changeSelectedClient(button.dataset.adminOpenScheduleChat, false);
+    state.view = "chat";
+    render();
+  }));
+  document.querySelectorAll("[data-admin-approve-schedule]").forEach((button) => button.addEventListener("click", () => {
+    respondToAssessmentSchedule(store, state.currentUser, button.dataset.adminApproveSchedule, { action: "approve" });
+    state.planDraftNotice = "Admin approved the assessment appointment.";
+    render();
+  }));
+  document.querySelectorAll("[data-admin-schedule-chat]").forEach((button) => button.addEventListener("click", () => {
+    const schedule = respondToAssessmentSchedule(store, state.currentUser, button.dataset.adminScheduleChat, {
+      action: "reject",
+      rejectionReason: "Admin moved this schedule to chat so coach and client can agree on a better time."
+    });
+    changeSelectedClient(schedule.clientId, false);
+    state.view = "chat";
     render();
   }));
   document.querySelector("#exportAppData")?.addEventListener("click", () => {

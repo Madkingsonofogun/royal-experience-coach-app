@@ -56,6 +56,7 @@ import {
   getCoachAlerts,
   getChatMessages,
   getExerciseDetailForUser,
+  getAssessmentSchedulesForUser,
   ensureMonthlyPlanHasWorkouts,
   getProgressImagesForUser,
   getTodayWorkoutForClient,
@@ -2083,5 +2084,46 @@ test("coach can resend agreed reassessment time and client approval schedules it
   respondToAssessmentSchedule(store, client, schedule.id, { action: "approve" });
   assert.equal(schedule.status, "Approved");
   assert.equal(store.clients.find((item) => item.id === "client_ada").nextReassessmentDate, "2026-06-13");
+});
+
+test("Admin can see and intervene in all assessment schedules", () => {
+  const store = createStore();
+  const coach = authenticateUser(store, "Coach", "2222");
+  const admin = authenticateUser(store, "Admin", "9999");
+  const schedule = proposeAssessmentSchedule(store, coach, {
+    clientId: "client_ada",
+    assessmentType: "Initial Assessment",
+    proposedDate: "2026-06-15",
+    proposedTime: "13:00"
+  });
+  assert.ok(getAssessmentSchedulesForUser(store, admin).some((item) => item.id === schedule.id));
+  respondToAssessmentSchedule(store, admin, schedule.id, {
+    action: "reject",
+    rejectionReason: "Admin wants coach and client to confirm in chat."
+  });
+  assert.equal(schedule.status, "Needs Chat");
+  assert.ok(store.notifications.some((item) => item.userId === "coach_user_1" && item.type === "Assessment Schedule"));
+  assert.ok(store.notifications.some((item) => item.userId === "client_user_ada" && /open chat/i.test(item.body)));
+});
+
+test("Admin can approve a client-countered assessment schedule", () => {
+  const store = createStore();
+  const coach = authenticateUser(store, "Coach", "2222");
+  const client = authenticateUser(store, "Client", "1111");
+  const admin = authenticateUser(store, "Admin", "9999");
+  const schedule = proposeAssessmentSchedule(store, coach, {
+    clientId: "client_ada",
+    assessmentType: "Reassessment",
+    proposedDate: "2026-06-15",
+    proposedTime: "13:00"
+  });
+  respondToAssessmentSchedule(store, client, schedule.id, {
+    action: "counter",
+    proposedDate: "2026-06-16",
+    proposedTime: "16:00"
+  });
+  respondToAssessmentSchedule(store, admin, schedule.id, { action: "approve" });
+  assert.equal(schedule.status, "Approved");
+  assert.equal(store.clients.find((item) => item.id === "client_ada").nextReassessmentDate, "2026-06-16");
 });
 

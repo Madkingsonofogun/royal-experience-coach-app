@@ -1580,6 +1580,19 @@ export function proposeAssessmentSchedule(store, actorUser, input) {
   return schedule;
 }
 
+export function getAssessmentSchedulesForUser(store, actorUser, clientId = null) {
+  if (!actorUser) return [];
+  const schedules = store.assessmentSchedules || [];
+  const filtered = schedules.filter((schedule) => {
+    if (clientId && schedule.clientId !== clientId) return false;
+    if (actorUser.role === "Admin") return true;
+    if (actorUser.role === "Coach") return schedule.coachId === actorUser.linkedId;
+    if (actorUser.role === "Client") return schedule.clientId === actorUser.linkedId;
+    return false;
+  });
+  return filtered.sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+}
+
 export function respondToAssessmentSchedule(store, actorUser, scheduleId, response) {
   if (!actorUser) throw new Error("Login required.");
   const schedule = findById(store.assessmentSchedules || [], scheduleId, "Assessment schedule");
@@ -1611,10 +1624,12 @@ export function respondToAssessmentSchedule(store, actorUser, scheduleId, respon
     throw new Error("Choose approve, counter, or reject.");
   }
   schedule.updatedAt = nowIso();
-  const notifyUserId = isClient
-    ? store.users.find((user) => user.role === "Coach" && user.linkedId === schedule.coachId)?.id || "admin_1"
-    : store.users.find((user) => user.role === "Client" && user.linkedId === schedule.clientId)?.id;
-  if (notifyUserId) {
+  const notifyUsers = [
+    store.users.find((user) => user.role === "Client" && user.linkedId === schedule.clientId)?.id,
+    store.users.find((user) => user.role === "Coach" && user.linkedId === schedule.coachId)?.id,
+    actorUser.role === "Admin" ? null : "admin_1"
+  ].filter((userId) => userId && userId !== actorUser.id);
+  [...new Set(notifyUsers)].forEach((notifyUserId) => {
     store.notifications.push({
       id: makeId("notification"),
       userId: notifyUserId,
@@ -1625,7 +1640,7 @@ export function respondToAssessmentSchedule(store, actorUser, scheduleId, respon
       read: false,
       createdAt: nowIso()
     });
-  }
+  });
   logAdminAction(store, actorUser, `Updated assessment schedule for ${client.name}: ${schedule.status}`);
   return schedule;
 }
@@ -2571,7 +2586,9 @@ export function adminUpdateWorkout(store, adminUser, workoutId, patch) {
 
 export function adminInterveneInChat(store, adminUser, clientId, body) {
   if (adminUser?.role !== "Admin") throw new Error("Only admins can intervene in chats");
-  const coachUser = store.users.find((user) => user.role === "Coach");
+  const client = findById(store.clients, clientId, "Client");
+  const coachUser = store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
+  if (!coachUser) throw new Error("Assigned coach login not found");
   const message = sendChatMessage(store, {
     fromUserId: adminUser.id,
     toUserId: coachUser.id,
