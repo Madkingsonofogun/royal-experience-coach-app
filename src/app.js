@@ -530,7 +530,7 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
   if (!/^https:\/\/.+\.supabase\.co$/i.test(projectUrl)) throw new Error("Supabase URL should look like https://your-project.supabase.co.");
   const { backupId, summary, rows } = supabaseBackupRows();
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const chunkSize = 250;
+  const chunkSize = 50;
   for (let index = 0; index < rows.length; index += chunkSize) {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -566,11 +566,14 @@ async function checkSupabaseBackupStatus({ url, anonKey, table }) {
 }
 
 function supabaseHeaders(key) {
-  return {
+  const headers = {
     apikey: key,
-    Authorization: `Bearer ${key}`,
     "Content-Type": "application/json"
   };
+  // Legacy anon keys are JWTs and can be used as Bearer tokens. New
+  // sb_publishable_ keys belong only in the apikey header.
+  if (key.split(".").length === 3) headers.Authorization = `Bearer ${key}`;
+  return headers;
 }
 
 function storeKeyForBackupCollection(collectionName) {
@@ -702,7 +705,10 @@ create index if not exists ${safeTable}_backup_id_idx on public.${safeTable} (ba
 create index if not exists ${safeTable}_collection_idx on public.${safeTable} (collection_name);
 
 -- Setup mode only. Tighten this before using real client data.
-alter table public.${safeTable} disable row level security;`;
+alter table public.${safeTable} disable row level security;
+
+grant select, insert on table public.${safeTable} to anon, authenticated;
+grant usage, select on sequence public.${safeTable}_id_seq to anon, authenticated;`;
 }
 
 async function copyTextToClipboard(text) {
