@@ -336,8 +336,11 @@ function render() {
     return;
   }
   const visibleClients = visibleClientsForUser(store, state.currentUser);
+  if (state.currentUser.role === "Coach" && !visibleClients.length && !["home", "profile"].includes(state.view)) {
+    state.view = "home";
+  }
   if (!canUserAccessClient(store, state.currentUser, state.clientId)) {
-    state.clientId = visibleClients[0]?.id || state.clientId;
+    state.clientId = visibleClients[0]?.id || "";
   }
   app.innerHTML = `
     <header class="topbar">
@@ -351,7 +354,7 @@ function render() {
       <div class="role-tabs">
         ${navTabs().map((tab) => tabButton(tab.id, tab.label)).join("")}
       </div>
-      ${state.currentUser.role !== "Client" ? `
+      ${state.currentUser.role !== "Client" && visibleClients.length ? `
         <label class="global-client">Selected Client
           <select id="globalClientSelect">${visibleClients.map((clientOption) => `<option value="${clientOption.id}" ${clientOption.id === state.clientId ? "selected" : ""}>${clientOption.name}</option>`).join("")}</select>
         </label>
@@ -981,6 +984,24 @@ function signupForm() {
 
 function homeDashboard() {
   const client = selectedClient();
+  if (!client && state.currentUser.role === "Coach") {
+    return `
+      <section class="workspace">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Smart Coach Dashboard</p>
+            <h2>${escapeHtml(state.currentUser.name)}</h2>
+          </div>
+        </div>
+        <article class="card empty-state-card">
+          <h3>No client has been assigned yet.</h3>
+          <p class="muted">Admin will assign clients to your coach account. Your assigned client dashboard will appear here afterward.</p>
+          <button class="primary" data-view="profile">View My Coach Profile</button>
+        </article>
+      </section>
+    `;
+  }
+  if (!client) return `<section class="workspace"><div class="empty">No client is currently available.</div></section>`;
   const latestAssessment = latestClientAssessment(client.id) || summarizeAssessment(state.assessment);
   const plan = getClientVisiblePlan(store, client.id);
   const nextReassessment = nextReassessmentDate(client.lastAssessmentDate || today);
