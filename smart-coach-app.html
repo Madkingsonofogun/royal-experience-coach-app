@@ -96270,8 +96270,8 @@ function createStore() {
       maxImageUploadBytes: 5 * 1024 * 1024,
       allowClientProgressImageDelete: false,
       coachCanEditOtherCoachImages: false,
-      supabaseUrl: "",
-      supabaseAnonKey: "",
+      supabaseUrl: "https://jeqjhugwogtxcxnrucza.supabase.co",
+      supabaseAnonKey: "sb_publishable_D73_Iiuma2215kdC7gSFxw_aR-aGcUS",
       supabaseBackupTable: "smart_coach_backups"
     },
     users: [
@@ -96787,6 +96787,8 @@ const state = {
   signupError: "",
   signupSuccess: "",
   supabaseBackupBusy: false,
+  supabaseRestoreBusy: false,
+  cloudSyncAttempted: false,
   signup: {
     firstName: "",
     lastName: "",
@@ -97052,6 +97054,9 @@ function loadSavedStore(defaultStore) {
 function mergeStore(defaultStore, savedStore) {
   const merged = { ...defaultStore, ...savedStore };
   merged.settings = { ...defaultStore.settings, ...(savedStore.settings || {}) };
+  merged.settings.supabaseUrl ||= defaultStore.settings.supabaseUrl;
+  merged.settings.supabaseAnonKey ||= defaultStore.settings.supabaseAnonKey;
+  merged.settings.supabaseBackupTable ||= defaultStore.settings.supabaseBackupTable;
   merged.adminPermissions = { ...(defaultStore.adminPermissions || {}), ...(savedStore.adminPermissions || {}) };
   return merged;
 }
@@ -97122,8 +97127,8 @@ function backupPayload() {
     assessmentTemplates: store.assessmentTemplates,
     monthlyPlans: store.monthlyPlans,
     monthlyPlanItems: store.monthlyPlanItems,
-    chats: store.chats,
-    chatMessages: store.chats,
+    chats: store.chats || [],
+    chatMessages: store.chatMessages || [],
     assessments: store.assessments,
     dailyCheckIns: store.dailyCheckIns,
     weeklyCheckIns: store.weeklyCheckIns,
@@ -97210,6 +97215,107 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
     }
   }
   return { backupId, summary, rowCount: rows.length };
+}
+
+function supabaseHeaders(key) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json"
+  };
+}
+
+function storeKeyForBackupCollection(collectionName) {
+  const map = {
+    users: "users",
+    clients: "clients",
+    coaches: "coaches",
+    exercises: "exercises",
+    workout_templates: "workoutTemplates",
+    workout_template_items: "workoutTemplateItems",
+    plan_offerings: "planOfferings",
+    packages: "packages",
+    plan_templates: "planTemplates",
+    assessment_templates: "assessmentTemplates",
+    monthly_plans: "monthlyPlans",
+    monthly_plan_items: "monthlyPlanItems",
+    chats: "chats",
+    chat_messages: "chatMessages",
+    assessments: "assessments",
+    daily_check_ins: "dailyCheckIns",
+    weekly_check_ins: "weeklyCheckIns",
+    coach_alerts: "coachAlerts"
+  };
+  return map[collectionName] || null;
+}
+
+async function restoreLatestFromSupabase({ url, anonKey, table }) {
+  const projectUrl = (url || "").trim().replace(/\/+$/, "");
+  const key = (anonKey || "").trim();
+  const tableName = (table || "smart_coach_backups").trim();
+  if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
+  const latestResponse = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
+    headers: supabaseHeaders(key)
+  });
+  if (!latestResponse.ok) throw new Error(await latestResponse.text() || `Supabase returned ${latestResponse.status}`);
+  const latestRows = await latestResponse.json();
+  const backupId = latestRows[0]?.data?.backupId;
+  if (!backupId) return { restored: false, reason: "No cloud backup exists yet." };
+  const rows = [];
+  const pageSize = 1000;
+  for (let start = 0; ; start += pageSize) {
+    const rowsResponse = await fetch(`${endpoint}?backup_id=eq.${encodeURIComponent(backupId)}&select=collection_name,data`, {
+      headers: { ...supabaseHeaders(key), Range: `${start}-${start + pageSize - 1}` }
+    });
+    if (!rowsResponse.ok) throw new Error(await rowsResponse.text() || `Supabase returned ${rowsResponse.status}`);
+    const page = await rowsResponse.json();
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  const cloudStore = {};
+  rows.forEach((row) => {
+    const keyName = storeKeyForBackupCollection(row.collection_name);
+    if (!keyName) return;
+    cloudStore[keyName] ||= [];
+    cloudStore[keyName].push(row.data);
+  });
+  if (!cloudStore.users?.length) throw new Error("The latest backup does not contain user accounts.");
+  replaceStoreWith({ ...store, ...cloudStore });
+  return { restored: true, backupId, counts: Object.fromEntries(Object.entries(cloudStore).map(([name, items]) => [name, items.length])) };
+}
+
+async function syncLatestCloudData(showStatus = true) {
+  if (state.supabaseRestoreBusy) return false;
+  state.supabaseRestoreBusy = true;
+  if (showStatus) {
+    state.syncStatus = "Checking Supabase for the newest app data...";
+    render();
+  }
+  try {
+    const result = await restoreLatestFromSupabase({
+      url: store.settings.supabaseUrl,
+      anonKey: store.settings.supabaseAnonKey,
+      table: store.settings.supabaseBackupTable
+    });
+    state.cloudSyncAttempted = true;
+    if (showStatus) {
+      state.syncStatus = result.restored
+        ? `Loaded latest Supabase backup ${result.backupId}. New clients, coaches, workouts, and chats are now available on this device.`
+        : result.reason;
+      render();
+    }
+    return result.restored;
+  } catch (error) {
+    state.cloudSyncAttempted = true;
+    if (showStatus) {
+      state.syncStatus = `Could not load Supabase data: ${error.message}`;
+      render();
+    }
+    return false;
+  } finally {
+    state.supabaseRestoreBusy = false;
+  }
 }
 
 function supabaseSetupSql(tableName = "smart_coach_backups") {
@@ -97307,12 +97413,14 @@ function loginPage() {
           <label>Numeric password / PIN
             <input id="loginPin" inputmode="numeric" pattern="[0-9]*" type="password" value="${state.loginPin}" placeholder="1234" />
           </label>
-          <button class="primary full" id="loginButton">Log In</button>
+          <button class="primary full" id="loginButton" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading Cloud Data..." : "Sync Cloud Data & Log In"}</button>
+          <button class="ghost full" id="syncLoginData" ${state.supabaseRestoreBusy ? "disabled" : ""}>Refresh Accounts From Supabase</button>
           <div class="login-links">
             <button class="ghost" id="forgotPinButton">Forgot PIN</button>
             <button class="success" id="openSignupButton">Create Account</button>
           </div>
           <p class="login-error" id="loginError"></p>
+          <p class="login-success">${state.syncStatus}</p>
           <p class="login-success">${state.signupSuccess}</p>
         `}
       </section>
@@ -98308,12 +98416,13 @@ function adminView() {
         <div class="actions">
           <button id="copySupabaseSql">Copy Setup SQL</button>
           <button id="saveSupabaseConfig">Save Supabase Settings</button>
+          <button class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
           <button class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
         </div>
         ${state.syncStatus ? `<div class="result-band"><strong>Sync status</strong><span>${escapeHtml(state.syncStatus)}</span></div>` : ""}
         <div class="result-band warning-band">
           <strong>Automatic multi-device access</strong>
-          <span>This starts Supabase backup storage. Full multi-device live login will come next by reading and writing these records through Supabase with proper account permissions.</span>
+          <span>The Supabase connection is embedded and login now loads the newest backup before checking the PIN. For production use with real client health data, Supabase Auth and Row Level Security still need to be added.</span>
         </div>
       </article>
       <div class="split">
@@ -99332,10 +99441,20 @@ function bindLogin() {
     state.loginPin = event.target.value.replace(/\D/g, "");
     event.target.value = state.loginPin;
   });
-  document.querySelector("#loginButton")?.addEventListener("click", () => {
+  document.querySelector("#syncLoginData")?.addEventListener("click", async () => {
+    await syncLatestCloudData(true);
+  });
+  document.querySelector("#loginButton")?.addEventListener("click", async () => {
+    const loginButton = document.querySelector("#loginButton");
+    if (loginButton) {
+      loginButton.disabled = true;
+      loginButton.textContent = "Loading Cloud Data...";
+    }
+    await syncLatestCloudData(false);
     const loginKey = state.loginRole;
     const user = authenticateUser(store, loginKey, state.loginPin);
     if (!user) {
+      render();
       document.querySelector("#loginError").textContent = loginBlockedMessage(store, loginKey, state.loginPin);
       return;
     }
@@ -99734,6 +99853,9 @@ function bindGlobal() {
     saveStore();
     state.syncStatus = "Supabase settings saved on this device.";
     render();
+  });
+  document.querySelector("#restoreSupabaseData")?.addEventListener("click", async () => {
+    await syncLatestCloudData(true);
   });
   document.querySelector("#backupSupabaseData")?.addEventListener("click", async () => {
     store.settings.supabaseUrl = document.querySelector("#supabaseUrl")?.value.trim() || store.settings.supabaseUrl || "";

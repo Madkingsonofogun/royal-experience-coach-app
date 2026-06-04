@@ -13,8 +13,8 @@ export function createStore() {
       maxImageUploadBytes: 5 * 1024 * 1024,
       allowClientProgressImageDelete: false,
       coachCanEditOtherCoachImages: false,
-      supabaseUrl: "",
-      supabaseAnonKey: "",
+      supabaseUrl: "https://jeqjhugwogtxcxnrucza.supabase.co",
+      supabaseAnonKey: "sb_publishable_D73_Iiuma2215kdC7gSFxw_aR-aGcUS",
       supabaseBackupTable: "smart_coach_backups"
     },
     users: [
