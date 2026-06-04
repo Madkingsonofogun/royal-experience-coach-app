@@ -72,6 +72,8 @@ import {
   adminReviewAccountRequest,
   sendChatMessage,
   requestLockedAccount,
+  proposeAssessmentSchedule,
+  respondToAssessmentSchedule,
   saveDailyCheckIn,
   saveWeeklyCheckIn,
   searchExerciseLibrary,
@@ -512,6 +514,7 @@ function backupPayload() {
     monthlyPlanItems: store.monthlyPlanItems,
     chatMessages: store.chatMessages || [],
     assessments: store.assessments,
+    assessmentSchedules: store.assessmentSchedules || [],
     dailyCheckIns: store.dailyCheckIns,
     weeklyCheckIns: store.weeklyCheckIns,
     painCheckIns: store.painCheckIns || [],
@@ -767,6 +770,7 @@ function storeKeyForBackupCollection(collectionName) {
     monthly_plan_items: "monthlyPlanItems",
     chat_messages: "chatMessages",
     assessments: "assessments",
+    assessment_schedules: "assessmentSchedules",
     daily_check_ins: "dailyCheckIns",
     weekly_check_ins: "weeklyCheckIns",
     pain_check_ins: "painCheckIns",
@@ -1091,6 +1095,7 @@ function homeDashboard() {
       <div class="dashboard-grid">
         ${state.currentUser.role === "Client" ? "" : smartDecisionPanel(client, latestAssessment, lastCheckIn)}
         ${todayPreviewPanel(client)}
+        ${assessmentSchedulePanel(client)}
         ${quickLinksPanel()}
       </div>
     </section>
@@ -1732,6 +1737,7 @@ function clientDashboard() {
         ${infoCard("Sessions remaining", client.sessionsRemaining)}
       </div>
       ${workoutCard(workout, dashboard.locked)}
+      ${assessmentSchedulePanel(client)}
       <div class="dashboard-actions">
         <button class="primary" id="openDaily">Check In Before Workout</button>
         ${workout ? `<button class="primary" data-workout-detail="${workout.id}">View Full Workout</button>` : ""}
@@ -3269,6 +3275,72 @@ function bindGlobal() {
   document.querySelector("#clientSelect")?.addEventListener("change", (event) => {
     changeSelectedClient(event.target.value);
   });
+  document.querySelector("#sendAssessmentSchedule")?.addEventListener("click", () => {
+    const proposedDate = document.querySelector("#assessmentScheduleDate")?.value;
+    const proposedTime = document.querySelector("#assessmentScheduleTime")?.value;
+    try {
+      proposeAssessmentSchedule(store, state.currentUser, {
+        clientId: state.clientId,
+        assessmentType: document.querySelector("#assessmentScheduleType")?.value || "Initial Assessment",
+        proposedDate,
+        proposedTime,
+        coachNotes: document.querySelector("#assessmentScheduleCoachNote")?.value || ""
+      });
+      state.planDraftNotice = "Assessment time sent to the client for approval.";
+      render();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+  document.querySelector("#clientApproveAssessmentSchedule")?.addEventListener("click", (event) => {
+    respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, { action: "approve" });
+    state.planDraftNotice = "Assessment appointment approved.";
+    render();
+  });
+  document.querySelector("#coachApproveAssessmentSchedule")?.addEventListener("click", (event) => {
+    respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, { action: "approve" });
+    state.planDraftNotice = "Client suggested time approved.";
+    render();
+  });
+  document.querySelector("#clientCounterAssessmentSchedule")?.addEventListener("click", (event) => {
+    const scheduleId = event.target.dataset.scheduleId;
+    const proposedDate = document.querySelector("#assessmentCounterDate")?.value;
+    const proposedTime = document.querySelector("#assessmentCounterTime")?.value;
+    try {
+      if (scheduleId) {
+        respondToAssessmentSchedule(store, state.currentUser, scheduleId, {
+          action: "counter",
+          proposedDate,
+          proposedTime,
+          clientNotes: document.querySelector("#assessmentScheduleClientNote")?.value || ""
+        });
+      } else {
+        proposeAssessmentSchedule(store, state.currentUser, {
+          clientId: state.clientId,
+          assessmentType: "Initial Assessment",
+          proposedDate,
+          proposedTime,
+          clientNotes: document.querySelector("#assessmentScheduleClientNote")?.value || ""
+        });
+      }
+      state.planDraftNotice = "Your suggested assessment time was sent to the coach.";
+      render();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+  document.querySelector("#rejectAssessmentScheduleOpenChat")?.addEventListener("click", (event) => {
+    respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, {
+      action: "reject",
+      rejectionReason: "Coach rejected the suggested time. Open chat to agree on a better appointment."
+    });
+    state.view = "chat";
+    render();
+  });
+  document.querySelector("[data-open-assessment-chat]")?.addEventListener("click", () => {
+    state.view = "chat";
+    render();
+  });
   document.querySelector("#assessmentTemplateSelect")?.addEventListener("change", (event) => {
     state.selectedAssessmentTemplateId = event.target.value;
     const template = selectedAssessmentTemplate();
@@ -4436,6 +4508,75 @@ function todayPreviewPanel(client) {
       <button class="primary" data-view="client">Open Client View</button>
     </article>
   `;
+}
+
+function assessmentSchedulePanel(client) {
+  const schedules = (store.assessmentSchedules || [])
+    .filter((item) => item.clientId === client.id)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+  const latest = schedules[0];
+  const isClient = state.currentUser.role === "Client";
+  const isCoachSide = state.currentUser.role === "Coach" || state.currentUser.role === "Admin";
+  const canCoachRespond = latest && latest.status === "Pending Coach Approval" && isCoachSide;
+  const canClientRespond = latest && latest.status === "Pending Client Approval" && isClient;
+  const scheduleDate = latest?.proposedDate || latest?.counterDate || "";
+  const scheduleTime = latest?.proposedTime || latest?.counterTime || "";
+  const chatPrompt = latest?.status === "Needs Chat"
+    ? `<div class="alert orange"><strong>Needs chat:</strong> Please agree on a date/time in chat, then the coach can resend the final appointment.</div>
+       <button class="ghost" data-open-assessment-chat>Open Chat</button>`
+    : "";
+  const statusLine = latest
+    ? `<div class="result-band assessment-schedule-status">
+        <strong>${latest.assessmentType}: ${latest.status}</strong>
+        <span>${formatScheduleDateTime(scheduleDate, scheduleTime)}</span>
+        ${latest.clientNotes ? `<p><strong>Client note:</strong> ${escapeHtml(latest.clientNotes)}</p>` : ""}
+        ${latest.coachNotes ? `<p><strong>Coach note:</strong> ${escapeHtml(latest.coachNotes)}</p>` : ""}
+      </div>`
+    : `<p class="muted">No assessment appointment is set yet.</p>`;
+
+  return `
+    <article class="card decision-card assessment-schedule-card">
+      <p class="eyebrow">Assessment scheduling</p>
+      <h3>${latest?.status === "Approved" ? "Assessment set" : "Set initial or reassessment time"}</h3>
+      ${statusLine}
+      ${chatPrompt}
+      ${isCoachSide ? `
+        <div class="form-grid compact-form">
+          <label>Assessment type
+            <select id="assessmentScheduleType">
+              ${["Initial Assessment", "Reassessment"].map((type) => `<option ${latest?.assessmentType === type ? "selected" : ""}>${type}</option>`).join("")}
+            </select>
+          </label>
+          <label>Date <input id="assessmentScheduleDate" type="date" value="${escapeHtml(scheduleDate)}" /></label>
+          <label>Time <input id="assessmentScheduleTime" type="time" value="${escapeHtml(scheduleTime)}" /></label>
+          <label>Coach note <input id="assessmentScheduleCoachNote" value="${escapeHtml(latest?.coachNotes || "")}" placeholder="Optional note" /></label>
+        </div>
+        <div class="actions">
+          <button class="primary" id="sendAssessmentSchedule">${latest?.status === "Needs Chat" ? "Resend Agreed Time" : "Send Assessment Time"}</button>
+          ${canCoachRespond ? `<button class="success" id="coachApproveAssessmentSchedule" data-schedule-id="${latest.id}">Approve Client Time</button>
+          <button class="ghost" id="rejectAssessmentScheduleOpenChat" data-schedule-id="${latest.id}">Reject and Open Chat</button>` : ""}
+        </div>
+      ` : ""}
+      ${isClient ? `
+        ${canClientRespond ? `
+          <div class="actions">
+            <button class="success" id="clientApproveAssessmentSchedule" data-schedule-id="${latest.id}">Approve Time</button>
+          </div>
+        ` : ""}
+        <div class="form-grid compact-form">
+          <label>Suggest date <input id="assessmentCounterDate" type="date" value="${escapeHtml(scheduleDate)}" /></label>
+          <label>Suggest time <input id="assessmentCounterTime" type="time" value="${escapeHtml(scheduleTime)}" /></label>
+          <label>Client note <input id="assessmentScheduleClientNote" value="${escapeHtml(latest?.clientNotes || "")}" placeholder="Optional note" /></label>
+        </div>
+        <button class="ghost" id="clientCounterAssessmentSchedule" data-schedule-id="${latest?.id || ""}">${latest ? "Reject / Suggest Different Time" : "Request Assessment Time"}</button>
+      ` : ""}
+    </article>
+  `;
+}
+
+function formatScheduleDateTime(date, time) {
+  if (!date && !time) return "No date/time selected";
+  return `${date || "Date needed"} at ${time || "time needed"}`;
 }
 
 function quickLinksPanel() {

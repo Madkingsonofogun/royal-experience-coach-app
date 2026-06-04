@@ -1529,6 +1529,107 @@ export function adminSetLoginDisabled(store, adminUser, targetUserId, disabled) 
   return user;
 }
 
+export function proposeAssessmentSchedule(store, actorUser, input) {
+  if (!actorUser) throw new Error("Login required.");
+  const client = findById(store.clients, input.clientId, "Client");
+  if (actorUser.role === "Coach" && client.coachId !== actorUser.linkedId) throw new Error("Coach can only schedule assigned clients.");
+  if (actorUser.role === "Client" && client.id !== actorUser.linkedId) throw new Error("Client can only schedule their own assessment.");
+  if (!["Coach", "Client", "Admin"].includes(actorUser.role)) throw new Error("Not authorized to schedule assessments.");
+  if (!input.proposedDate || !input.proposedTime) throw new Error("Choose a date and time.");
+  const coach = store.coaches.find((item) => item.id === client.coachId);
+  const coachUser = store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
+  const clientUser = store.users.find((user) => user.role === "Client" && user.linkedId === client.id);
+  const schedule = {
+    id: input.id || makeId("assessment_schedule"),
+    clientId: client.id,
+    coachId: client.coachId || null,
+    coachUserId: coachUser?.id || null,
+    clientUserId: clientUser?.id || null,
+    assessmentType: input.assessmentType || "Initial Assessment",
+    proposedByUserId: actorUser.id,
+    proposedByRole: actorUser.role,
+    proposedDate: input.proposedDate,
+    proposedTime: input.proposedTime,
+    status: actorUser.role === "Client" ? "Pending Coach Approval" : "Pending Client Approval",
+    coachNotes: actorUser.role === "Client" ? "" : String(input.coachNotes || input.notes || ""),
+    clientNotes: actorUser.role === "Client" ? String(input.clientNotes || input.notes || "") : "",
+    counterDate: "",
+    counterTime: "",
+    counterByRole: "",
+    rejectionReason: "",
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    approvedAt: null
+  };
+  store.assessmentSchedules = store.assessmentSchedules || [];
+  store.assessmentSchedules.push(schedule);
+  const targetUserId = actorUser.role === "Client" ? coachUser?.id || "admin_1" : clientUser?.id;
+  if (targetUserId) {
+    store.notifications.push({
+      id: makeId("notification"),
+      userId: targetUserId,
+      clientId: client.id,
+      type: "Assessment Schedule",
+      title: `${schedule.assessmentType} time proposed`,
+      body: `${actorUser.name} proposed ${schedule.proposedDate} at ${schedule.proposedTime}.`,
+      read: false,
+      createdAt: schedule.createdAt
+    });
+  }
+  logAdminAction(store, actorUser, `Proposed ${schedule.assessmentType} for ${client.name} with ${coach?.name || "coach"}`);
+  return schedule;
+}
+
+export function respondToAssessmentSchedule(store, actorUser, scheduleId, response) {
+  if (!actorUser) throw new Error("Login required.");
+  const schedule = findById(store.assessmentSchedules || [], scheduleId, "Assessment schedule");
+  const client = findById(store.clients, schedule.clientId, "Client");
+  const isClient = actorUser.role === "Client" && actorUser.linkedId === schedule.clientId;
+  const isCoach = actorUser.role === "Coach" && actorUser.linkedId === schedule.coachId;
+  const isAdmin = actorUser.role === "Admin";
+  if (!isClient && !isCoach && !isAdmin) throw new Error("Not authorized to respond to this assessment schedule.");
+  const action = response.action || "";
+  if (action === "approve") {
+    schedule.status = "Approved";
+    schedule.approvedAt = nowIso();
+    client.nextAssessmentDate = schedule.proposedDate;
+    if (schedule.assessmentType === "Reassessment") client.nextReassessmentDate = schedule.proposedDate;
+  } else if (action === "counter") {
+    if (!response.proposedDate || !response.proposedTime) throw new Error("Choose a new date and time.");
+    schedule.proposedDate = response.proposedDate;
+    schedule.proposedTime = response.proposedTime;
+    schedule.counterDate = response.proposedDate;
+    schedule.counterTime = response.proposedTime;
+    schedule.counterByRole = actorUser.role;
+    schedule.status = isClient ? "Pending Coach Approval" : "Pending Client Approval";
+    if (isClient) schedule.clientNotes = String(response.clientNotes || response.notes || schedule.clientNotes || "");
+    if (isCoach || isAdmin) schedule.coachNotes = String(response.coachNotes || response.notes || schedule.coachNotes || "");
+  } else if (action === "reject") {
+    schedule.rejectionReason = String(response.rejectionReason || response.reason || "");
+    schedule.status = isCoach || isAdmin ? "Needs Chat" : "Client Rejected";
+  } else {
+    throw new Error("Choose approve, counter, or reject.");
+  }
+  schedule.updatedAt = nowIso();
+  const notifyUserId = isClient
+    ? store.users.find((user) => user.role === "Coach" && user.linkedId === schedule.coachId)?.id || "admin_1"
+    : store.users.find((user) => user.role === "Client" && user.linkedId === schedule.clientId)?.id;
+  if (notifyUserId) {
+    store.notifications.push({
+      id: makeId("notification"),
+      userId: notifyUserId,
+      clientId: schedule.clientId,
+      type: "Assessment Schedule",
+      title: `Assessment schedule ${schedule.status}`,
+      body: schedule.status === "Needs Chat" ? "Please open chat to agree on a better assessment time." : `${schedule.assessmentType}: ${schedule.proposedDate} at ${schedule.proposedTime}`,
+      read: false,
+      createdAt: nowIso()
+    });
+  }
+  logAdminAction(store, actorUser, `Updated assessment schedule for ${client.name}: ${schedule.status}`);
+  return schedule;
+}
+
 export function createInviteCode(store, actorUser, input) {
   const roleAllowed = normalizeRole(input.roleAllowed || input.role);
   if (!["CLIENT", "COACH"].includes(roleAllowed)) throw new Error("Invite role must be CLIENT or COACH");

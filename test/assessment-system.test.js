@@ -65,6 +65,8 @@ import {
   markNotificationsRead,
   resolveCoachAlert,
   requestLockedAccount,
+  proposeAssessmentSchedule,
+  respondToAssessmentSchedule,
   saveAssessment,
   adminReviewAccountRequest,
   sendChatMessage,
@@ -2012,5 +2014,74 @@ test("admin can use 2 hour session length for clients, workouts, and plan offeri
   assert.equal(workout.sessionLength, 120);
   assert.equal(offering.sessionLength, 120);
   assert.equal(client.sessionLength, 120);
+});
+
+test("coach can propose an initial assessment time for client approval", () => {
+  const store = createStore();
+  const coach = authenticateUser(store, "Coach", "2222");
+  const schedule = proposeAssessmentSchedule(store, coach, {
+    clientId: "client_ada",
+    assessmentType: "Initial Assessment",
+    proposedDate: "2026-06-10",
+    proposedTime: "10:00",
+    coachNotes: "Initial movement screen."
+  });
+  assert.equal(schedule.status, "Pending Client Approval");
+  assert.equal(schedule.clientId, "client_ada");
+  assert.equal(schedule.coachNotes, "Initial movement screen.");
+  assert.ok(store.notifications.some((item) => item.userId === "client_user_ada" && item.type === "Assessment Schedule"));
+});
+
+test("client can counter assessment time and coach rejection suggests chat", () => {
+  const store = createStore();
+  const coach = authenticateUser(store, "Coach", "2222");
+  const client = authenticateUser(store, "Client", "1111");
+  const schedule = proposeAssessmentSchedule(store, coach, {
+    clientId: "client_ada",
+    assessmentType: "Initial Assessment",
+    proposedDate: "2026-06-10",
+    proposedTime: "10:00"
+  });
+  respondToAssessmentSchedule(store, client, schedule.id, {
+    action: "counter",
+    proposedDate: "2026-06-11",
+    proposedTime: "15:30",
+    clientNotes: "I can come after work."
+  });
+  assert.equal(schedule.status, "Pending Coach Approval");
+  assert.equal(schedule.clientNotes, "I can come after work.");
+  respondToAssessmentSchedule(store, coach, schedule.id, {
+    action: "reject",
+    rejectionReason: "Coach is not available then."
+  });
+  assert.equal(schedule.status, "Needs Chat");
+  assert.ok(store.notifications.some((item) => item.userId === "client_user_ada" && /open chat/i.test(item.body)));
+});
+
+test("coach can resend agreed reassessment time and client approval schedules it", () => {
+  const store = createStore();
+  const coach = authenticateUser(store, "Coach", "2222");
+  const client = authenticateUser(store, "Client", "1111");
+  const schedule = proposeAssessmentSchedule(store, coach, {
+    clientId: "client_ada",
+    assessmentType: "Reassessment",
+    proposedDate: "2026-06-10",
+    proposedTime: "10:00"
+  });
+  respondToAssessmentSchedule(store, client, schedule.id, {
+    action: "counter",
+    proposedDate: "2026-06-12",
+    proposedTime: "11:00"
+  });
+  respondToAssessmentSchedule(store, coach, schedule.id, {
+    action: "counter",
+    proposedDate: "2026-06-13",
+    proposedTime: "09:30",
+    coachNotes: "Agreed in chat."
+  });
+  assert.equal(schedule.status, "Pending Client Approval");
+  respondToAssessmentSchedule(store, client, schedule.id, { action: "approve" });
+  assert.equal(schedule.status, "Approved");
+  assert.equal(store.clients.find((item) => item.id === "client_ada").nextReassessmentDate, "2026-06-13");
 });
 

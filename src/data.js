@@ -87,6 +87,7 @@ export function createStore() {
       }
     ],
     assessments: [],
+    assessmentSchedules: [],
     weeklyCheckIns: [],
     dailyCheckIns: [],
     painCheckIns: [],
