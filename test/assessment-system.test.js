@@ -74,6 +74,7 @@ import {
   suggestMonthlyPlanLevel,
   submitPinResetRequest,
   updateClientSelfProfile,
+  updateCoachSelfProfile,
   unreadNotificationCount,
   uploadProfileImage,
   uploadProgressImage,
@@ -1935,6 +1936,31 @@ test("client can update own injury notes and emergency contact", () => {
   assert.equal(updated.emergencyContact, "Jordan Smith / 555-1200");
   assert.notEqual(linkedUser.pinHash, "2468");
   assert.equal(authenticateUser(store, "Client", "2468").id, clientUser.id);
+});
+
+test("coach can update own profile, contact information, emergency contact, and PIN", () => {
+  const store = createStore();
+  const coachUser = authenticateUser(store, "Coach", "2222");
+  const updated = updateCoachSelfProfile(store, coachUser, {
+    name: "Coach Maya King",
+    email: "maya.king@example.com",
+    phone: "555-777-1212",
+    specialty: "Boxing and fight conditioning",
+    bio: "Technique-first boxing coach.",
+    emergencyContact: "Luis King / 555-777-9999",
+    pin: "8642",
+    confirmPin: "8642"
+  });
+  const linkedUser = store.users.find((user) => user.id === coachUser.id);
+  assert.equal(updated.name, "Coach Maya King");
+  assert.equal(linkedUser.name, "Coach Maya King");
+  assert.equal(linkedUser.email, "maya.king@example.com");
+  assert.equal(linkedUser.phone, "555-777-1212");
+  assert.equal(updated.specialty, "Boxing and fight conditioning");
+  assert.equal(updated.bio, "Technique-first boxing coach.");
+  assert.equal(updated.emergencyContact, "Luis King / 555-777-9999");
+  assert.notEqual(linkedUser.pinHash, "8642");
+  assert.equal(authenticateUser(store, "Coach", "8642").id, coachUser.id);
 });
 
 test("admin can use 2 hour session length for clients, workouts, and plan offerings", () => {

@@ -1769,6 +1769,41 @@ export function updateClientSelfProfile(store, clientUser, patch) {
   return client;
 }
 
+export function updateCoachSelfProfile(store, coachUser, patch) {
+  if (!coachUser || coachUser.role !== "Coach") throw new Error("Only coaches can update their own profile details.");
+  const coach = findById(store.coaches, coachUser.linkedId, "Coach");
+  const user = findById(store.users, coachUser.id, "User");
+  if (patch.name !== undefined) {
+    const name = String(patch.name || "").trim();
+    if (!name) throw new Error("Coach name is required.");
+    coach.name = name;
+    user.name = name;
+  }
+  if (patch.email !== undefined) {
+    const email = String(patch.email || "").trim().toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+    coach.email = email;
+    user.email = email;
+  }
+  if (patch.phone !== undefined) {
+    coach.phone = String(patch.phone || "").trim();
+    user.phone = coach.phone;
+  }
+  if (patch.specialty !== undefined) coach.specialty = String(patch.specialty || "").trim();
+  if (patch.bio !== undefined) coach.bio = String(patch.bio || "");
+  if (patch.emergencyContact !== undefined) coach.emergencyContact = String(patch.emergencyContact || "");
+  if (patch.pin || patch.confirmPin) {
+    validateNumericPin(patch.pin, patch.confirmPin);
+    user.pinSalt = makeId("salt");
+    user.pinHash = hashPin(patch.pin, user.pinSalt);
+    user.forcePinChange = false;
+    user.temporaryPinExpiresAt = null;
+  }
+  coach.updatedAt = nowIso();
+  logAdminAction(store, coachUser, `Coach updated own profile for ${coach.name}`);
+  return coach;
+}
+
 export function adminArchiveMonthlyPlan(store, adminUser, planId) {
   requireAdmin(adminUser);
   const plan = findById(store.monthlyPlans, planId, "Monthly plan");
