@@ -12,7 +12,8 @@ export function createStore() {
       allowMildAutoAdjustments: true,
       maxImageUploadBytes: 5 * 1024 * 1024,
       allowClientProgressImageDelete: false,
-      coachCanEditOtherCoachImages: false
+      coachCanEditOtherCoachImages: false,
+      firebaseConfigText: ""
     },
     users: [
       user("admin_1", "Admin", "Admin", "admin@madking.test", "5550000000", "9999", "admin_1"),

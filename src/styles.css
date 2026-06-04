@@ -93,6 +93,12 @@ textarea {
   resize: vertical;
 }
 
+.code-textarea {
+  font-family: Consolas, "Courier New", monospace;
+  min-height: 140px;
+  white-space: pre;
+}
+
 label {
   display: grid;
   gap: 7px;

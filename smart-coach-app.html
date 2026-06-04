@@ -100,6 +100,12 @@ textarea {
   resize: vertical;
 }
 
+.code-textarea {
+  font-family: Consolas, "Courier New", monospace;
+  min-height: 140px;
+  white-space: pre;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -96263,7 +96269,8 @@ function createStore() {
       allowMildAutoAdjustments: true,
       maxImageUploadBytes: 5 * 1024 * 1024,
       allowClientProgressImageDelete: false,
-      coachCanEditOtherCoachImages: false
+      coachCanEditOtherCoachImages: false,
+      firebaseConfigText: ""
     },
     users: [
       user("admin_1", "Admin", "Admin", "admin@madking.test", "5550000000", "9999", "admin_1"),
@@ -96760,6 +96767,7 @@ function exercise(id, name, planLevel, equipmentText, contraindications, replace
 
 
 const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
+const FIREBASE_SDK_VERSION = "10.14.1";
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
 const state = {
@@ -96777,6 +96785,7 @@ const state = {
   },
   signupError: "",
   signupSuccess: "",
+  firebaseBackupBusy: false,
   signup: {
     firstName: "",
     lastName: "",
@@ -96904,6 +96913,7 @@ const state = {
   },
   view: "home",
   adminPanel: "overview",
+  syncStatus: "",
   planDraftNotice: "",
   clientId: "client_ada",
   selectedWorkoutId: null,
@@ -97051,6 +97061,124 @@ function saveStore() {
   } catch (error) {
     console.warn("Could not save app data.", error);
   }
+}
+
+function replaceStoreWith(nextStore) {
+  Object.keys(store).forEach((key) => delete store[key]);
+  Object.assign(store, mergeStore(createStore(), nextStore));
+  if (state.currentUser) {
+    state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || null;
+  }
+  if (!store.clients.some((client) => client.id === state.clientId)) {
+    state.clientId = visibleClientsForUser(store, state.currentUser || store.users[0])[0]?.id || store.clients[0]?.id || "";
+  }
+  saveStore();
+}
+
+function exportAppData() {
+  const payload = JSON.stringify(store, null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `mad-king-coach-app-data-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+  state.syncStatus = "App data export downloaded. Import that file on the other device to see the newest clients, coaches, packages, plans, chats, and check-ins.";
+}
+
+function importAppDataFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!Array.isArray(parsed.clients) || !Array.isArray(parsed.coaches) || !Array.isArray(parsed.users)) {
+        throw new Error("Missing app data lists.");
+      }
+      replaceStoreWith(parsed);
+      state.syncStatus = `Imported app data from ${file.name}. New clients and coaches from that file are now available on this device.`;
+      render();
+    } catch (error) {
+      state.syncStatus = "That file could not be imported. Please choose an app data JSON export from this app.";
+      render();
+    }
+  };
+  reader.readAsText(file);
+}
+
+function firebaseBackupPayload() {
+  return {
+    users: store.users,
+    clients: store.clients,
+    coaches: store.coaches,
+    exercises: store.exercises,
+    workoutTemplates: store.workoutTemplates,
+    workoutTemplateItems: store.workoutTemplateItems,
+    planOfferings: store.planOfferings,
+    packages: store.packages,
+    planTemplates: store.planTemplates,
+    assessmentTemplates: store.assessmentTemplates,
+    monthlyPlans: store.monthlyPlans,
+    monthlyPlanItems: store.monthlyPlanItems,
+    chats: store.chats,
+    chatMessages: store.chats,
+    assessments: store.assessments,
+    dailyCheckIns: store.dailyCheckIns,
+    weeklyCheckIns: store.weeklyCheckIns,
+    coachAlerts: store.coachAlerts
+  };
+}
+
+function firebaseCollectionName(key) {
+  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+function firebaseDocumentId(item, fallback) {
+  return String(item?.id || item?.assessmentId || item?.checkInId || item?.messageId || fallback).replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+function cleanFirebaseValue(value) {
+  return JSON.parse(JSON.stringify(value ?? null));
+}
+
+async function backupStoreToFirebase(configText) {
+  const config = JSON.parse(configText || "{}");
+  if (!config.apiKey || !config.projectId || !config.appId) {
+    throw new Error("Firebase config needs apiKey, projectId, and appId.");
+  }
+  const [{ initializeApp, getApps }, firestore] = await Promise.all([
+    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`),
+    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`)
+  ]);
+  const app = getApps().find((item) => item.options?.projectId === config.projectId) || initializeApp(config, `mad-king-backup-${config.projectId}`);
+  const db = firestore.getFirestore(app);
+  const backupId = `backup_${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14)}`;
+  const payload = firebaseBackupPayload();
+  const summary = Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, Array.isArray(value) ? value.length : 0]));
+  await firestore.setDoc(firestore.doc(db, "madKingBackups", backupId), {
+    backupId,
+    appName: "Mad King Conditioning Smart Coach",
+    createdAt: new Date().toISOString(),
+    summary
+  });
+  for (const [key, items] of Object.entries(payload)) {
+    if (!Array.isArray(items)) continue;
+    const collectionName = firebaseCollectionName(key);
+    for (let index = 0; index < items.length; index += 1) {
+      const item = cleanFirebaseValue(items[index]);
+      await firestore.setDoc(
+        firestore.doc(db, "madKingBackups", backupId, collectionName, firebaseDocumentId(item, `${key}_${index}`)),
+        { ...item, backupId, backupCollection: collectionName }
+      );
+    }
+  }
+  await firestore.setDoc(firestore.doc(db, "madKingBackups", "latest"), {
+    backupId,
+    updatedAt: new Date().toISOString(),
+    summary
+  });
+  return { backupId, summary };
 }
 
 function route() {
@@ -98044,7 +98172,8 @@ function adminView() {
     { label: "Add Plan Offering", panel: "offerings" },
     { label: "Add Package", panel: "packages" },
     { label: "Add Assessment Template", panel: "assessmentTemplates" },
-    { label: "PINs / Security", panel: "security" }
+    { label: "PINs / Security", panel: "security" },
+    { label: "Data Sync", panel: "dataSync" }
   ];
   return `
     <section class="workspace">
@@ -98078,6 +98207,39 @@ function adminView() {
               <button data-admin-remove-profile="${user.id}">Remove</button>
             </div>
           `).join("")}
+        </div>
+      </article>
+      <article class="card admin-card ${adminPanelClass("dataSync")}" id="admin-data-sync">
+        <div class="section-head compact-head">
+          <div>
+            <p class="eyebrow">Data Sync</p>
+            <h3>Move new clients and coaches to another device</h3>
+            <p class="muted">This browser demo saves changes on the device you are using. To see newly-created clients, coaches, plans, chats, and check-ins on another device, export the app data here and import it on the other device.</p>
+          </div>
+        </div>
+        <div class="grid-3 stat-strip">
+          ${infoCard("Clients saved here", store.clients.length)}
+          ${infoCard("Coaches saved here", store.coaches.filter((coach) => coach.role !== "Admin").length)}
+          ${infoCard("Monthly plans saved here", store.monthlyPlans.length)}
+        </div>
+        <div class="actions">
+          <button class="primary" id="exportAppData">Export App Data</button>
+          <button class="success" id="importAppDataButton">Import App Data</button>
+          <input class="visually-hidden" id="importAppDataInput" type="file" accept="application/json,.json" />
+        </div>
+        <h3>Firebase Backup</h3>
+        <p class="muted">Paste your Firebase web config here. This backs up the current app data into Firestore under <strong>madKingBackups</strong>. It is backup storage first, not automatic live sync yet.</p>
+        <label>Firebase web config
+          <textarea id="firebaseConfigText" class="code-textarea" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'>${escapeHtml(store.settings.firebaseConfigText || "")}</textarea>
+        </label>
+        <div class="actions">
+          <button id="saveFirebaseConfig">Save Firebase Config</button>
+          <button class="primary" id="backupFirebaseData" ${state.firebaseBackupBusy ? "disabled" : ""}>${state.firebaseBackupBusy ? "Backing Up..." : "Backup to Firebase"}</button>
+        </div>
+        ${state.syncStatus ? `<div class="result-band"><strong>Sync status</strong><span>${escapeHtml(state.syncStatus)}</span></div>` : ""}
+        <div class="result-band warning-band">
+          <strong>Automatic multi-device access</strong>
+          <span>To have clients and coaches show up automatically from any phone or computer, this app needs a shared online database and login backend. Export/import is the local demo backup tool.</span>
         </div>
       </article>
       <div class="split">
@@ -99474,6 +99636,41 @@ function bindGlobal() {
     state.adminPanel = button.dataset.adminPanel;
     render();
   }));
+  document.querySelector("#exportAppData")?.addEventListener("click", () => {
+    exportAppData();
+    render();
+  });
+  document.querySelector("#importAppDataButton")?.addEventListener("click", () => {
+    document.querySelector("#importAppDataInput")?.click();
+  });
+  document.querySelector("#importAppDataInput")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    importAppDataFile(file);
+  });
+  document.querySelector("#saveFirebaseConfig")?.addEventListener("click", () => {
+    store.settings.firebaseConfigText = document.querySelector("#firebaseConfigText")?.value.trim() || "";
+    saveStore();
+    state.syncStatus = "Firebase config saved on this device.";
+    render();
+  });
+  document.querySelector("#backupFirebaseData")?.addEventListener("click", async () => {
+    const configText = document.querySelector("#firebaseConfigText")?.value.trim() || store.settings.firebaseConfigText || "";
+    store.settings.firebaseConfigText = configText;
+    saveStore();
+    state.firebaseBackupBusy = true;
+    state.syncStatus = "Starting Firebase backup...";
+    render();
+    try {
+      const result = await backupStoreToFirebase(configText);
+      state.syncStatus = `Firebase backup complete: ${result.backupId}. Backed up ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, and ${result.summary.chats || 0} chat records.`;
+    } catch (error) {
+      state.syncStatus = `Firebase backup failed: ${error.message}. Check the config, Firestore is enabled, and Firestore rules allow Admin backup writes.`;
+    } finally {
+      state.firebaseBackupBusy = false;
+      render();
+    }
+  });
   document.querySelectorAll("[data-open-exercise-editor]").forEach((button) => button.addEventListener("click", (event) => {
     event.stopPropagation();
     openExercisePopup(button.dataset.openExerciseEditor);
