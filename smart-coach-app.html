@@ -97114,10 +97114,18 @@ function importAppDataFile(file) {
 }
 
 function backupPayload() {
+  const backupSettings = {
+    ...store.settings,
+    supabaseAnonKey: "",
+    supabaseUrl: "",
+    supabaseBackupTable: store.settings.supabaseBackupTable || "smart_coach_backups"
+  };
   return {
     users: store.users,
     clients: store.clients,
     coaches: store.coaches,
+    settings: [{ id: "app_settings", ...backupSettings }],
+    adminPermissions: [{ id: "admin_permissions", ...(store.adminPermissions || {}) }],
     exercises: store.exercises,
     workoutTemplates: store.workoutTemplates,
     workoutTemplateItems: store.workoutTemplateItems,
@@ -97127,12 +97135,18 @@ function backupPayload() {
     assessmentTemplates: store.assessmentTemplates,
     monthlyPlans: store.monthlyPlans,
     monthlyPlanItems: store.monthlyPlanItems,
-    chats: store.chats || [],
     chatMessages: store.chatMessages || [],
     assessments: store.assessments,
     dailyCheckIns: store.dailyCheckIns,
     weeklyCheckIns: store.weeklyCheckIns,
-    coachAlerts: store.coachAlerts
+    painCheckIns: store.painCheckIns || [],
+    todayWorkoutAdjustments: store.todayWorkoutAdjustments || [],
+    workoutCompletions: store.workoutCompletions || [],
+    progressImages: store.progressImages || [],
+    notifications: store.notifications || [],
+    pinResetRequests: store.pinResetRequests || [],
+    coachAlerts: store.coachAlerts,
+    adminAuditLog: store.adminAuditLog || []
   };
 }
 
@@ -97149,7 +97163,7 @@ function cleanBackupValue(value) {
 }
 
 function supabaseBackupRows() {
-  const backupId = `backup_${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14)}`;
+  const backupId = `backup_${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 17)}`;
   const payload = backupPayload();
   const summary = Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, Array.isArray(value) ? value.length : 0]));
   const rows = [{
@@ -97230,6 +97244,8 @@ function storeKeyForBackupCollection(collectionName) {
     users: "users",
     clients: "clients",
     coaches: "coaches",
+    settings: "settings",
+    admin_permissions: "adminPermissions",
     exercises: "exercises",
     workout_templates: "workoutTemplates",
     workout_template_items: "workoutTemplateItems",
@@ -97239,12 +97255,18 @@ function storeKeyForBackupCollection(collectionName) {
     assessment_templates: "assessmentTemplates",
     monthly_plans: "monthlyPlans",
     monthly_plan_items: "monthlyPlanItems",
-    chats: "chats",
     chat_messages: "chatMessages",
     assessments: "assessments",
     daily_check_ins: "dailyCheckIns",
     weekly_check_ins: "weeklyCheckIns",
-    coach_alerts: "coachAlerts"
+    pain_check_ins: "painCheckIns",
+    today_workout_adjustments: "todayWorkoutAdjustments",
+    workout_completions: "workoutCompletions",
+    progress_images: "progressImages",
+    notifications: "notifications",
+    pin_reset_requests: "pinResetRequests",
+    coach_alerts: "coachAlerts",
+    admin_audit_log: "adminAuditLog"
   };
   return map[collectionName] || null;
 }
@@ -97255,7 +97277,7 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const latestResponse = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
+  const latestResponse = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&order=created_at.desc&limit=1`, {
     headers: supabaseHeaders(key)
   });
   if (!latestResponse.ok) throw new Error(await latestResponse.text() || `Supabase returned ${latestResponse.status}`);
@@ -97281,6 +97303,19 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
     cloudStore[keyName].push(row.data);
   });
   if (!cloudStore.users?.length) throw new Error("The latest backup does not contain user accounts.");
+  if (cloudStore.settings?.[0]) {
+    cloudStore.settings = {
+      ...cloudStore.settings[0],
+      supabaseUrl: store.settings.supabaseUrl,
+      supabaseAnonKey: store.settings.supabaseAnonKey,
+      supabaseBackupTable: store.settings.supabaseBackupTable
+    };
+    delete cloudStore.settings.id;
+  }
+  if (cloudStore.adminPermissions?.[0]) {
+    cloudStore.adminPermissions = { ...cloudStore.adminPermissions[0] };
+    delete cloudStore.adminPermissions.id;
+  }
   replaceStoreWith({ ...store, ...cloudStore });
   return { restored: true, backupId, counts: Object.fromEntries(Object.entries(cloudStore).map(([name, items]) => [name, items.length])) };
 }
@@ -98419,6 +98454,18 @@ function adminView() {
           <button class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
           <button class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
         </div>
+        <h4>Information included in every Supabase backup</h4>
+        <div class="chip-grid">
+          ${[
+            "Users and PIN hashes", "Clients", "Coaches", "App settings", "Admin permissions",
+            "Exercises", "Workout templates and items", "Plan offerings", "Packages", "Plan templates",
+            "Assessment templates", "Monthly plans and items", "Assessments", "Daily check-ins",
+            "Weekly check-ins", "Pain check-ins", "Today workout adjustments", "Workout completions",
+            "Progress image records", "Chat messages", "Notifications", "PIN reset requests",
+            "Coach alerts", "Admin audit log"
+          ].map((label) => `<span class="chip">${label}</span>`).join("")}
+        </div>
+        <p class="muted">Progress-image records include saved URLs and storage keys. The image files themselves require Supabase Storage, which is a separate next step.</p>
         ${state.syncStatus ? `<div class="result-band"><strong>Sync status</strong><span>${escapeHtml(state.syncStatus)}</span></div>` : ""}
         <div class="result-band warning-band">
           <strong>Automatic multi-device access</strong>
@@ -99871,7 +99918,7 @@ function bindGlobal() {
         anonKey: store.settings.supabaseAnonKey,
         table: store.settings.supabaseBackupTable
       });
-      state.syncStatus = `Supabase backup complete: ${result.backupId}. Saved ${result.rowCount} rows, including ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, and ${result.summary.chats || 0} chat records.`;
+      state.syncStatus = `Supabase backup complete: ${result.backupId}. Saved ${result.rowCount} rows, including ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, ${result.summary.chatMessages || 0} chat messages, and all check-in/history records.`;
     } catch (error) {
       state.syncStatus = `Supabase backup failed: ${error.message}. Check the URL, anon key, table exists, and setup SQL has been run.`;
     } finally {
