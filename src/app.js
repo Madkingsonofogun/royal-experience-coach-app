@@ -550,6 +550,21 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
   return { backupId, summary, rowCount: rows.length };
 }
 
+async function checkSupabaseBackupStatus({ url, anonKey, table }) {
+  const projectUrl = (url || "").trim().replace(/\/+$/, "");
+  const key = (anonKey || "").trim();
+  const tableName = (table || "smart_coach_backups").trim();
+  if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
+  const response = await fetch(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?select=backup_id,collection_name,created_at&order=created_at.desc&limit=1`, {
+    headers: { ...supabaseHeaders(key), Prefer: "count=exact" }
+  });
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  const rows = await response.json();
+  const contentRange = response.headers.get("content-range") || "";
+  const rowCount = Number(contentRange.split("/")[1]) || 0;
+  return { rowCount, latest: rows[0] || null };
+}
+
 function supabaseHeaders(key) {
   return {
     apikey: key,
@@ -1770,6 +1785,7 @@ function adminView() {
         <div class="actions">
           <button id="copySupabaseSql">Copy Setup SQL</button>
           <button id="saveSupabaseConfig">Save Supabase Settings</button>
+          <button id="testSupabaseConnection">Test Supabase Connection</button>
           <button class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
           <button class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
         </div>
@@ -3218,6 +3234,23 @@ function bindGlobal() {
     store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || "smart_coach_backups";
     saveStore();
     state.syncStatus = "Supabase settings saved on this device.";
+    render();
+  });
+  document.querySelector("#testSupabaseConnection")?.addEventListener("click", async () => {
+    state.syncStatus = "Testing Supabase connection...";
+    render();
+    try {
+      const result = await checkSupabaseBackupStatus({
+        url: store.settings.supabaseUrl,
+        anonKey: store.settings.supabaseAnonKey,
+        table: store.settings.supabaseBackupTable
+      });
+      state.syncStatus = result.rowCount
+        ? `Supabase connection works. The backup table currently contains ${result.rowCount} saved rows. Latest row: ${result.latest?.collection_name || "Unknown"} from ${result.latest?.created_at || "Unknown date"}.`
+        : "Supabase connection works, but the backup table has 0 rows. Click Backup to Supabase to create the first backup.";
+    } catch (error) {
+      state.syncStatus = `Supabase connection test failed: ${error.message}`;
+    }
     render();
   });
   document.querySelector("#restoreSupabaseData")?.addEventListener("click", async () => {
