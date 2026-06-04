@@ -1021,36 +1021,37 @@ function profilePage() {
 function coachProfilePage() {
   const coach = store.coaches.find((item) => item.id === state.currentUser.linkedId);
   if (!coach) return `<section class="workspace"><div class="empty">Coach profile not found. Contact Admin.</div></section>`;
+  const profileLocked = Boolean(coach.profileLocked || state.currentUser.profileLocked);
   return `
     <section class="workspace">
       <div class="section-head">
         <div><p class="eyebrow">Coach Profile</p><h2>${escapeHtml(coach.name || state.currentUser.name)}</h2></div>
         <span class="badge green">Coach</span>
       </div>
-      ${coach.profileLocked ? `<article class="card locked">Your profile is locked. Contact Admin to request changes.</article>` : ""}
-      ${coachProfileImagePanel(state.currentUser, coach)}
-      <article class="card">
+      ${profileLocked ? `<article class="card locked">Your profile is locked. Contact Admin to unlock profile editing.</article>` : ""}
+      ${coachProfileImagePanel(state.currentUser, coach, !profileLocked)}
+      <article class="card ${profileLocked ? "locked" : ""}">
         <h3>My Coach Information</h3>
         <p class="muted">Update your personal coach profile, contact information, emergency contact, and 4-digit PIN.</p>
         <div class="form-grid">
-          <label>Name <input id="coachSelfName" value="${escapeHtml(coach.name || state.currentUser.name || "")}" /></label>
-          <label>Email <input id="coachSelfEmail" value="${escapeHtml(state.currentUser.email || coach.email || "")}" /></label>
-          <label>Phone number <input id="coachSelfPhone" value="${escapeHtml(state.currentUser.phone || coach.phone || "")}" /></label>
-          <label>Specialty <input id="coachSelfSpecialty" value="${escapeHtml(coach.specialty || "")}" placeholder="Boxing, strength, conditioning..." /></label>
-          <label class="wide">Emergency contact <input id="coachSelfEmergencyContact" value="${escapeHtml(coach.emergencyContact || "")}" placeholder="Name / phone" /></label>
+          <label>Name <input id="coachSelfName" value="${escapeHtml(coach.name || state.currentUser.name || "")}" ${profileLocked ? "disabled" : ""} /></label>
+          <label>Email <input id="coachSelfEmail" value="${escapeHtml(state.currentUser.email || coach.email || "")}" ${profileLocked ? "disabled" : ""} /></label>
+          <label>Phone number <input id="coachSelfPhone" value="${escapeHtml(state.currentUser.phone || coach.phone || "")}" ${profileLocked ? "disabled" : ""} /></label>
+          <label>Specialty <input id="coachSelfSpecialty" value="${escapeHtml(coach.specialty || "")}" placeholder="Boxing, strength, conditioning..." ${profileLocked ? "disabled" : ""} /></label>
+          <label class="wide">Emergency contact <input id="coachSelfEmergencyContact" value="${escapeHtml(coach.emergencyContact || "")}" placeholder="Name / phone" ${profileLocked ? "disabled" : ""} /></label>
         </div>
-        <label>About me <textarea id="coachSelfBio" placeholder="Coach bio, experience, and training approach">${escapeHtml(coach.bio || "")}</textarea></label>
+        <label>About me <textarea id="coachSelfBio" placeholder="Coach bio, experience, and training approach" ${profileLocked ? "disabled" : ""}>${escapeHtml(coach.bio || "")}</textarea></label>
         <div class="form-grid">
-          <label>New 4-digit PIN <input id="coachSelfNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="Leave blank to keep current PIN" /></label>
-          <label>Confirm new PIN <input id="coachSelfConfirmPin" inputmode="numeric" maxlength="4" type="password" /></label>
+          <label>New 4-digit PIN <input id="coachSelfNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="Leave blank to keep current PIN" ${profileLocked ? "disabled" : ""} /></label>
+          <label>Confirm new PIN <input id="coachSelfConfirmPin" inputmode="numeric" maxlength="4" type="password" ${profileLocked ? "disabled" : ""} /></label>
         </div>
-        <button class="primary" id="saveCoachSelfProfile">Save My Coach Profile</button>
+        ${profileLocked ? "" : `<button class="primary" id="saveCoachSelfProfile">Save My Coach Profile</button>`}
       </article>
     </section>
   `;
 }
 
-function coachProfileImagePanel(profileUser, coach) {
+function coachProfileImagePanel(profileUser, coach, canEdit = true) {
   return `
     <article class="card profile-image-card">
       ${avatar(profileUser.profileImageUrl || coach.profileImageUrl, coach.name, "large")}
@@ -1058,11 +1059,11 @@ function coachProfileImagePanel(profileUser, coach) {
         <p class="eyebrow">Coach profile image</p>
         <h3>${escapeHtml(coach.name)}</h3>
         <p class="muted">${profileUser.profileImageUploadedAt ? `Uploaded ${new Date(profileUser.profileImageUploadedAt).toLocaleDateString()}` : "Default avatar is showing."}</p>
-        <div class="image-controls">
+        ${canEdit ? `<div class="image-controls">
           <input id="profileImageInput" type="file" accept="image/jpeg,image/png,image/webp" />
           <button class="primary" id="uploadProfileImageButton">${profileUser.profileImageUrl ? "Change Profile Image" : "Upload Profile Image"}</button>
           <button class="ghost" id="removeProfileImageButton">Remove Profile Image</button>
-        </div>
+        </div>` : `<p class="muted">Admin must unlock your profile before you can change this image.</p>`}
       </div>
     </article>
   `;
@@ -2391,6 +2392,7 @@ function coachEditModal(coachId) {
           ${editInput("coach", "specialty", "Coach title / specialty", coach.specialty || "")}
           ${editInput("coach", "emergencyContact", "Emergency contact", coach.emergencyContact || "")}
           ${editSelect("coach", "status", "Status", ["Active", "Inactive", "Suspended", "Archived"], coach.status || user?.accountStatus || "Active")}
+          ${editSelect("coach", "profileLocked", "Coach profile page", [{ value: "false", label: "Unlocked" }, { value: "true", label: "Locked" }], String(Boolean(coach.profileLocked || user?.profileLocked)))}
           <label>Set new 4-digit PIN <input id="coachModalNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="New PIN" /></label>
           <label>Confirm new PIN <input id="coachModalConfirmPin" inputmode="numeric" maxlength="4" type="password" placeholder="Confirm PIN" /></label>
         </div>
@@ -2398,6 +2400,7 @@ function coachEditModal(coachId) {
         <div class="modal-actions">
           <button id="coachModalSetPin" data-coach-id="${coach.id}">Set Coach PIN</button>
           <button id="coachModalResetPin" data-coach-id="${coach.id}">Reset Coach PIN</button>
+          <button id="coachModalToggleProfileLock" data-coach-id="${coach.id}">${coach.profileLocked || user?.profileLocked ? "Unlock Coach Profile" : "Lock Coach Profile"}</button>
           <button class="ghost" id="closeEditModalSecondary">Cancel</button>
           <button class="primary" id="saveCoachModal" data-coach-id="${coach.id}">Save Coach</button>
         </div>
@@ -3723,8 +3726,18 @@ function bindGlobal() {
     const coachId = event.currentTarget.dataset.coachId;
     const patch = collectEditFields("coach");
     patch.fullName = patch.name;
+    patch.profileLocked = patch.profileLocked === "true";
     adminUpdateCoach(store, state.currentUser, coachId, patch);
     state.editModal = null;
+    render();
+  });
+  document.querySelector("#coachModalToggleProfileLock")?.addEventListener("click", (event) => {
+    const coachId = event.currentTarget.dataset.coachId;
+    const coach = store.coaches.find((item) => item.id === coachId);
+    const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
+    const currentlyLocked = Boolean(coach?.profileLocked || user?.profileLocked);
+    adminUpdateCoach(store, state.currentUser, coachId, { profileLocked: !currentlyLocked });
+    window.alert(currentlyLocked ? "Coach profile page unlocked." : "Coach profile page locked.");
     render();
   });
   document.querySelector("#coachModalSetPin")?.addEventListener("click", (event) => {

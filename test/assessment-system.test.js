@@ -1963,6 +1963,19 @@ test("coach can update own profile, contact information, emergency contact, and 
   assert.equal(authenticateUser(store, "Coach", "8642").id, coachUser.id);
 });
 
+test("Admin can lock and unlock coach profile editing", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const coachUser = authenticateUser(store, "Coach", "2222");
+  adminUpdateCoach(store, admin, coachUser.linkedId, { profileLocked: true });
+  assert.equal(coachUser.profileLocked, true);
+  assert.throws(() => updateCoachSelfProfile(store, coachUser, { bio: "Blocked edit" }), /locked/i);
+  assert.throws(() => uploadProfileImage(store, coachUser, coachUser.id, imageFile()), /permission/i);
+  adminUpdateCoach(store, admin, coachUser.linkedId, { profileLocked: false });
+  assert.equal(coachUser.profileLocked, false);
+  assert.equal(updateCoachSelfProfile(store, coachUser, { bio: "Unlocked edit" }).bio, "Unlocked edit");
+});
+
 test("admin can use 2 hour session length for clients, workouts, and plan offerings", () => {
   const store = createStore();
   const admin = authenticateUser(store, "Admin", "9999");

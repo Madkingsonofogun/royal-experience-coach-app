@@ -1773,6 +1773,7 @@ export function updateCoachSelfProfile(store, coachUser, patch) {
   if (!coachUser || coachUser.role !== "Coach") throw new Error("Only coaches can update their own profile details.");
   const coach = findById(store.coaches, coachUser.linkedId, "Coach");
   const user = findById(store.users, coachUser.id, "User");
+  if (coach.profileLocked || user.profileLocked) throw new Error("Your coach profile is locked. Contact Admin to request changes.");
   if (patch.name !== undefined) {
     const name = String(patch.name || "").trim();
     if (!name) throw new Error("Coach name is required.");
@@ -1932,6 +1933,13 @@ export function adminUpdateCoach(store, adminUser, coachId, patch) {
     if (patch.lastName !== undefined) user.lastName = patch.lastName;
     if (patch.email !== undefined) user.email = String(patch.email || "").toLowerCase();
     if (patch.phone !== undefined) user.phone = String(patch.phone || "");
+    if (patch.profileLocked !== undefined) {
+      user.profileLocked = Boolean(patch.profileLocked);
+      coach.profileLocked = Boolean(patch.profileLocked);
+      coach.profileUnlockedByAdminId = patch.profileLocked ? null : adminUser.id;
+      coach.profileUnlockedAt = patch.profileLocked ? null : nowIso();
+      coach.profileLockReason = patch.profileLocked ? "Locked by Admin." : "";
+    }
     if (patch.status) {
       user.accountStatus = patch.status === "Inactive" ? "Suspended" : patch.status;
       user.disabled = ["Inactive", "Suspended", "Archived"].includes(patch.status);
@@ -2530,8 +2538,14 @@ export function archiveProgressImage(store, actorUser, imageId) {
 
 function canManageProfileImage(store, actorUser, targetUser) {
   if (!actorUser || !targetUser) return false;
-  if (actorUser.id === targetUser.id) return true;
   if (actorUser.role === "Admin") return true;
+  if (actorUser.id === targetUser.id) {
+    if (targetUser.role === "Coach") {
+      const coach = store.coaches.find((item) => item.id === targetUser.linkedId);
+      return !targetUser.profileLocked && !coach?.profileLocked;
+    }
+    return true;
+  }
   if (targetUser.role === "Admin") return false;
   if (actorUser.role === "Coach" && targetUser.role === "Coach") return Boolean(store.settings.coachCanEditOtherCoachImages);
   return false;
