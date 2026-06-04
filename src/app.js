@@ -315,8 +315,16 @@ const state = {
   }
 };
 
+let autoCloudBackupTimer = null;
+let autoCloudBackupRunning = false;
+let suppressAutomaticCloudBackup = false;
+let lastCloudBackupFingerprint = "";
+let loginAccountRefreshTimer = null;
+let loginInitialSyncStarted = false;
+
 const app = document.querySelector("#app");
 render();
+startLoginAccountAutoRefresh();
 
 function render() {
   saveStore();
@@ -358,6 +366,26 @@ function render() {
   bindGlobal();
 }
 
+function startLoginAccountAutoRefresh() {
+  if (!loginInitialSyncStarted) {
+    loginInitialSyncStarted = true;
+    setTimeout(() => refreshLoginAccountsAutomatically(true), 250);
+  }
+  if (loginAccountRefreshTimer) return;
+  loginAccountRefreshTimer = setInterval(() => refreshLoginAccountsAutomatically(false), 15000);
+}
+
+async function refreshLoginAccountsAutomatically(showResult) {
+  if (state.currentUser || state.supabaseRestoreBusy || autoCloudBackupTimer || autoCloudBackupRunning) return;
+  const restored = await syncLatestCloudData(false);
+  if (showResult) {
+    state.syncStatus = restored
+      ? "Accounts automatically updated from Supabase."
+      : "Automatic account updates are on. Log in when your account has been approved.";
+    render();
+  }
+}
+
 function loadSavedStore(defaultStore) {
   try {
     const saved = window.localStorage?.getItem(STORE_STORAGE_KEY);
@@ -386,6 +414,7 @@ function saveStore() {
   } catch (error) {
     console.warn("Could not save app data.", error);
   }
+  scheduleAutomaticCloudBackup();
 }
 
 function replaceStoreWith(nextStore) {
@@ -481,6 +510,59 @@ function cleanBackupValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
 }
 
+function normalizeSupabaseUrl(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/rest\/v1$/i, "");
+}
+
+function cloudBackupFingerprint() {
+  return JSON.stringify(backupPayload());
+}
+
+function scheduleAutomaticCloudBackup() {
+  if (
+    suppressAutomaticCloudBackup ||
+    store.settings.automaticSupabaseBackup === false ||
+    !normalizeSupabaseUrl(store.settings.supabaseUrl) ||
+    !String(store.settings.supabaseAnonKey || "").trim()
+  ) return;
+  const fingerprint = cloudBackupFingerprint();
+  if (fingerprint === lastCloudBackupFingerprint) return;
+  clearTimeout(autoCloudBackupTimer);
+  autoCloudBackupTimer = setTimeout(() => runAutomaticCloudBackup(fingerprint), 2500);
+}
+
+async function runAutomaticCloudBackup(expectedFingerprint) {
+  autoCloudBackupTimer = null;
+  if (autoCloudBackupRunning || state.supabaseBackupBusy || state.supabaseRestoreBusy) {
+    scheduleAutomaticCloudBackup();
+    return;
+  }
+  const currentFingerprint = cloudBackupFingerprint();
+  if (currentFingerprint === lastCloudBackupFingerprint) return;
+  autoCloudBackupRunning = true;
+  let saved = false;
+  try {
+    const result = await backupStoreToSupabase({
+      url: store.settings.supabaseUrl,
+      anonKey: store.settings.supabaseAnonKey,
+      table: store.settings.supabaseBackupTable
+    });
+    lastCloudBackupFingerprint = currentFingerprint === expectedFingerprint ? expectedFingerprint : currentFingerprint;
+    saved = true;
+    state.syncStatus = `Automatically saved to Supabase at ${new Date().toLocaleTimeString()}. Backup ${result.backupId}.`;
+  } catch (error) {
+    state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
+      ? "Automatic Supabase save is blocked by Row Level Security. Run the Setup SQL in Admin Data Sync."
+      : `Automatic Supabase save failed: ${error.message}`;
+  } finally {
+    autoCloudBackupRunning = false;
+    if (saved && cloudBackupFingerprint() !== lastCloudBackupFingerprint) scheduleAutomaticCloudBackup();
+  }
+}
+
 function supabaseBackupRows() {
   const backupId = `backup_${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 17)}`;
   const payload = backupPayload();
@@ -523,7 +605,7 @@ function supabaseBackupRows() {
 }
 
 async function backupStoreToSupabase({ url, anonKey, table }) {
-  const projectUrl = (url || "").trim().replace(/\/+$/, "");
+  const projectUrl = normalizeSupabaseUrl(url);
   const key = (anonKey || "").trim();
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and anon key are required.");
@@ -535,9 +617,7 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+        ...supabaseHeaders(key),
         Prefer: "return=minimal"
       },
       body: JSON.stringify(rows.slice(index, index + chunkSize))
@@ -551,13 +631,24 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
 }
 
 async function checkSupabaseBackupStatus({ url, anonKey, table }) {
-  const projectUrl = (url || "").trim().replace(/\/+$/, "");
+  const projectUrl = normalizeSupabaseUrl(url);
   const key = (anonKey || "").trim();
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
-  const response = await fetch(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?select=backup_id,collection_name,created_at&order=created_at.desc&limit=1`, {
-    headers: { ...supabaseHeaders(key), Prefer: "count=exact" }
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  let response;
+  try {
+    response = await fetch(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?select=backup_id,collection_name,created_at&order=created_at.desc&limit=1`, {
+      headers: { ...supabaseHeaders(key), Prefer: "count=exact" },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Connection timed out. Check your internet connection and Supabase project URL.");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   const rows = await response.json();
   const contentRange = response.headers.get("content-range") || "";
@@ -609,7 +700,7 @@ function storeKeyForBackupCollection(collectionName) {
 }
 
 async function restoreLatestFromSupabase({ url, anonKey, table }) {
-  const projectUrl = (url || "").trim().replace(/\/+$/, "");
+  const projectUrl = normalizeSupabaseUrl(url);
   const key = (anonKey || "").trim();
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
@@ -653,7 +744,13 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
     cloudStore.adminPermissions = { ...cloudStore.adminPermissions[0] };
     delete cloudStore.adminPermissions.id;
   }
-  replaceStoreWith({ ...store, ...cloudStore });
+  suppressAutomaticCloudBackup = true;
+  try {
+    replaceStoreWith({ ...store, ...cloudStore });
+  } finally {
+    suppressAutomaticCloudBackup = false;
+  }
+  lastCloudBackupFingerprint = cloudBackupFingerprint();
   return { restored: true, backupId, counts: Object.fromEntries(Object.entries(cloudStore).map(([name, items]) => [name, items.length])) };
 }
 
@@ -777,7 +874,7 @@ function loginPage() {
         <div>
           <p class="eyebrow">A Royal Experience</p>
           <h1>${state.signupOpen ? "Create Account Request" : state.forgotPinOpen ? "Forgot PIN" : "Log in with your numeric PIN"}</h1>
-          <p class="muted">${state.signupOpen ? "Your account will stay locked until Admin reviews and unlocks it." : state.forgotPinOpen ? "Tell Admin who you are so they can reset your PIN and send it by email or text." : "Demo PINs: Coach 2222, Client Ada 1111, Client Marcus 3333, Admin 9999."}</p>
+          ${state.signupOpen ? `<p class="muted">Your account will stay locked until Admin reviews and unlocks it.</p>` : state.forgotPinOpen ? `<p class="muted">Tell Admin who you are so they can reset your PIN and send it by email or text.</p>` : ""}
         </div>
         ${state.signupOpen ? signupForm() : state.forgotPinOpen ? forgotPinForm() : `
           <label>Account type
@@ -788,8 +885,7 @@ function loginPage() {
           <label>Numeric password / PIN
             <input id="loginPin" inputmode="numeric" pattern="[0-9]*" type="password" value="${state.loginPin}" placeholder="1234" />
           </label>
-          <button class="primary full" id="loginButton" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading Cloud Data..." : "Sync Cloud Data & Log In"}</button>
-          <button class="ghost full" id="syncLoginData" ${state.supabaseRestoreBusy ? "disabled" : ""}>Refresh Accounts From Supabase</button>
+          <button class="primary full" id="loginButton">Log In</button>
           <div class="login-links">
             <button class="ghost" id="forgotPinButton">Forgot PIN</button>
             <button class="success" id="openSignupButton">Create Account</button>
@@ -1773,7 +1869,7 @@ function adminView() {
           <input class="visually-hidden" id="importAppDataInput" type="file" accept="application/json,.json" />
         </div>
         <h3>Supabase Backup</h3>
-        <p class="muted">Create a Supabase project, run the setup SQL below once, then paste your Supabase project URL and anon key here. This backs up the current app data into Supabase table <strong>${escapeHtml(store.settings.supabaseBackupTable || "smart_coach_backups")}</strong>.</p>
+        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves a workout, client, message, assessment, check-in, package, or other change, the app saves locally immediately and sends the updated app data to Supabase after 2.5 seconds.</p>
         <div class="form-grid">
           <label>Supabase project URL
             <input id="supabaseUrl" value="${escapeHtml(store.settings.supabaseUrl || "")}" placeholder="https://your-project.supabase.co" />
@@ -1789,11 +1885,11 @@ function adminView() {
           <textarea id="supabaseSetupSql" class="code-textarea" readonly>${escapeHtml(supabaseSetupSql(store.settings.supabaseBackupTable || "smart_coach_backups"))}</textarea>
         </label>
         <div class="actions">
-          <button id="copySupabaseSql">Copy Setup SQL</button>
-          <button id="saveSupabaseConfig">Save Supabase Settings</button>
-          <button id="testSupabaseConnection">Test Supabase Connection</button>
-          <button class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
-          <button class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
+          <button type="button" id="copySupabaseSql">Copy Setup SQL</button>
+          <button type="button" id="saveSupabaseConfig">Save Supabase Settings</button>
+          <button type="button" id="testSupabaseConnection">Test Supabase Connection</button>
+          <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
+          <button type="button" class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
         </div>
         <h4>Information included in every Supabase backup</h4>
         <div class="chip-grid">
@@ -2829,14 +2925,11 @@ function bindLogin() {
     state.loginPin = event.target.value.replace(/\D/g, "");
     event.target.value = state.loginPin;
   });
-  document.querySelector("#syncLoginData")?.addEventListener("click", async () => {
-    await syncLatestCloudData(true);
-  });
   document.querySelector("#loginButton")?.addEventListener("click", async () => {
     const loginButton = document.querySelector("#loginButton");
     if (loginButton) {
       loginButton.disabled = true;
-      loginButton.textContent = "Loading Cloud Data...";
+      loginButton.textContent = "Log In";
     }
     await syncLatestCloudData(false);
     const loginKey = state.loginRole;
@@ -3235,7 +3328,7 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#saveSupabaseConfig")?.addEventListener("click", () => {
-    store.settings.supabaseUrl = document.querySelector("#supabaseUrl")?.value.trim() || "";
+    store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || "");
     store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || "";
     store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || "smart_coach_backups";
     saveStore();
@@ -3243,6 +3336,10 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#testSupabaseConnection")?.addEventListener("click", async () => {
+    store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
+    store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || store.settings.supabaseAnonKey || "";
+    store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || store.settings.supabaseBackupTable || "smart_coach_backups";
+    saveStore();
     state.syncStatus = "Testing Supabase connection...";
     render();
     try {
@@ -3257,13 +3354,14 @@ function bindGlobal() {
     } catch (error) {
       state.syncStatus = `Supabase connection test failed: ${error.message}`;
     }
+    window.alert(state.syncStatus);
     render();
   });
   document.querySelector("#restoreSupabaseData")?.addEventListener("click", async () => {
     await syncLatestCloudData(true);
   });
   document.querySelector("#backupSupabaseData")?.addEventListener("click", async () => {
-    store.settings.supabaseUrl = document.querySelector("#supabaseUrl")?.value.trim() || store.settings.supabaseUrl || "";
+    store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
     store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || store.settings.supabaseAnonKey || "";
     store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || store.settings.supabaseBackupTable || "smart_coach_backups";
     saveStore();
@@ -3276,11 +3374,15 @@ function bindGlobal() {
         anonKey: store.settings.supabaseAnonKey,
         table: store.settings.supabaseBackupTable
       });
+      lastCloudBackupFingerprint = cloudBackupFingerprint();
       state.syncStatus = `Supabase backup complete: ${result.backupId}. Saved ${result.rowCount} rows, including ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, ${result.summary.chatMessages || 0} chat messages, and all check-in/history records.`;
     } catch (error) {
-      state.syncStatus = `Supabase backup failed: ${error.message}. Check the URL, anon key, table exists, and setup SQL has been run.`;
+      state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
+        ? "Supabase is connected, but Row Level Security is blocking backups. In Supabase, open SQL Editor and run the Setup SQL shown in this app's Data Sync section, then click Backup to Supabase again."
+        : `Supabase backup failed: ${error.message}. Check the URL, publishable key, table exists, and setup SQL has been run.`;
     } finally {
       state.supabaseBackupBusy = false;
+      window.alert(state.syncStatus);
       render();
     }
   });

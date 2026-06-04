@@ -15,7 +15,8 @@ export function createStore() {
       coachCanEditOtherCoachImages: false,
       supabaseUrl: "https://jeqjhugwogtxcxnrucza.supabase.co",
       supabaseAnonKey: "sb_publishable_D73_Iiuma2215kdC7gSFxw_aR-aGcUS",
-      supabaseBackupTable: "smart_coach_backups"
+      supabaseBackupTable: "smart_coach_backups",
+      automaticSupabaseBackup: true
     },
     users: [
       user("admin_1", "Admin", "Admin", "admin@madking.test", "5550000000", "9999", "admin_1"),
