@@ -407,7 +407,20 @@ function mergeStore(defaultStore, savedStore) {
   merged.settings.supabaseAnonKey ||= defaultStore.settings.supabaseAnonKey;
   merged.settings.supabaseBackupTable ||= defaultStore.settings.supabaseBackupTable;
   merged.adminPermissions = { ...(defaultStore.adminPermissions || {}), ...(savedStore.adminPermissions || {}) };
+  Object.keys(merged).forEach((key) => {
+    if (Array.isArray(merged[key])) merged[key] = deduplicateRecords(merged[key]);
+  });
   return merged;
+}
+
+function deduplicateRecords(records) {
+  const unique = new Map();
+  records.forEach((record, index) => {
+    const id = record?.id || record?.assessmentId || record?.checkInId || record?.messageId;
+    const fallback = JSON.stringify(record) || `record_${index}`;
+    unique.set(String(id || fallback), record);
+  });
+  return [...unique.values()];
 }
 
 function saveStore() {
@@ -470,7 +483,7 @@ function backupPayload() {
     supabaseUrl: "",
     supabaseBackupTable: store.settings.supabaseBackupTable || "smart_coach_backups"
   };
-  return {
+  const payload = {
     users: store.users,
     clients: store.clients,
     coaches: store.coaches,
@@ -498,6 +511,10 @@ function backupPayload() {
     coachAlerts: store.coachAlerts,
     adminAuditLog: store.adminAuditLog || []
   };
+  Object.keys(payload).forEach((key) => {
+    if (Array.isArray(payload[key])) payload[key] = deduplicateRecords(payload[key]);
+  });
+  return payload;
 }
 
 function backupCollectionName(key) {
@@ -717,7 +734,7 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   const rows = [];
   const pageSize = 1000;
   for (let start = 0; ; start += pageSize) {
-    const rowsResponse = await fetch(`${endpoint}?backup_id=eq.${encodeURIComponent(backupId)}&select=collection_name,data`, {
+    const rowsResponse = await fetch(`${endpoint}?backup_id=eq.${encodeURIComponent(backupId)}&select=collection_name,record_id,data&order=id.asc`, {
       headers: { ...supabaseHeaders(key), Range: `${start}-${start + pageSize - 1}` }
     });
     if (!rowsResponse.ok) throw new Error(await rowsResponse.text() || `Supabase returned ${rowsResponse.status}`);
@@ -726,11 +743,19 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
     if (page.length < pageSize) break;
   }
   const cloudStore = {};
+  const uniqueCloudRows = new Map();
   rows.forEach((row) => {
+    uniqueCloudRows.set(`${row.collection_name}:${row.record_id}`, row);
+  });
+  const duplicateRowsRemoved = rows.length - uniqueCloudRows.size;
+  uniqueCloudRows.forEach((row) => {
     const keyName = storeKeyForBackupCollection(row.collection_name);
     if (!keyName) return;
     cloudStore[keyName] ||= [];
     cloudStore[keyName].push(row.data);
+  });
+  Object.keys(cloudStore).forEach((keyName) => {
+    if (Array.isArray(cloudStore[keyName])) cloudStore[keyName] = deduplicateRecords(cloudStore[keyName]);
   });
   if (!cloudStore.users?.length) throw new Error("The latest backup does not contain user accounts.");
   if (cloudStore.settings?.[0]) {
@@ -752,8 +777,14 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   } finally {
     suppressAutomaticCloudBackup = false;
   }
-  lastCloudBackupFingerprint = cloudBackupFingerprint();
-  return { restored: true, backupId, counts: Object.fromEntries(Object.entries(cloudStore).map(([name, items]) => [name, items.length])) };
+  lastCloudBackupFingerprint = duplicateRowsRemoved ? "" : cloudBackupFingerprint();
+  if (duplicateRowsRemoved) scheduleAutomaticCloudBackup();
+  return {
+    restored: true,
+    backupId,
+    duplicateRowsRemoved,
+    counts: Object.fromEntries(Object.entries(cloudStore).map(([name, items]) => [name, items.length]))
+  };
 }
 
 async function syncLatestCloudData(showStatus = true) {
@@ -772,7 +803,7 @@ async function syncLatestCloudData(showStatus = true) {
     state.cloudSyncAttempted = true;
     if (showStatus) {
       state.syncStatus = result.restored
-        ? `Loaded latest Supabase backup ${result.backupId}. New clients, coaches, workouts, and chats are now available on this device.`
+        ? `Loaded latest Supabase backup ${result.backupId}.${result.duplicateRowsRemoved ? ` Removed ${result.duplicateRowsRemoved} duplicate cloud records and queued a clean backup.` : " New clients, coaches, workouts, and chats are now available on this device."}`
         : result.reason;
       render();
     }
