@@ -13,7 +13,9 @@ export function createStore() {
       maxImageUploadBytes: 5 * 1024 * 1024,
       allowClientProgressImageDelete: false,
       coachCanEditOtherCoachImages: false,
-      firebaseConfigText: ""
+      supabaseUrl: "",
+      supabaseAnonKey: "",
+      supabaseBackupTable: "smart_coach_backups"
     },
     users: [
       user("admin_1", "Admin", "Admin", "admin@madking.test", "5550000000", "9999", "admin_1"),

@@ -88,7 +88,6 @@ import {
 import { blankAssessment, createStore } from "./data.js";
 
 const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
-const FIREBASE_SDK_VERSION = "10.14.1";
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
 const state = {
@@ -106,7 +105,7 @@ const state = {
   },
   signupError: "",
   signupSuccess: "",
-  firebaseBackupBusy: false,
+  supabaseBackupBusy: false,
   signup: {
     firstName: "",
     lastName: "",
@@ -428,7 +427,7 @@ function importAppDataFile(file) {
   reader.readAsText(file);
 }
 
-function firebaseBackupPayload() {
+function backupPayload() {
   return {
     users: store.users,
     clients: store.clients,
@@ -451,70 +450,116 @@ function firebaseBackupPayload() {
   };
 }
 
-function firebaseCollectionName(key) {
+function backupCollectionName(key) {
   return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 
-function firebaseDocumentId(item, fallback) {
+function backupRecordId(item, fallback) {
   return String(item?.id || item?.assessmentId || item?.checkInId || item?.messageId || fallback).replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
-function parseFirebaseConfig(configText) {
-  let text = (configText || "").trim();
-  const configMatch = text.match(/firebaseConfig\s*=\s*({[\s\S]*?})\s*;?/);
-  if (configMatch) text = configMatch[1];
-  try {
-    return JSON.parse(text);
-  } catch {
-    const jsonLike = text
-      .replace(/\/\/.*$/gm, "")
-      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
-      .replace(/,\s*}/g, "}");
-    return JSON.parse(jsonLike);
-  }
-}
-
-function cleanFirebaseValue(value) {
+function cleanBackupValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
 }
 
-async function backupStoreToFirebase(configText) {
-  const config = parseFirebaseConfig(configText);
-  if (!config.apiKey || !config.projectId || !config.appId) {
-    throw new Error("Firebase config needs apiKey, projectId, and appId.");
-  }
-  const [{ initializeApp, getApps }, firestore] = await Promise.all([
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`),
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`)
-  ]);
-  const app = getApps().find((item) => item.options?.projectId === config.projectId) || initializeApp(config, `mad-king-backup-${config.projectId}`);
-  const db = firestore.getFirestore(app);
+function supabaseBackupRows() {
   const backupId = `backup_${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14)}`;
-  const payload = firebaseBackupPayload();
+  const payload = backupPayload();
   const summary = Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, Array.isArray(value) ? value.length : 0]));
-  await firestore.setDoc(firestore.doc(db, "madKingBackups", backupId), {
-    backupId,
-    appName: "Mad King Conditioning Smart Coach",
-    createdAt: new Date().toISOString(),
-    summary
-  });
+  const rows = [{
+    backup_id: backupId,
+    collection_name: "_backup_metadata",
+    record_id: backupId,
+    data: {
+      backupId,
+      appName: "Mad King Conditioning Smart Coach",
+      createdAt: new Date().toISOString(),
+      summary
+    }
+  }];
   for (const [key, items] of Object.entries(payload)) {
     if (!Array.isArray(items)) continue;
-    const collectionName = firebaseCollectionName(key);
+    const collectionName = backupCollectionName(key);
     for (let index = 0; index < items.length; index += 1) {
-      const item = cleanFirebaseValue(items[index]);
-      await firestore.setDoc(
-        firestore.doc(db, "madKingBackups", backupId, collectionName, firebaseDocumentId(item, `${key}_${index}`)),
-        { ...item, backupId, backupCollection: collectionName }
-      );
+      const item = cleanBackupValue(items[index]);
+      rows.push({
+        backup_id: backupId,
+        collection_name: collectionName,
+        record_id: backupRecordId(item, `${key}_${index}`),
+        data: item
+      });
     }
   }
-  await firestore.setDoc(firestore.doc(db, "madKingBackups", "latest"), {
-    backupId,
-    updatedAt: new Date().toISOString(),
-    summary
+  rows.push({
+    backup_id: "latest",
+    collection_name: "_backup_metadata",
+    record_id: "latest",
+    data: {
+      backupId,
+      updatedAt: new Date().toISOString(),
+      summary
+    }
   });
-  return { backupId, summary };
+  return { backupId, summary, rows };
+}
+
+async function backupStoreToSupabase({ url, anonKey, table }) {
+  const projectUrl = (url || "").trim().replace(/\/+$/, "");
+  const key = (anonKey || "").trim();
+  const tableName = (table || "smart_coach_backups").trim();
+  if (!projectUrl || !key) throw new Error("Supabase URL and anon key are required.");
+  if (!/^https:\/\/.+\.supabase\.co$/i.test(projectUrl)) throw new Error("Supabase URL should look like https://your-project.supabase.co.");
+  const { backupId, summary, rows } = supabaseBackupRows();
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
+  const chunkSize = 250;
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(rows.slice(index, index + chunkSize))
+    });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Supabase returned ${response.status}`);
+    }
+  }
+  return { backupId, summary, rowCount: rows.length };
+}
+
+function supabaseSetupSql(tableName = "smart_coach_backups") {
+  const safeTable = String(tableName || "smart_coach_backups").replace(/[^a-zA-Z0-9_]/g, "") || "smart_coach_backups";
+  return `create table if not exists public.${safeTable} (
+  id bigint generated by default as identity primary key,
+  backup_id text not null,
+  collection_name text not null,
+  record_id text not null,
+  data jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ${safeTable}_backup_id_idx on public.${safeTable} (backup_id);
+create index if not exists ${safeTable}_collection_idx on public.${safeTable} (collection_name);
+
+-- Setup mode only. Tighten this before using real client data.
+alter table public.${safeTable} disable row level security;`;
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function route() {
@@ -1563,19 +1608,31 @@ function adminView() {
           <button class="success" id="importAppDataButton">Import App Data</button>
           <input class="visually-hidden" id="importAppDataInput" type="file" accept="application/json,.json" />
         </div>
-        <h3>Firebase Backup</h3>
-        <p class="muted">Paste your Firebase web config here. This backs up the current app data into Firestore under <strong>madKingBackups</strong>. It is backup storage first, not automatic live sync yet.</p>
-        <label>Firebase web config
-          <textarea id="firebaseConfigText" class="code-textarea" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'>${escapeHtml(store.settings.firebaseConfigText || "")}</textarea>
+        <h3>Supabase Backup</h3>
+        <p class="muted">Create a Supabase project, run the setup SQL below once, then paste your Supabase project URL and anon key here. This backs up the current app data into Supabase table <strong>${escapeHtml(store.settings.supabaseBackupTable || "smart_coach_backups")}</strong>.</p>
+        <div class="form-grid">
+          <label>Supabase project URL
+            <input id="supabaseUrl" value="${escapeHtml(store.settings.supabaseUrl || "")}" placeholder="https://your-project.supabase.co" />
+          </label>
+          <label>Supabase anon key
+            <input id="supabaseAnonKey" value="${escapeHtml(store.settings.supabaseAnonKey || "")}" placeholder="Paste anon public key" />
+          </label>
+          <label>Backup table
+            <input id="supabaseBackupTable" value="${escapeHtml(store.settings.supabaseBackupTable || "smart_coach_backups")}" />
+          </label>
+        </div>
+        <label>Setup SQL to run once in Supabase SQL Editor
+          <textarea id="supabaseSetupSql" class="code-textarea" readonly>${escapeHtml(supabaseSetupSql(store.settings.supabaseBackupTable || "smart_coach_backups"))}</textarea>
         </label>
         <div class="actions">
-          <button id="saveFirebaseConfig">Save Firebase Config</button>
-          <button class="primary" id="backupFirebaseData" ${state.firebaseBackupBusy ? "disabled" : ""}>${state.firebaseBackupBusy ? "Backing Up..." : "Backup to Firebase"}</button>
+          <button id="copySupabaseSql">Copy Setup SQL</button>
+          <button id="saveSupabaseConfig">Save Supabase Settings</button>
+          <button class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
         </div>
         ${state.syncStatus ? `<div class="result-band"><strong>Sync status</strong><span>${escapeHtml(state.syncStatus)}</span></div>` : ""}
         <div class="result-band warning-band">
           <strong>Automatic multi-device access</strong>
-          <span>To have clients and coaches show up automatically from any phone or computer, this app needs a shared online database and login backend. Export/import is the local demo backup tool.</span>
+          <span>This starts Supabase backup storage. Full multi-device live login will come next by reading and writing these records through Supabase with proper account permissions.</span>
         </div>
       </article>
       <div class="split">
@@ -2984,31 +3041,38 @@ function bindGlobal() {
     if (!file) return;
     importAppDataFile(file);
   });
-  document.querySelector("#saveFirebaseConfig")?.addEventListener("click", () => {
-    try {
-      const config = parseFirebaseConfig(document.querySelector("#firebaseConfigText")?.value || "");
-      store.settings.firebaseConfigText = JSON.stringify(config, null, 2);
-      saveStore();
-      state.syncStatus = "Firebase config saved on this device.";
-    } catch {
-      state.syncStatus = "Firebase config could not be read. Paste the Firebase web config object or the full Firebase setup snippet.";
-    }
+  document.querySelector("#copySupabaseSql")?.addEventListener("click", async () => {
+    await copyTextToClipboard(supabaseSetupSql(document.querySelector("#supabaseBackupTable")?.value || store.settings.supabaseBackupTable));
+    state.syncStatus = "Supabase setup SQL copied. Paste it into Supabase SQL Editor and run it once.";
     render();
   });
-  document.querySelector("#backupFirebaseData")?.addEventListener("click", async () => {
-    const configText = document.querySelector("#firebaseConfigText")?.value.trim() || store.settings.firebaseConfigText || "";
-    state.firebaseBackupBusy = true;
-    state.syncStatus = "Starting Firebase backup...";
+  document.querySelector("#saveSupabaseConfig")?.addEventListener("click", () => {
+    store.settings.supabaseUrl = document.querySelector("#supabaseUrl")?.value.trim() || "";
+    store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || "";
+    store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || "smart_coach_backups";
+    saveStore();
+    state.syncStatus = "Supabase settings saved on this device.";
+    render();
+  });
+  document.querySelector("#backupSupabaseData")?.addEventListener("click", async () => {
+    store.settings.supabaseUrl = document.querySelector("#supabaseUrl")?.value.trim() || store.settings.supabaseUrl || "";
+    store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || store.settings.supabaseAnonKey || "";
+    store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || store.settings.supabaseBackupTable || "smart_coach_backups";
+    saveStore();
+    state.supabaseBackupBusy = true;
+    state.syncStatus = "Starting Supabase backup...";
     render();
     try {
-      store.settings.firebaseConfigText = JSON.stringify(parseFirebaseConfig(configText), null, 2);
-      saveStore();
-      const result = await backupStoreToFirebase(configText);
-      state.syncStatus = `Firebase backup complete: ${result.backupId}. Backed up ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, and ${result.summary.chats || 0} chat records.`;
+      const result = await backupStoreToSupabase({
+        url: store.settings.supabaseUrl,
+        anonKey: store.settings.supabaseAnonKey,
+        table: store.settings.supabaseBackupTable
+      });
+      state.syncStatus = `Supabase backup complete: ${result.backupId}. Saved ${result.rowCount} rows, including ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, and ${result.summary.chats || 0} chat records.`;
     } catch (error) {
-      state.syncStatus = `Firebase backup failed: ${error.message}. Check the config, Firestore is enabled, and Firestore rules allow Admin backup writes.`;
+      state.syncStatus = `Supabase backup failed: ${error.message}. Check the URL, anon key, table exists, and setup SQL has been run.`;
     } finally {
-      state.firebaseBackupBusy = false;
+      state.supabaseBackupBusy = false;
       render();
     }
   });
