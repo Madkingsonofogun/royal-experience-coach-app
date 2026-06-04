@@ -75,6 +75,7 @@ import {
   submitPinResetRequest,
   updateClientSelfProfile,
   updateCoachSelfProfile,
+  updateAdminSelfProfile,
   unreadNotificationCount,
   uploadProfileImage,
   uploadProgressImage,
@@ -1974,6 +1975,26 @@ test("Admin can lock and unlock coach profile editing", () => {
   adminUpdateCoach(store, admin, coachUser.linkedId, { profileLocked: false });
   assert.equal(coachUser.profileLocked, false);
   assert.equal(updateCoachSelfProfile(store, coachUser, { bio: "Unlocked edit" }).bio, "Unlocked edit");
+});
+
+test("Admin can update own profile, PIN, and profile image", () => {
+  const store = createStore();
+  const admin = authenticateUser(store, "Admin", "9999");
+  const updated = updateAdminSelfProfile(store, admin, {
+    name: "Royal Admin",
+    email: "royal.admin@example.com",
+    phone: "555-999-1212",
+    title: "Business Administrator",
+    bio: "Manages the coaching business.",
+    emergencyContact: "Office Contact / 555-999-9999",
+    pin: "9753",
+    confirmPin: "9753"
+  });
+  uploadProfileImage(store, admin, admin.id, imageFile("admin.png", 1000, "image/png"));
+  assert.equal(updated.name, "Royal Admin");
+  assert.equal(updated.emergencyContact, "Office Contact / 555-999-9999");
+  assert.equal(authenticateUser(store, "Admin", "9753").id, admin.id);
+  assert.ok(store.users.find((user) => user.id === admin.id).profileImageUrl);
 });
 
 test("admin can use 2 hour session length for clients, workouts, and plan offerings", () => {

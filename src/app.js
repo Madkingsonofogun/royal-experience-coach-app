@@ -82,6 +82,7 @@ import {
   submitPinResetRequest,
   updateClientSelfProfile,
   updateCoachSelfProfile,
+  updateAdminSelfProfile,
   unreadNotificationCount,
   visibleClientsForUser,
   summarizeAssessment
@@ -985,6 +986,7 @@ function homeDashboard() {
 
 function profilePage() {
   if (state.currentUser.role === "Coach") return coachProfilePage();
+  if (state.currentUser.role === "Admin") return adminProfilePage();
   const client = selectedClient();
   const profileUser = userForProfile(client);
   const progressImages = getProgressImagesForUser(store, state.currentUser, client.id);
@@ -1014,6 +1016,37 @@ function profilePage() {
         ${ownCoach ? `<article class="card"><h3>My coach profile emergency contact</h3><p>${ownCoach.emergencyContact || "No emergency contact saved."}</p></article>` : ""}
       </div>
       ${progressImagePanel(client, progressImages)}
+    </section>
+  `;
+}
+
+function adminProfilePage() {
+  const profile = store.coaches.find((item) => item.id === state.currentUser.linkedId)
+    || { id: state.currentUser.linkedId || state.currentUser.id, name: state.currentUser.name, role: "Admin" };
+  return `
+    <section class="workspace">
+      <div class="section-head">
+        <div><p class="eyebrow">Admin Profile</p><h2>${escapeHtml(profile.name || state.currentUser.name)}</h2></div>
+        <span class="badge green">Admin</span>
+      </div>
+      ${personalProfileImagePanel(state.currentUser, profile, "Admin")}
+      <article class="card">
+        <h3>My Admin Information</h3>
+        <p class="muted">Update your personal Admin profile, contact information, emergency contact, and 4-digit PIN.</p>
+        <div class="form-grid">
+          <label>Name <input id="adminSelfName" value="${escapeHtml(profile.name || state.currentUser.name || "")}" /></label>
+          <label>Email <input id="adminSelfEmail" value="${escapeHtml(state.currentUser.email || profile.email || "")}" /></label>
+          <label>Phone number <input id="adminSelfPhone" value="${escapeHtml(state.currentUser.phone || profile.phone || "")}" /></label>
+          <label>Title <input id="adminSelfTitle" value="${escapeHtml(profile.title || "Administrator")}" /></label>
+          <label class="wide">Emergency contact <input id="adminSelfEmergencyContact" value="${escapeHtml(profile.emergencyContact || "")}" placeholder="Name / phone" /></label>
+        </div>
+        <label>About me <textarea id="adminSelfBio" placeholder="Admin bio and business role">${escapeHtml(profile.bio || "")}</textarea></label>
+        <div class="form-grid">
+          <label>New 4-digit PIN <input id="adminSelfNewPin" inputmode="numeric" maxlength="4" type="password" placeholder="Leave blank to keep current PIN" /></label>
+          <label>Confirm new PIN <input id="adminSelfConfirmPin" inputmode="numeric" maxlength="4" type="password" /></label>
+        </div>
+        <button class="primary" id="saveAdminSelfProfile">Save My Admin Profile</button>
+      </article>
     </section>
   `;
 }
@@ -1052,12 +1085,16 @@ function coachProfilePage() {
 }
 
 function coachProfileImagePanel(profileUser, coach, canEdit = true) {
+  return personalProfileImagePanel(profileUser, coach, "Coach", canEdit);
+}
+
+function personalProfileImagePanel(profileUser, profile, roleLabel, canEdit = true) {
   return `
     <article class="card profile-image-card">
-      ${avatar(profileUser.profileImageUrl || coach.profileImageUrl, coach.name, "large")}
+      ${avatar(profileUser.profileImageUrl || profile.profileImageUrl, profile.name, "large")}
       <div>
-        <p class="eyebrow">Coach profile image</p>
-        <h3>${escapeHtml(coach.name)}</h3>
+        <p class="eyebrow">${roleLabel} profile image</p>
+        <h3>${escapeHtml(profile.name)}</h3>
         <p class="muted">${profileUser.profileImageUploadedAt ? `Uploaded ${new Date(profileUser.profileImageUploadedAt).toLocaleDateString()}` : "Default avatar is showing."}</p>
         ${canEdit ? `<div class="image-controls">
           <input id="profileImageInput" type="file" accept="image/jpeg,image/png,image/webp" />
@@ -3303,9 +3340,33 @@ function bindGlobal() {
       event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
     });
   });
+  document.querySelector("#saveAdminSelfProfile")?.addEventListener("click", () => {
+    try {
+      const pin = document.querySelector("#adminSelfNewPin")?.value || "";
+      const confirmPin = document.querySelector("#adminSelfConfirmPin")?.value || "";
+      updateAdminSelfProfile(store, state.currentUser, {
+        name: document.querySelector("#adminSelfName")?.value || "",
+        email: document.querySelector("#adminSelfEmail")?.value || "",
+        phone: document.querySelector("#adminSelfPhone")?.value || "",
+        title: document.querySelector("#adminSelfTitle")?.value || "",
+        emergencyContact: document.querySelector("#adminSelfEmergencyContact")?.value || "",
+        bio: document.querySelector("#adminSelfBio")?.value || "",
+        ...(pin || confirmPin ? { pin, confirmPin } : {})
+      });
+      window.alert("Admin profile saved.");
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+  ["#adminSelfNewPin", "#adminSelfConfirmPin"].forEach((selector) => {
+    document.querySelector(selector)?.addEventListener("input", (event) => {
+      event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
+    });
+  });
   document.querySelector("#uploadProfileImageButton")?.addEventListener("click", () => {
     const file = document.querySelector("#profileImageInput")?.files?.[0];
-    const targetUser = state.currentUser.role === "Coach" && state.view === "profile" ? state.currentUser : userForProfile(selectedClient());
+    const targetUser = ["Coach", "Admin"].includes(state.currentUser.role) && state.view === "profile" ? state.currentUser : userForProfile(selectedClient());
     if (!file || !targetUser) return window.alert("Choose an image first.");
     try {
       uploadProfileImage(store, state.currentUser, targetUser.id, file);
@@ -3315,7 +3376,7 @@ function bindGlobal() {
     }
   });
   document.querySelector("#removeProfileImageButton")?.addEventListener("click", () => {
-    const targetUser = state.currentUser.role === "Coach" && state.view === "profile" ? state.currentUser : userForProfile(selectedClient());
+    const targetUser = ["Coach", "Admin"].includes(state.currentUser.role) && state.view === "profile" ? state.currentUser : userForProfile(selectedClient());
     if (!targetUser) return;
     try {
       removeProfileImage(store, state.currentUser, targetUser.id);

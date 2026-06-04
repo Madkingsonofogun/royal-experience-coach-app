@@ -1805,6 +1805,45 @@ export function updateCoachSelfProfile(store, coachUser, patch) {
   return coach;
 }
 
+export function updateAdminSelfProfile(store, adminUser, patch) {
+  requireAdmin(adminUser);
+  const user = findById(store.users, adminUser.id, "User");
+  let profile = store.coaches.find((item) => item.id === adminUser.linkedId);
+  if (!profile) {
+    profile = { id: adminUser.linkedId || adminUser.id, name: user.name, role: "Admin", createdAt: nowIso() };
+    store.coaches.push(profile);
+  }
+  if (patch.name !== undefined) {
+    const name = String(patch.name || "").trim();
+    if (!name) throw new Error("Admin name is required.");
+    user.name = name;
+    profile.name = name;
+  }
+  if (patch.email !== undefined) {
+    const email = String(patch.email || "").trim().toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+    user.email = email;
+    profile.email = email;
+  }
+  if (patch.phone !== undefined) {
+    user.phone = String(patch.phone || "").trim();
+    profile.phone = user.phone;
+  }
+  if (patch.title !== undefined) profile.title = String(patch.title || "").trim();
+  if (patch.bio !== undefined) profile.bio = String(patch.bio || "");
+  if (patch.emergencyContact !== undefined) profile.emergencyContact = String(patch.emergencyContact || "");
+  if (patch.pin || patch.confirmPin) {
+    validateNumericPin(patch.pin, patch.confirmPin);
+    user.pinSalt = makeId("salt");
+    user.pinHash = hashPin(patch.pin, user.pinSalt);
+    user.forcePinChange = false;
+    user.temporaryPinExpiresAt = null;
+  }
+  profile.updatedAt = nowIso();
+  logAdminAction(store, adminUser, `Admin updated own profile for ${profile.name}`);
+  return profile;
+}
+
 export function adminArchiveMonthlyPlan(store, adminUser, planId) {
   requireAdmin(adminUser);
   const plan = findById(store.monthlyPlans, planId, "Monthly plan");
@@ -2552,7 +2591,7 @@ function canManageProfileImage(store, actorUser, targetUser) {
 }
 
 function syncLinkedProfileImage(store, user) {
-  const linkedList = user.role === "Client" ? store.clients : user.role === "Coach" ? store.coaches : null;
+  const linkedList = user.role === "Client" ? store.clients : ["Coach", "Admin"].includes(user.role) ? store.coaches : null;
   const profile = linkedList?.find((item) => item.id === user.linkedId);
   if (!profile) return;
   profile.profileImageUrl = user.profileImageUrl;
