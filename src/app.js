@@ -621,9 +621,9 @@ async function getLatestSupabaseBackupId({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) return "";
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const response = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
+  const response = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
     headers: supabaseHeaders(key)
-  });
+  }, 8000);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   const rows = await response.json();
   return rows[0]?.data?.backupId || "";
@@ -743,23 +743,27 @@ async function checkSupabaseBackupStatus({ url, anonKey, table }) {
   const key = (anonKey || "").trim();
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
+  const response = await supabaseFetchWithTimeout(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=backup_id,collection_name,created_at,data&limit=1`, {
+    headers: supabaseHeaders(key)
+  }, 8000);
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  const rows = await response.json();
+  return { rowCount: rows.length ? 1 : 0, latest: rows[0] || null };
+}
+
+async function supabaseFetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
-  let response;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    response = await fetch(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=backup_id,collection_name,created_at,data&limit=1`, {
-      headers: supabaseHeaders(key),
-      signal: controller.signal
-    });
+    return await fetch(url, { ...options, signal: controller.signal });
   } catch (error) {
-    if (error?.name === "AbortError") throw new Error("Connection timed out. Check your internet connection and Supabase project URL.");
+    if (error?.name === "AbortError") {
+      throw new Error("Supabase request timed out. Run the updated Setup SQL, then click Backup to Supabase once from the device that has the newest data.");
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
-  const rows = await response.json();
-  return { rowCount: rows.length ? 1 : 0, latest: rows[0] || null };
 }
 
 function supabaseHeaders(key) {
@@ -812,9 +816,9 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const latestResponse = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
+  const latestResponse = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
     headers: supabaseHeaders(key)
-  });
+  }, 8000);
   if (!latestResponse.ok) throw new Error(await latestResponse.text() || `Supabase returned ${latestResponse.status}`);
   const latestRows = await latestResponse.json();
   const backupId = latestRows[0]?.data?.backupId;
@@ -822,9 +826,9 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   const rows = [];
   const pageSize = 1000;
   for (let start = 0; ; start += pageSize) {
-    const rowsResponse = await fetch(`${endpoint}?backup_id=eq.${encodeURIComponent(backupId)}&select=collection_name,record_id,data&order=id.asc`, {
+    const rowsResponse = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.${encodeURIComponent(backupId)}&select=collection_name,record_id,data&order=id.asc`, {
       headers: { ...supabaseHeaders(key), Range: `${start}-${start + pageSize - 1}` }
-    });
+    }, 10000);
     if (!rowsResponse.ok) throw new Error(await rowsResponse.text() || `Supabase returned ${rowsResponse.status}`);
     const page = await rowsResponse.json();
     rows.push(...page);
@@ -903,11 +907,11 @@ async function syncLatestCloudData(showStatus = true) {
       state.syncStatus = String(error.message || "").includes("57014")
         ? "Could not load Supabase data because the backup table timed out. Run the updated Setup SQL in Admin Data Sync, then click Backup to Supabase once."
         : `Could not load Supabase data: ${error.message}`;
-      render();
     }
     return false;
   } finally {
     state.supabaseRestoreBusy = false;
+    if (showStatus) render();
   }
 }
 
