@@ -97805,15 +97805,13 @@ create index if not exists ${safeTable}_backup_id_idx on public.${safeTable} (ba
 create index if not exists ${safeTable}_collection_idx on public.${safeTable} (collection_name);
 create index if not exists ${safeTable}_lookup_idx on public.${safeTable} (backup_id, collection_name, record_id);
 
--- Remove duplicate "latest" pointers that can make sync checks time out.
+-- Remove duplicate backup rows before adding the unique rule.
+-- Keeps the newest row for each backup/collection/record.
 delete from public.${safeTable} a
 using public.${safeTable} b
-where a.backup_id = 'latest'
-  and a.collection_name = '_backup_metadata'
-  and a.record_id = 'latest'
-  and b.backup_id = 'latest'
-  and b.collection_name = '_backup_metadata'
-  and b.record_id = 'latest'
+where a.backup_id = b.backup_id
+  and a.collection_name = b.collection_name
+  and a.record_id = b.record_id
   and a.id < b.id;
 
 create unique index if not exists ${safeTable}_record_unique_idx
