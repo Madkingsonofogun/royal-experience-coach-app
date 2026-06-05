@@ -393,7 +393,7 @@ function startLoggedInCloudDataMonitor() {
 }
 
 async function refreshLoginAccountsAutomatically(showResult) {
-  if (state.currentUser || state.supabaseRestoreBusy || autoCloudBackupTimer || autoCloudBackupRunning) return;
+  if (state.currentUser || state.supabaseRestoreBusy) return;
   const restored = await syncLatestCloudData(false);
   if (showResult) {
     state.syncStatus = restored
@@ -559,6 +559,7 @@ function cloudBackupFingerprint() {
 function scheduleAutomaticCloudBackup() {
   if (
     suppressAutomaticCloudBackup ||
+    !state.currentUser ||
     store.settings.automaticSupabaseBackup === false ||
     !normalizeSupabaseUrl(store.settings.supabaseUrl) ||
     !String(store.settings.supabaseAnonKey || "").trim()
@@ -602,6 +603,15 @@ async function runAutomaticCloudBackup(expectedFingerprint) {
   } finally {
     autoCloudBackupRunning = false;
     if (saved && cloudBackupFingerprint() !== lastCloudBackupFingerprint) scheduleAutomaticCloudBackup();
+  }
+}
+
+async function backupPublicChangeToCloud() {
+  if (!canUseSupabaseBackup() || state.supabaseBackupBusy || state.supabaseRestoreBusy) return;
+  try {
+    await runAutomaticCloudBackup(cloudBackupFingerprint());
+  } catch (error) {
+    console.warn("Could not save public change to Supabase.", error);
   }
 }
 
@@ -3216,6 +3226,7 @@ function bindLogin() {
   document.querySelector("#submitForgotPinRequest")?.addEventListener("click", () => {
     try {
       submitPinResetRequest(store, state.forgotPin);
+      backupPublicChangeToCloud();
       state.forgotPinSuccess = "Your PIN reset request was sent to Admin.";
       state.forgotPinError = "";
       state.forgotPin = { nameOrEmail: "", phone: "", note: "" };
@@ -3252,6 +3263,7 @@ function bindLogin() {
   document.querySelector("#createLoginButton")?.addEventListener("click", () => {
     try {
       requestLockedAccount(store, state.signup);
+      backupPublicChangeToCloud();
       state.signupOpen = false;
       state.signupSuccess = "Account request submitted. Admin must approve and unlock your account before you can log in.";
       state.signupError = "";
