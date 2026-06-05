@@ -621,7 +621,7 @@ async function getLatestSupabaseBackupId({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) return "";
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const response = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data,created_at&order=created_at.desc&limit=1`, {
+  const response = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
     headers: supabaseHeaders(key)
   });
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
@@ -653,6 +653,8 @@ async function checkCloudDataUpdates() {
   } catch (error) {
     state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
       ? "Supabase sync is blocked by Row Level Security. Run the Setup SQL in Admin Data Sync."
+      : String(error.message || "").includes("57014")
+        ? "Supabase sync timed out because the backup table needs cleanup. Run the updated Setup SQL in Admin Data Sync, then click Backup to Supabase once."
       : `Supabase sync check failed: ${error.message}`;
   } finally {
     cloudDataMonitorRunning = false;
@@ -710,14 +712,24 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
   const chunkSize = 50;
   for (let index = 0; index < rows.length; index += chunkSize) {
-    const response = await fetch(endpoint, {
+    let response = await fetch(`${endpoint}?on_conflict=backup_id,collection_name,record_id`, {
       method: "POST",
       headers: {
         ...supabaseHeaders(key),
-        Prefer: "return=minimal"
+        Prefer: "resolution=merge-duplicates,return=minimal"
       },
       body: JSON.stringify(rows.slice(index, index + chunkSize))
     });
+    if (!response.ok && /unique|constraint|on_conflict|schema cache/i.test(await response.clone().text())) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          ...supabaseHeaders(key),
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify(rows.slice(index, index + chunkSize))
+      });
+    }
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || `Supabase returned ${response.status}`);
@@ -735,8 +747,8 @@ async function checkSupabaseBackupStatus({ url, anonKey, table }) {
   const timeout = setTimeout(() => controller.abort(), 12000);
   let response;
   try {
-    response = await fetch(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?select=backup_id,collection_name,created_at&order=created_at.desc&limit=1`, {
-      headers: { ...supabaseHeaders(key), Prefer: "count=exact" },
+    response = await fetch(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=backup_id,collection_name,created_at,data&limit=1`, {
+      headers: supabaseHeaders(key),
       signal: controller.signal
     });
   } catch (error) {
@@ -747,9 +759,7 @@ async function checkSupabaseBackupStatus({ url, anonKey, table }) {
   }
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   const rows = await response.json();
-  const contentRange = response.headers.get("content-range") || "";
-  const rowCount = Number(contentRange.split("/")[1]) || 0;
-  return { rowCount, latest: rows[0] || null };
+  return { rowCount: rows.length ? 1 : 0, latest: rows[0] || null };
 }
 
 function supabaseHeaders(key) {
@@ -802,7 +812,7 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const latestResponse = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&order=created_at.desc&limit=1`, {
+  const latestResponse = await fetch(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
     headers: supabaseHeaders(key)
   });
   if (!latestResponse.ok) throw new Error(await latestResponse.text() || `Supabase returned ${latestResponse.status}`);
@@ -890,7 +900,9 @@ async function syncLatestCloudData(showStatus = true) {
   } catch (error) {
     state.cloudSyncAttempted = true;
     if (showStatus) {
-      state.syncStatus = `Could not load Supabase data: ${error.message}`;
+      state.syncStatus = String(error.message || "").includes("57014")
+        ? "Could not load Supabase data because the backup table timed out. Run the updated Setup SQL in Admin Data Sync, then click Backup to Supabase once."
+        : `Could not load Supabase data: ${error.message}`;
       render();
     }
     return false;
@@ -912,11 +924,26 @@ function supabaseSetupSql(tableName = "smart_coach_backups") {
 
 create index if not exists ${safeTable}_backup_id_idx on public.${safeTable} (backup_id);
 create index if not exists ${safeTable}_collection_idx on public.${safeTable} (collection_name);
+create index if not exists ${safeTable}_lookup_idx on public.${safeTable} (backup_id, collection_name, record_id);
+
+-- Remove duplicate "latest" pointers that can make sync checks time out.
+delete from public.${safeTable} a
+using public.${safeTable} b
+where a.backup_id = 'latest'
+  and a.collection_name = '_backup_metadata'
+  and a.record_id = 'latest'
+  and b.backup_id = 'latest'
+  and b.collection_name = '_backup_metadata'
+  and b.record_id = 'latest'
+  and a.id < b.id;
+
+create unique index if not exists ${safeTable}_record_unique_idx
+on public.${safeTable} (backup_id, collection_name, record_id);
 
 -- Setup mode only. Tighten this before using real client data.
 alter table public.${safeTable} disable row level security;
 
-grant select, insert on table public.${safeTable} to anon, authenticated;
+grant select, insert, update on table public.${safeTable} to anon, authenticated;
 grant usage, select on sequence public.${safeTable}_id_seq to anon, authenticated;`;
 }
 
