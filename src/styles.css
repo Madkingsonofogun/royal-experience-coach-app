@@ -987,6 +987,11 @@ dd {
   border-left: 5px solid var(--green);
 }
 
+.success-band {
+  border-left-color: var(--green);
+  background: rgba(74, 222, 128, 0.1);
+}
+
 .workout-items {
   display: grid;
   gap: 10px;

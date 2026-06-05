@@ -2143,9 +2143,9 @@ function adminView() {
       <article class="card admin-card ${adminPanelClass("dataSync")}" id="admin-data-sync">
         <div class="section-head compact-head">
           <div>
-            <p class="eyebrow">Data Sync</p>
-            <h3>Move new clients and coaches to another device</h3>
-            <p class="muted">This browser demo saves changes on the device you are using. To see newly-created clients, coaches, plans, chats, and check-ins on another device, export the app data here and import it on the other device.</p>
+            <p class="eyebrow">Cloud Data Sync</p>
+            <h3>Share clients, coaches, workouts, and chats across devices</h3>
+            <p class="muted">Supabase is the shared cloud backup for this app. When cloud saving is on, changes are saved on this device first, then sent to Supabase automatically so phones, computers, and the Vercel site can load the same approved accounts, clients, coaches, workouts, packages, plans, messages, and check-ins.</p>
           </div>
         </div>
         <div class="grid-3 stat-strip">
@@ -2153,13 +2153,17 @@ function adminView() {
           ${infoCard("Coaches saved here", store.coaches.filter((coach) => coach.role !== "Admin").length)}
           ${infoCard("Monthly plans saved here", store.monthlyPlans.length)}
         </div>
+        <div class="result-band success-band">
+          <strong>Shared cloud sync</strong>
+          <span>Use Supabase as the main way to keep devices matched. After saving on one device, the other device checks Supabase and can load the newest backup without using export/import.</span>
+        </div>
         <div class="actions">
           <button class="primary" id="exportAppData">Export App Data</button>
           <button class="success" id="importAppDataButton">Import App Data</button>
           <input class="visually-hidden" id="importAppDataInput" type="file" accept="application/json,.json" />
         </div>
         <h3>Supabase Backup</h3>
-        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves a workout, client, message, assessment, check-in, package, or other change, the app saves locally immediately and sends the updated app data to Supabase after 2.5 seconds.</p>
+        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves a workout, client, coach, message, assessment, check-in, package, plan offering, template, or other change, the app saves locally immediately and sends the updated app data to Supabase after 2.5 seconds. Logging out also runs a final Supabase backup.</p>
         <div class="form-grid">
           <label>Supabase project URL
             <input id="supabaseUrl" value="${escapeHtml(store.settings.supabaseUrl || "")}" placeholder="https://your-project.supabase.co" />
