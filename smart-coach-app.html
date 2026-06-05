@@ -97812,6 +97812,7 @@ function route() {
   if (state.view === "chat") return chatPage();
   if (state.view === "profile") return profilePage();
   if (state.view === "assessment") return assessmentPage();
+  if (state.view === "schedule") return schedulePage();
   if (state.view === "weekly") return weeklyPage();
   if (state.view === "plan") return monthlyPlanPage();
   if (state.view === "library") return exerciseLibraryPage();
@@ -97833,6 +97834,7 @@ function navTabs() {
     { id: "home", label: "Home" },
     { id: "profile", label: "Profile" },
     { id: "plan", label: "Monthly Plan" },
+    { id: "schedule", label: "Scheduling" },
     { id: "chat", label: "Chat" }
   ];
   if (state.currentUser.role === "Client") return [...shared, { id: "weekly", label: "Weekly Check-In" }, { id: "client", label: "Client View" }];
@@ -98205,6 +98207,44 @@ function assessmentPage() {
     <section class="workspace panel">
       ${assessmentTemplatePicker(client)}
       ${assessmentWizard(client)}
+    </section>
+  `;
+}
+
+function schedulePage() {
+  const client = selectedClient();
+  if (!client) {
+    return `
+      <section class="workspace">
+        <div class="empty">No client is available for scheduling yet.</div>
+      </section>
+    `;
+  }
+  return `
+    <section class="workspace">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Assessment Scheduling</p>
+          <h2>Initial assessment and reassessment appointments</h2>
+          <p class="muted">${state.currentUser.role === "Client"
+            ? "Approve your coach's suggested time or suggest a better one."
+            : "Send an assessment time to the selected client, review counters, or move the discussion into chat."}</p>
+        </div>
+        ${state.currentUser.role !== "Client" ? `<button class="primary" data-view="assessment">Open Assessment</button>` : ""}
+      </div>
+      ${assessmentSchedulePanel(client)}
+      ${state.currentUser.role === "Admin" ? `
+        <article class="card">
+          <div class="section-head compact-head">
+            <div>
+              <p class="eyebrow">Admin oversight</p>
+              <h3>All assessment schedule requests</h3>
+              <p class="muted">Admin can see every client/coach schedule request here and intervene when needed.</p>
+            </div>
+          </div>
+          ${adminAssessmentScheduleBoard()}
+        </article>
+      ` : ""}
     </section>
   `;
 }
@@ -101539,6 +101579,7 @@ function quickLinksPanel() {
   const actions = isClient
     ? [
         ["profile", "My Profile"],
+        ["schedule", "Scheduling"],
         ["weekly", "Weekly Check-In"],
         ["plan", "Monthly Plan"],
         ["client", "Today"],
@@ -101546,6 +101587,7 @@ function quickLinksPanel() {
       ]
     : [
         ["profile", "Profile"],
+        ["schedule", "Scheduling"],
         ["assessment", "Assessment"],
         ["plan", "Monthly Plan"],
         ["library", "Exercise Library"],
