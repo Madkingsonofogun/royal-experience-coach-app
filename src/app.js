@@ -503,29 +503,7 @@ function backupPayload() {
     clients: store.clients,
     coaches: store.coaches,
     settings: [{ id: "app_settings", ...backupSettings }],
-    adminPermissions: [{ id: "admin_permissions", ...(store.adminPermissions || {}) }],
-    exercises: store.exercises,
-    workoutTemplates: store.workoutTemplates,
-    workoutTemplateItems: store.workoutTemplateItems,
-    planOfferings: store.planOfferings,
-    packages: store.packages,
-    planTemplates: store.planTemplates,
-    assessmentTemplates: store.assessmentTemplates,
-    monthlyPlans: store.monthlyPlans,
-    monthlyPlanItems: store.monthlyPlanItems,
-    chatMessages: store.chatMessages || [],
-    assessments: store.assessments,
-    assessmentSchedules: store.assessmentSchedules || [],
-    dailyCheckIns: store.dailyCheckIns,
-    weeklyCheckIns: store.weeklyCheckIns,
-    painCheckIns: store.painCheckIns || [],
-    todayWorkoutAdjustments: store.todayWorkoutAdjustments || [],
-    workoutCompletions: store.workoutCompletions || [],
-    progressImages: store.progressImages || [],
-    notifications: store.notifications || [],
-    pinResetRequests: store.pinResetRequests || [],
-    coachAlerts: store.coachAlerts,
-    adminAuditLog: store.adminAuditLog || []
+    adminPermissions: [{ id: "admin_permissions", ...(store.adminPermissions || {}) }]
   };
   Object.keys(payload).forEach((key) => {
     if (Array.isArray(payload[key])) payload[key] = deduplicateRecords(payload[key]);
@@ -896,7 +874,7 @@ async function syncLatestCloudData(showStatus = true) {
     state.cloudSyncAttempted = true;
     if (showStatus) {
       state.syncStatus = result.restored
-        ? `Loaded latest Supabase backup ${result.backupId}.${result.duplicateRowsRemoved ? ` Removed ${result.duplicateRowsRemoved} duplicate cloud records and queued a clean backup.` : " New clients, coaches, workouts, and chats are now available on this device."}`
+        ? `Loaded latest Supabase profile backup ${result.backupId}.${result.duplicateRowsRemoved ? ` Removed ${result.duplicateRowsRemoved} duplicate cloud records and queued a clean backup.` : " Client, coach, admin, and login profiles are now available on this device."}`
         : result.reason;
       render();
     }
@@ -947,6 +925,13 @@ alter table public.${safeTable} disable row level security;
 
 grant select, insert, update on table public.${safeTable} to anon, authenticated;
 grant usage, select on sequence public.${safeTable}_id_seq to anon, authenticated;`;
+}
+
+function supabaseEraseSql(tableName = "smart_coach_backups") {
+  const safeTable = String(tableName || "smart_coach_backups").replace(/[^a-zA-Z0-9_]/g, "") || "smart_coach_backups";
+  return `-- This erases the old Supabase backup rows so you can start fresh.
+-- Run this once, then return to the app and click Backup to Supabase.
+truncate table public.${safeTable} restart identity;`;
 }
 
 async function copyTextToClipboard(text) {
@@ -2143,9 +2128,9 @@ function adminView() {
       <article class="card admin-card ${adminPanelClass("dataSync")}" id="admin-data-sync">
         <div class="section-head compact-head">
           <div>
-            <p class="eyebrow">Cloud Data Sync</p>
-            <h3>Share clients, coaches, workouts, and chats across devices</h3>
-            <p class="muted">Supabase is the shared cloud backup for this app. When cloud saving is on, changes are saved on this device first, then sent to Supabase automatically so phones, computers, and the Vercel site can load the same approved accounts, clients, coaches, workouts, packages, plans, messages, and check-ins.</p>
+            <p class="eyebrow">Cloud Profile Sync</p>
+            <h3>Share client, coach, admin, and login profiles across devices</h3>
+            <p class="muted">Supabase is now used only for account and profile backup. When cloud saving is on, user logins, PIN hashes, client profiles, coach profiles, admin profile data, and admin permissions are sent to Supabase so phones, computers, and the Vercel site can load the same approved people.</p>
           </div>
         </div>
         <div class="grid-3 stat-strip">
@@ -2154,8 +2139,8 @@ function adminView() {
           ${infoCard("Monthly plans saved here", store.monthlyPlans.length)}
         </div>
         <div class="result-band success-band">
-          <strong>Shared cloud sync</strong>
-          <span>Use Supabase as the main way to keep devices matched. After saving on one device, the other device checks Supabase and can load the newest backup without using export/import.</span>
+          <strong>Shared profile sync</strong>
+          <span>Use Supabase to keep people and logins matched across devices. Workouts, exercises, plan offerings, packages, templates, chats, and check-ins are not saved to Supabase in this profile-only mode.</span>
         </div>
         <div class="actions">
           <button class="primary" id="exportAppData">Export App Data</button>
@@ -2163,7 +2148,7 @@ function adminView() {
           <input class="visually-hidden" id="importAppDataInput" type="file" accept="application/json,.json" />
         </div>
         <h3>Supabase Backup</h3>
-        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves a workout, client, coach, message, assessment, check-in, package, plan offering, template, or other change, the app saves locally immediately and sends the updated app data to Supabase after 2.5 seconds. Logging out also runs a final Supabase backup.</p>
+        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves a client, coach, admin profile, login, PIN, account approval, or profile permission change, the app saves locally immediately and sends the updated profile data to Supabase after 2.5 seconds. Logging out also runs a final Supabase backup.</p>
         <div class="form-grid">
           <label>Supabase project URL
             <input id="supabaseUrl" value="${escapeHtml(store.settings.supabaseUrl || "")}" placeholder="https://your-project.supabase.co" />
@@ -2180,6 +2165,7 @@ function adminView() {
         </label>
         <div class="actions">
           <button type="button" id="copySupabaseSql">Copy Setup SQL</button>
+          <button type="button" class="danger" id="copySupabaseEraseSql">Copy Erase Supabase SQL</button>
           <button type="button" id="saveSupabaseConfig">Save Supabase Settings</button>
           <button type="button" id="testSupabaseConnection">Test Supabase Connection</button>
           <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
@@ -2188,15 +2174,14 @@ function adminView() {
         <h4>Information included in every Supabase backup</h4>
         <div class="chip-grid">
           ${[
-            "Users and PIN hashes", "Clients", "Coaches", "App settings", "Admin permissions",
-            "Exercises", "Workout templates and items", "Plan offerings", "Packages", "Plan templates",
-            "Assessment templates", "Monthly plans and items", "Assessments", "Daily check-ins",
-            "Weekly check-ins", "Pain check-ins", "Today workout adjustments", "Workout completions",
-            "Progress image records", "Chat messages", "Notifications", "PIN reset requests",
-            "Coach alerts", "Admin audit log"
+            "Users and PIN hashes", "Client profiles", "Coach profiles", "Admin profile", "App settings", "Admin permissions"
           ].map((label) => `<span class="chip">${label}</span>`).join("")}
         </div>
-        <p class="muted">Progress-image records include saved URLs and storage keys. The image files themselves require Supabase Storage, which is a separate next step.</p>
+        <p class="muted">Not included in Supabase profile-only mode: workouts, exercises, plan offerings, packages, templates, monthly plans, assessments, check-ins, chats, notifications, progress photos, and audit logs.</p>
+        <div class="result-band warning-band">
+          <strong>Git publishing note</strong>
+          <span>Admin-created workouts, exercises, packages, and plan offerings cannot be pushed to GitHub directly from this browser when Save is clicked. GitHub publishing needs a backend, GitHub Action, or manual developer push because the browser should not hold Git credentials.</span>
+        </div>
         ${state.syncStatus ? `<div class="result-band"><strong>Sync status</strong><span>${escapeHtml(state.syncStatus)}</span></div>` : ""}
         <div class="result-band warning-band">
           <strong>Automatic multi-device access</strong>
@@ -3817,6 +3802,11 @@ function bindGlobal() {
     state.syncStatus = "Supabase setup SQL copied. Paste it into Supabase SQL Editor and run it once.";
     render();
   });
+  document.querySelector("#copySupabaseEraseSql")?.addEventListener("click", async () => {
+    await copyTextToClipboard(supabaseEraseSql(document.querySelector("#supabaseBackupTable")?.value || store.settings.supabaseBackupTable));
+    state.syncStatus = "Erase Supabase SQL copied. Run it in Supabase SQL Editor only if you want to remove old cloud backups, then click Backup to Supabase to create a fresh profile-only backup.";
+    render();
+  });
   document.querySelector("#saveSupabaseConfig")?.addEventListener("click", () => {
     store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || "");
     store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || "";
@@ -3839,7 +3829,7 @@ function bindGlobal() {
         table: store.settings.supabaseBackupTable
       });
       state.syncStatus = result.rowCount
-        ? `Supabase connection works. The backup table currently contains ${result.rowCount} saved rows. Latest row: ${result.latest?.collection_name || "Unknown"} from ${result.latest?.created_at || "Unknown date"}.`
+        ? `Supabase connection works. The latest profile backup pointer is available from ${result.latest?.created_at || "Unknown date"}.`
         : "Supabase connection works, but the backup table has 0 rows. Click Backup to Supabase to create the first backup.";
     } catch (error) {
       state.syncStatus = `Supabase connection test failed: ${error.message}`;
@@ -3866,7 +3856,7 @@ function bindGlobal() {
       });
       lastCloudBackupFingerprint = cloudBackupFingerprint();
       lastCloudBackupId = result.backupId;
-      state.syncStatus = `Supabase backup complete: ${result.backupId}. Saved ${result.rowCount} rows, including ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coaches, ${result.summary.exercises || 0} exercises, ${result.summary.workoutTemplates || 0} workouts, ${result.summary.planOfferings || 0} plan offerings, ${result.summary.packages || 0} packages, ${result.summary.chatMessages || 0} chat messages, and all check-in/history records.`;
+      state.syncStatus = `Supabase profile backup complete: ${result.backupId}. Saved ${result.summary.users || 0} users, ${result.summary.clients || 0} client profiles, ${result.summary.coaches || 0} coach/admin profiles, app settings, and admin permissions. Workouts, exercises, packages, plan offerings, chats, and check-ins were not sent to Supabase.`;
     } catch (error) {
       state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
         ? "Supabase is connected, but Row Level Security is blocking backups. In Supabase, open SQL Editor and run the Setup SQL shown in this app's Data Sync section, then click Backup to Supabase again."
