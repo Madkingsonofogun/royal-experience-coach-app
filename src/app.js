@@ -112,6 +112,7 @@ const state = {
   signupSuccess: "",
   supabaseBackupBusy: false,
   supabaseRestoreBusy: false,
+  googleSheetsBusy: false,
   cloudSyncAttempted: false,
   signup: {
     firstName: "",
@@ -421,6 +422,8 @@ function mergeStore(defaultStore, savedStore) {
   merged.settings.supabaseUrl ||= defaultStore.settings.supabaseUrl;
   merged.settings.supabaseAnonKey ||= defaultStore.settings.supabaseAnonKey;
   merged.settings.supabaseBackupTable ||= defaultStore.settings.supabaseBackupTable;
+  merged.settings.googleSheetsWebAppUrl ||= defaultStore.settings.googleSheetsWebAppUrl;
+  if (merged.settings.automaticGoogleSheetsSync == null) merged.settings.automaticGoogleSheetsSync = defaultStore.settings.automaticGoogleSheetsSync;
   merged.adminPermissions = { ...(defaultStore.adminPermissions || {}), ...(savedStore.adminPermissions || {}) };
   Object.keys(merged).forEach((key) => {
     if (Array.isArray(merged[key])) merged[key] = deduplicateRecords(merged[key]);
@@ -489,6 +492,85 @@ function importAppDataFile(file) {
     }
   };
   reader.readAsText(file);
+}
+
+function googleSheetsWebAppUrl() {
+  return String(store.settings.googleSheetsWebAppUrl || "").trim();
+}
+
+function canUseGoogleSheetsSync() {
+  return store.settings.automaticGoogleSheetsSync !== false && Boolean(googleSheetsWebAppUrl());
+}
+
+function googleSheetRow(type, record) {
+  return {
+    type,
+    sheetName: {
+      assessment: "Assessments",
+      dailyCheckIn: "Daily Check Ins",
+      weeklyCheckIn: "Weekly Check Ins"
+    }[type] || "App Rows",
+    recordId: record.assessmentId || record.checkInId || record.id || `${type}_${Date.now()}`,
+    clientId: record.clientId || "",
+    createdAt: record.createdAt || record.assessmentDate || record.checkInDate || record.workoutDate || new Date().toISOString(),
+    data: cleanBackupValue(record)
+  };
+}
+
+async function sendRowsToGoogleSheets(rows, { waitForResponse = false } = {}) {
+  const url = googleSheetsWebAppUrl();
+  if (!url) throw new Error("Google Sheets Web App URL is required.");
+  const body = JSON.stringify({ action: "appendRows", rows });
+  if (waitForResponse) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body
+    });
+    if (!response.ok) throw new Error(await response.text() || `Google Sheets returned ${response.status}`);
+    return response.json().catch(() => ({ ok: true }));
+  }
+  await fetch(url, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body
+  });
+  return { ok: true };
+}
+
+function syncRecordToGoogleSheets(type, record) {
+  if (!canUseGoogleSheetsSync()) return;
+  sendRowsToGoogleSheets([googleSheetRow(type, record)]).catch((error) => {
+    console.warn("Could not send row to Google Sheets.", error);
+    state.syncStatus = `Google Sheets sync failed: ${error.message}`;
+  });
+}
+
+function mergeGoogleSheetRecords(payload) {
+  const assessments = payload.assessments || payload.Assessments || payload.sheets?.Assessments || [];
+  const dailyCheckIns = payload.dailyCheckIns || payload["Daily Check Ins"] || payload.sheets?.["Daily Check Ins"] || [];
+  const weeklyCheckIns = payload.weeklyCheckIns || payload["Weekly Check Ins"] || payload.sheets?.["Weekly Check Ins"] || [];
+  const unpack = (rows) => rows.map((row) => row.data || row).filter(Boolean);
+  store.assessments = deduplicateRecords([...store.assessments, ...unpack(assessments)]);
+  store.dailyCheckIns = deduplicateRecords([...store.dailyCheckIns, ...unpack(dailyCheckIns)]);
+  store.weeklyCheckIns = deduplicateRecords([...store.weeklyCheckIns, ...unpack(weeklyCheckIns)]);
+  saveStore();
+  return {
+    assessments: unpack(assessments).length,
+    dailyCheckIns: unpack(dailyCheckIns).length,
+    weeklyCheckIns: unpack(weeklyCheckIns).length
+  };
+}
+
+async function pullGoogleSheetsData() {
+  const url = googleSheetsWebAppUrl();
+  if (!url) throw new Error("Google Sheets Web App URL is required.");
+  const separator = url.includes("?") ? "&" : "?";
+  const response = await fetch(`${url}${separator}action=export`);
+  if (!response.ok) throw new Error(await response.text() || `Google Sheets returned ${response.status}`);
+  const payload = await response.json();
+  return mergeGoogleSheetRecords(payload);
 }
 
 function backupPayload() {
@@ -932,6 +1014,70 @@ function supabaseEraseSql(tableName = "smart_coach_backups") {
   return `-- This erases the old Supabase backup rows so you can start fresh.
 -- Run this once, then return to the app and click Backup to Supabase.
 truncate table public.${safeTable} restart identity;`;
+}
+
+function googleSheetsAppsScriptCode() {
+  return `const SHEET_NAMES = ["Assessments", "Daily Check Ins", "Weekly Check Ins"];
+
+function setupSheets_() {
+  const ss = SpreadsheetApp.getActive();
+  SHEET_NAMES.forEach((name) => {
+    const sheet = ss.getSheetByName(name) || ss.insertSheet(name);
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(["recordId", "clientId", "createdAt", "type", "json"]);
+    }
+  });
+}
+
+function doPost(e) {
+  setupSheets_();
+  const payload = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+  const rows = payload.rows || [];
+  const ss = SpreadsheetApp.getActive();
+  rows.forEach((row) => {
+    const sheetName = row.sheetName || "App Rows";
+    const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+    if (sheet.getLastRow() === 0) sheet.appendRow(["recordId", "clientId", "createdAt", "type", "json"]);
+    sheet.appendRow([
+      row.recordId || "",
+      row.clientId || "",
+      row.createdAt || new Date().toISOString(),
+      row.type || "",
+      JSON.stringify(row.data || {})
+    ]);
+  });
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, saved: rows.length }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function readSheet_(name) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(name);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const values = sheet.getDataRange().getValues();
+  const headers = values.shift();
+  const jsonIndex = headers.indexOf("json");
+  return values.map((row) => {
+    try {
+      return JSON.parse(row[jsonIndex] || "{}");
+    } catch (error) {
+      return {};
+    }
+  }).filter((row) => Object.keys(row).length);
+}
+
+function doGet(e) {
+  setupSheets_();
+  const action = e && e.parameter && e.parameter.action;
+  const payload = action === "export"
+    ? {
+        assessments: readSheet_("Assessments"),
+        dailyCheckIns: readSheet_("Daily Check Ins"),
+        weeklyCheckIns: readSheet_("Weekly Check Ins")
+      }
+    : { ok: true, message: "Mad King Conditioning Google Sheets sync is ready." };
+  return ContentService.createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
 }
 
 async function copyTextToClipboard(text) {
@@ -2186,6 +2332,29 @@ function adminView() {
         <div class="result-band warning-band">
           <strong>Automatic multi-device access</strong>
           <span>The Supabase connection is embedded and login now loads the newest backup before checking the PIN. For production use with real client health data, Supabase Auth and Row Level Security still need to be added.</span>
+        </div>
+        <h3>Google Sheets Check-In and Assessment Sync</h3>
+        <p class="muted">Use Google Sheets for check-ins, assessments, and reassessments. Upload an Excel workbook to Google Drive, open it as a Google Sheet, add the Apps Script below, deploy it as a Web App, then paste the Web App URL here.</p>
+        <div class="form-grid">
+          <label>Google Apps Script Web App URL
+            <input id="googleSheetsWebAppUrl" value="${escapeHtml(store.settings.googleSheetsWebAppUrl || "")}" placeholder="https://script.google.com/macros/s/..." />
+          </label>
+          <label>Automatic Google Sheets sync
+            <select id="automaticGoogleSheetsSync">
+              <option value="true" ${store.settings.automaticGoogleSheetsSync === false ? "" : "selected"}>On</option>
+              <option value="false" ${store.settings.automaticGoogleSheetsSync === false ? "selected" : ""}>Off</option>
+            </select>
+          </label>
+        </div>
+        <label>Google Apps Script code
+          <textarea id="googleSheetsScriptCode" class="code-textarea" readonly>${escapeHtml(googleSheetsAppsScriptCode())}</textarea>
+        </label>
+        <div class="actions">
+          <button type="button" id="copyGoogleSheetsScript">Copy Google Script</button>
+          <button type="button" id="saveGoogleSheetsConfig">Save Google Sheets Settings</button>
+          <button type="button" id="testGoogleSheetsConnection">Test Google Sheets</button>
+          <button type="button" class="primary" id="pushGoogleSheetsData" ${state.googleSheetsBusy ? "disabled" : ""}>${state.googleSheetsBusy ? "Sending..." : "Send Existing Check-Ins / Assessments"}</button>
+          <button type="button" class="success" id="pullGoogleSheetsData" ${state.googleSheetsBusy ? "disabled" : ""}>${state.googleSheetsBusy ? "Loading..." : "Pull From Google Sheets"}</button>
         </div>
       </article>
       <div class="split">
@@ -3501,6 +3670,7 @@ function bindGlobal() {
   }));
   document.querySelector("#saveAssessment")?.addEventListener("click", () => {
     const saved = saveAssessment(store, state.assessment);
+    syncRecordToGoogleSheets("assessment", saved);
     state.planDraftNotice = `Assessment saved for ${selectedClient().name}. Coach can generate a draft monthly plan from the summary suggestion.`;
     state.assessmentStep = 5;
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
@@ -3508,6 +3678,7 @@ function bindGlobal() {
   });
   document.querySelector("#generateAssessmentPlan")?.addEventListener("click", () => {
     const saved = saveAssessment(store, state.assessment);
+    syncRecordToGoogleSheets("assessment", saved);
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
     const currentPlan = getClientVisiblePlan(store, saved.clientId);
     const result = createReassessmentDraftIfNeeded(store, saved, currentPlan, true);
@@ -3520,7 +3691,8 @@ function bindGlobal() {
   document.querySelector("#saveWeekly")?.addEventListener("click", () => {
     state.weekly.workoutCompletionPercent = Number(document.querySelector("#weeklyCompletion").value);
     state.weekly.workoutDifficulty = document.querySelector("#weeklyDifficulty").value;
-    saveWeeklyCheckIn(store, { ...state.weekly, clientId: state.clientId, checkInDate: today });
+    const saved = saveWeeklyCheckIn(store, { ...state.weekly, clientId: state.clientId, checkInDate: today });
+    syncRecordToGoogleSheets("weeklyCheckIn", saved);
     render();
   });
   document.querySelectorAll("[data-weekly-score]").forEach((button) => button.addEventListener("click", () => {
@@ -3554,7 +3726,8 @@ function bindGlobal() {
     state.daily.painCheckIn.feelsSafeToTrain = document.querySelector("#safeTrain")?.checked ?? true;
     state.daily.painCheckIn.painNotes = document.querySelector("#dailyPainNotes")?.value || "";
     try {
-      saveDailyCheckIn(store, { ...state.daily, clientId: state.clientId });
+      const saved = saveDailyCheckIn(store, { ...state.daily, clientId: state.clientId });
+      syncRecordToGoogleSheets("dailyCheckIn", saved.dailyCheckIn);
       state.view = "client";
       render();
     } catch (error) {
@@ -3863,6 +4036,79 @@ function bindGlobal() {
         : `Supabase backup failed: ${error.message}. Check the URL, publishable key, table exists, and setup SQL has been run.`;
     } finally {
       state.supabaseBackupBusy = false;
+      window.alert(state.syncStatus);
+      render();
+    }
+  });
+  document.querySelector("#copyGoogleSheetsScript")?.addEventListener("click", async () => {
+    await copyTextToClipboard(googleSheetsAppsScriptCode());
+    state.syncStatus = "Google Apps Script copied. Paste it into Extensions > Apps Script in your Google Sheet, deploy as Web App, then paste the Web App URL here.";
+    render();
+  });
+  document.querySelector("#saveGoogleSheetsConfig")?.addEventListener("click", () => {
+    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || "";
+    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
+    saveStore();
+    state.syncStatus = "Google Sheets settings saved on this device.";
+    render();
+  });
+  document.querySelector("#testGoogleSheetsConnection")?.addEventListener("click", async () => {
+    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || store.settings.googleSheetsWebAppUrl || "";
+    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
+    saveStore();
+    state.googleSheetsBusy = true;
+    state.syncStatus = "Testing Google Sheets connection...";
+    render();
+    try {
+      const separator = googleSheetsWebAppUrl().includes("?") ? "&" : "?";
+      const response = await fetch(`${googleSheetsWebAppUrl()}${separator}action=status`);
+      if (!response.ok) throw new Error(await response.text() || `Google Sheets returned ${response.status}`);
+      state.syncStatus = "Google Sheets connection works.";
+    } catch (error) {
+      state.syncStatus = `Google Sheets connection failed: ${error.message}`;
+    } finally {
+      state.googleSheetsBusy = false;
+      window.alert(state.syncStatus);
+      render();
+    }
+  });
+  document.querySelector("#pushGoogleSheetsData")?.addEventListener("click", async () => {
+    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || store.settings.googleSheetsWebAppUrl || "";
+    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
+    saveStore();
+    const rows = [
+      ...store.assessments.map((record) => googleSheetRow("assessment", record)),
+      ...store.dailyCheckIns.map((record) => googleSheetRow("dailyCheckIn", record)),
+      ...store.weeklyCheckIns.map((record) => googleSheetRow("weeklyCheckIn", record))
+    ];
+    state.googleSheetsBusy = true;
+    state.syncStatus = `Sending ${rows.length} existing assessment/check-in rows to Google Sheets...`;
+    render();
+    try {
+      await sendRowsToGoogleSheets(rows, { waitForResponse: true });
+      state.syncStatus = `Sent ${rows.length} existing assessment/check-in rows to Google Sheets.`;
+    } catch (error) {
+      state.syncStatus = `Google Sheets send failed: ${error.message}`;
+    } finally {
+      state.googleSheetsBusy = false;
+      window.alert(state.syncStatus);
+      render();
+    }
+  });
+  document.querySelector("#pullGoogleSheetsData")?.addEventListener("click", async () => {
+    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || store.settings.googleSheetsWebAppUrl || "";
+    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
+    saveStore();
+    state.googleSheetsBusy = true;
+    state.syncStatus = "Pulling assessments and check-ins from Google Sheets...";
+    render();
+    try {
+      const counts = await pullGoogleSheetsData();
+      state.syncStatus = `Pulled Google Sheets rows: ${counts.assessments} assessments, ${counts.dailyCheckIns} daily check-ins, ${counts.weeklyCheckIns} weekly check-ins.`;
+    } catch (error) {
+      state.syncStatus = `Google Sheets pull failed: ${error.message}`;
+    } finally {
+      state.googleSheetsBusy = false;
       window.alert(state.syncStatus);
       render();
     }
