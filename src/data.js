@@ -16,9 +16,7 @@ export function createStore() {
       supabaseUrl: "https://jeqjhugwogtxcxnrucza.supabase.co",
       supabaseAnonKey: "sb_publishable_D73_Iiuma2215kdC7gSFxw_aR-aGcUS",
       supabaseBackupTable: "smart_coach_backups",
-      automaticSupabaseBackup: true,
-      googleSheetsWebAppUrl: "",
-      automaticGoogleSheetsSync: true
+      automaticSupabaseBackup: true
     },
     users: [
       user("admin_1", "Admin", "Admin", "admin@madking.test", "5550000000", "9999", "admin_1"),

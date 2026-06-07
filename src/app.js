@@ -112,7 +112,7 @@ const state = {
   signupSuccess: "",
   supabaseBackupBusy: false,
   supabaseRestoreBusy: false,
-  googleSheetsBusy: false,
+  supabaseResetBusy: false,
   cloudSyncAttempted: false,
   signup: {
     firstName: "",
@@ -422,8 +422,6 @@ function mergeStore(defaultStore, savedStore) {
   merged.settings.supabaseUrl ||= defaultStore.settings.supabaseUrl;
   merged.settings.supabaseAnonKey ||= defaultStore.settings.supabaseAnonKey;
   merged.settings.supabaseBackupTable ||= defaultStore.settings.supabaseBackupTable;
-  merged.settings.googleSheetsWebAppUrl ||= defaultStore.settings.googleSheetsWebAppUrl;
-  if (merged.settings.automaticGoogleSheetsSync == null) merged.settings.automaticGoogleSheetsSync = defaultStore.settings.automaticGoogleSheetsSync;
   merged.adminPermissions = { ...(defaultStore.adminPermissions || {}), ...(savedStore.adminPermissions || {}) };
   Object.keys(merged).forEach((key) => {
     if (Array.isArray(merged[key])) merged[key] = deduplicateRecords(merged[key]);
@@ -494,85 +492,6 @@ function importAppDataFile(file) {
   reader.readAsText(file);
 }
 
-function googleSheetsWebAppUrl() {
-  return String(store.settings.googleSheetsWebAppUrl || "").trim();
-}
-
-function canUseGoogleSheetsSync() {
-  return store.settings.automaticGoogleSheetsSync !== false && Boolean(googleSheetsWebAppUrl());
-}
-
-function googleSheetRow(type, record) {
-  return {
-    type,
-    sheetName: {
-      assessment: "Assessments",
-      dailyCheckIn: "Daily Check Ins",
-      weeklyCheckIn: "Weekly Check Ins"
-    }[type] || "App Rows",
-    recordId: record.assessmentId || record.checkInId || record.id || `${type}_${Date.now()}`,
-    clientId: record.clientId || "",
-    createdAt: record.createdAt || record.assessmentDate || record.checkInDate || record.workoutDate || new Date().toISOString(),
-    data: cleanBackupValue(record)
-  };
-}
-
-async function sendRowsToGoogleSheets(rows, { waitForResponse = false } = {}) {
-  const url = googleSheetsWebAppUrl();
-  if (!url) throw new Error("Google Sheets Web App URL is required.");
-  const body = JSON.stringify({ action: "appendRows", rows });
-  if (waitForResponse) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body
-    });
-    if (!response.ok) throw new Error(await response.text() || `Google Sheets returned ${response.status}`);
-    return response.json().catch(() => ({ ok: true }));
-  }
-  await fetch(url, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body
-  });
-  return { ok: true };
-}
-
-function syncRecordToGoogleSheets(type, record) {
-  if (!canUseGoogleSheetsSync()) return;
-  sendRowsToGoogleSheets([googleSheetRow(type, record)]).catch((error) => {
-    console.warn("Could not send row to Google Sheets.", error);
-    state.syncStatus = `Google Sheets sync failed: ${error.message}`;
-  });
-}
-
-function mergeGoogleSheetRecords(payload) {
-  const assessments = payload.assessments || payload.Assessments || payload.sheets?.Assessments || [];
-  const dailyCheckIns = payload.dailyCheckIns || payload["Daily Check Ins"] || payload.sheets?.["Daily Check Ins"] || [];
-  const weeklyCheckIns = payload.weeklyCheckIns || payload["Weekly Check Ins"] || payload.sheets?.["Weekly Check Ins"] || [];
-  const unpack = (rows) => rows.map((row) => row.data || row).filter(Boolean);
-  store.assessments = deduplicateRecords([...store.assessments, ...unpack(assessments)]);
-  store.dailyCheckIns = deduplicateRecords([...store.dailyCheckIns, ...unpack(dailyCheckIns)]);
-  store.weeklyCheckIns = deduplicateRecords([...store.weeklyCheckIns, ...unpack(weeklyCheckIns)]);
-  saveStore();
-  return {
-    assessments: unpack(assessments).length,
-    dailyCheckIns: unpack(dailyCheckIns).length,
-    weeklyCheckIns: unpack(weeklyCheckIns).length
-  };
-}
-
-async function pullGoogleSheetsData() {
-  const url = googleSheetsWebAppUrl();
-  if (!url) throw new Error("Google Sheets Web App URL is required.");
-  const separator = url.includes("?") ? "&" : "?";
-  const response = await fetch(`${url}${separator}action=export`);
-  if (!response.ok) throw new Error(await response.text() || `Google Sheets returned ${response.status}`);
-  const payload = await response.json();
-  return mergeGoogleSheetRecords(payload);
-}
-
 function backupPayload() {
   const backupSettings = {
     ...store.settings,
@@ -585,7 +504,22 @@ function backupPayload() {
     clients: store.clients,
     coaches: store.coaches,
     settings: [{ id: "app_settings", ...backupSettings }],
-    adminPermissions: [{ id: "admin_permissions", ...(store.adminPermissions || {}) }]
+    adminPermissions: [{ id: "admin_permissions", ...(store.adminPermissions || {}) }],
+    monthlyPlans: store.monthlyPlans || [],
+    monthlyPlanItems: store.monthlyPlanItems || [],
+    chatMessages: store.chatMessages || [],
+    assessments: store.assessments || [],
+    assessmentSchedules: store.assessmentSchedules || [],
+    dailyCheckIns: store.dailyCheckIns || [],
+    weeklyCheckIns: store.weeklyCheckIns || [],
+    painCheckIns: store.painCheckIns || [],
+    todayWorkoutAdjustments: store.todayWorkoutAdjustments || [],
+    workoutCompletions: store.workoutCompletions || [],
+    progressImages: store.progressImages || [],
+    notifications: store.notifications || [],
+    pinResetRequests: store.pinResetRequests || [],
+    coachAlerts: store.coachAlerts || [],
+    adminAuditLog: store.adminAuditLog || []
   };
   Object.keys(payload).forEach((key) => {
     if (Array.isArray(payload[key])) payload[key] = deduplicateRecords(payload[key]);
@@ -798,6 +732,26 @@ async function backupStoreToSupabase({ url, anonKey, table }) {
   return { backupId, summary, rowCount: rows.length };
 }
 
+async function resetSupabaseBackupTable({ url, anonKey, table }) {
+  const projectUrl = normalizeSupabaseUrl(url);
+  const key = (anonKey || "").trim();
+  const tableName = (table || "smart_coach_backups").trim();
+  if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
+  if (!/^https:\/\/.+\.supabase\.co$/i.test(projectUrl)) throw new Error("Supabase URL should look like https://your-project.supabase.co.");
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?id=gte.0`;
+  const response = await supabaseFetchWithTimeout(endpoint, {
+    method: "DELETE",
+    headers: {
+      ...supabaseHeaders(key),
+      Prefer: "return=minimal"
+    }
+  }, 12000);
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  lastCloudBackupFingerprint = "";
+  lastCloudBackupId = "";
+  return true;
+}
+
 async function checkSupabaseBackupStatus({ url, anonKey, table }) {
   const projectUrl = normalizeSupabaseUrl(url);
   const key = (anonKey || "").trim();
@@ -956,7 +910,7 @@ async function syncLatestCloudData(showStatus = true) {
     state.cloudSyncAttempted = true;
     if (showStatus) {
       state.syncStatus = result.restored
-        ? `Loaded latest Supabase profile backup ${result.backupId}.${result.duplicateRowsRemoved ? ` Removed ${result.duplicateRowsRemoved} duplicate cloud records and queued a clean backup.` : " Client, coach, admin, and login profiles are now available on this device."}`
+        ? `Loaded latest Supabase coaching backup ${result.backupId}.${result.duplicateRowsRemoved ? ` Removed ${result.duplicateRowsRemoved} duplicate cloud records and queued a clean backup.` : " Profiles, chats, assessments, check-ins, and client plan records are now available on this device."}`
         : result.reason;
       render();
     }
@@ -1005,7 +959,7 @@ on public.${safeTable} (backup_id, collection_name, record_id);
 -- Setup mode only. Tighten this before using real client data.
 alter table public.${safeTable} disable row level security;
 
-grant select, insert, update on table public.${safeTable} to anon, authenticated;
+grant select, insert, update, delete on table public.${safeTable} to anon, authenticated;
 grant usage, select on sequence public.${safeTable}_id_seq to anon, authenticated;`;
 }
 
@@ -1014,70 +968,6 @@ function supabaseEraseSql(tableName = "smart_coach_backups") {
   return `-- This erases the old Supabase backup rows so you can start fresh.
 -- Run this once, then return to the app and click Backup to Supabase.
 truncate table public.${safeTable} restart identity;`;
-}
-
-function googleSheetsAppsScriptCode() {
-  return `const SHEET_NAMES = ["Assessments", "Daily Check Ins", "Weekly Check Ins"];
-
-function setupSheets_() {
-  const ss = SpreadsheetApp.getActive();
-  SHEET_NAMES.forEach((name) => {
-    const sheet = ss.getSheetByName(name) || ss.insertSheet(name);
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["recordId", "clientId", "createdAt", "type", "json"]);
-    }
-  });
-}
-
-function doPost(e) {
-  setupSheets_();
-  const payload = JSON.parse((e && e.postData && e.postData.contents) || "{}");
-  const rows = payload.rows || [];
-  const ss = SpreadsheetApp.getActive();
-  rows.forEach((row) => {
-    const sheetName = row.sheetName || "App Rows";
-    const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-    if (sheet.getLastRow() === 0) sheet.appendRow(["recordId", "clientId", "createdAt", "type", "json"]);
-    sheet.appendRow([
-      row.recordId || "",
-      row.clientId || "",
-      row.createdAt || new Date().toISOString(),
-      row.type || "",
-      JSON.stringify(row.data || {})
-    ]);
-  });
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, saved: rows.length }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function readSheet_(name) {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(name);
-  if (!sheet || sheet.getLastRow() < 2) return [];
-  const values = sheet.getDataRange().getValues();
-  const headers = values.shift();
-  const jsonIndex = headers.indexOf("json");
-  return values.map((row) => {
-    try {
-      return JSON.parse(row[jsonIndex] || "{}");
-    } catch (error) {
-      return {};
-    }
-  }).filter((row) => Object.keys(row).length);
-}
-
-function doGet(e) {
-  setupSheets_();
-  const action = e && e.parameter && e.parameter.action;
-  const payload = action === "export"
-    ? {
-        assessments: readSheet_("Assessments"),
-        dailyCheckIns: readSheet_("Daily Check Ins"),
-        weeklyCheckIns: readSheet_("Weekly Check Ins")
-      }
-    : { ok: true, message: "Mad King Conditioning Google Sheets sync is ready." };
-  return ContentService.createTextOutput(JSON.stringify(payload))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;
 }
 
 async function copyTextToClipboard(text) {
@@ -1572,7 +1462,12 @@ function monthlyPlanPage() {
   const client = selectedClient();
   const plan = getClientVisiblePlan(store, client.id);
   const latestAssessment = latestClientAssessment(client.id) || summarizeAssessment({ ...state.assessment, clientId: client.id });
-  if (plan) ensureMonthlyPlanHasWorkouts(store, plan.id, latestAssessment);
+  if (plan) {
+    const beforeCount = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id).length;
+    ensureMonthlyPlanHasWorkouts(store, plan.id, latestAssessment);
+    const afterCount = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id).length;
+    if (afterCount > beforeCount) saveStore();
+  }
   const items = store.monthlyPlanItems.filter((item) => item.clientId === client.id && item.monthlyPlanId === plan?.id);
   const canManagePlans = state.currentUser.role !== "Client";
   const draftPlans = canManagePlans ? store.monthlyPlans.filter((item) => item.clientId === client.id && item.status === "Draft") : [];
@@ -2274,9 +2169,9 @@ function adminView() {
       <article class="card admin-card ${adminPanelClass("dataSync")}" id="admin-data-sync">
         <div class="section-head compact-head">
           <div>
-            <p class="eyebrow">Cloud Profile Sync</p>
-            <h3>Share client, coach, admin, and login profiles across devices</h3>
-            <p class="muted">Supabase is now used only for account and profile backup. When cloud saving is on, user logins, PIN hashes, client profiles, coach profiles, admin profile data, and admin permissions are sent to Supabase so phones, computers, and the Vercel site can load the same approved people.</p>
+            <p class="eyebrow">Cloud Coaching Sync</p>
+            <h3>Share profiles, chats, assessments, and client progress across devices</h3>
+            <p class="muted">Supabase saves the live coaching records that clients, coaches, and Admin need to share. The exercise library, workout templates, plan offerings, packages, plan templates, and assessment templates stay built into the app for now.</p>
           </div>
         </div>
         <div class="grid-3 stat-strip">
@@ -2285,8 +2180,8 @@ function adminView() {
           ${infoCard("Monthly plans saved here", store.monthlyPlans.length)}
         </div>
         <div class="result-band success-band">
-          <strong>Shared profile sync</strong>
-          <span>Use Supabase to keep people and logins matched across devices. Workouts, exercises, plan offerings, packages, templates, chats, and check-ins are not saved to Supabase in this profile-only mode.</span>
+          <strong>Shared coaching sync</strong>
+          <span>Use Supabase to keep approved accounts, client and coach profiles, chats, assessments, check-ins, alerts, and assigned client plans matched across devices.</span>
         </div>
         <div class="actions">
           <button class="primary" id="exportAppData">Export App Data</button>
@@ -2294,7 +2189,7 @@ function adminView() {
           <input class="visually-hidden" id="importAppDataInput" type="file" accept="application/json,.json" />
         </div>
         <h3>Supabase Backup</h3>
-        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves a client, coach, admin profile, login, PIN, account approval, or profile permission change, the app saves locally immediately and sends the updated profile data to Supabase after 2.5 seconds. Logging out also runs a final Supabase backup.</p>
+        <p class="muted">Automatic cloud saving is <strong>${store.settings.automaticSupabaseBackup === false ? "Off" : "On"}</strong>. After a logged-in user saves shared coaching data, the app saves locally immediately and sends the updated records to Supabase after 2.5 seconds. Logging out also runs a final Supabase backup.</p>
         <div class="form-grid">
           <label>Supabase project URL
             <input id="supabaseUrl" value="${escapeHtml(store.settings.supabaseUrl || "")}" placeholder="https://your-project.supabase.co" />
@@ -2316,45 +2211,27 @@ function adminView() {
           <button type="button" id="testSupabaseConnection">Test Supabase Connection</button>
           <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
           <button type="button" class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
+          <button type="button" class="danger" id="resetSupabaseTable" ${state.supabaseResetBusy ? "disabled" : ""}>${state.supabaseResetBusy ? "Resetting..." : "Reset Supabase Table"}</button>
         </div>
         <h4>Information included in every Supabase backup</h4>
         <div class="chip-grid">
           ${[
-            "Users and PIN hashes", "Client profiles", "Coach profiles", "Admin profile", "App settings", "Admin permissions"
+            "Users and PIN hashes", "Client profiles", "Coach/Admin profiles", "App settings", "Admin permissions",
+            "Chats", "Notifications", "Assessments and reassessments", "Assessment schedules",
+            "Daily check-ins", "Weekly check-ins", "Pain check-ins", "Coach alerts",
+            "Today workout adjustments", "Workout completions", "Client monthly plans", "Progress image records",
+            "PIN reset requests", "Admin audit log"
           ].map((label) => `<span class="chip">${label}</span>`).join("")}
         </div>
-        <p class="muted">Not included in Supabase profile-only mode: workouts, exercises, plan offerings, packages, templates, monthly plans, assessments, check-ins, chats, notifications, progress photos, and audit logs.</p>
+        <p class="muted">Not included in Supabase: exercise library, workout templates and items, plan offerings, packages, plan templates, and assessment templates. Those stay built into the app and can be changed here in the app files when needed.</p>
         <div class="result-band warning-band">
-          <strong>Git publishing note</strong>
-          <span>Admin-created workouts, exercises, packages, and plan offerings cannot be pushed to GitHub directly from this browser when Save is clicked. GitHub publishing needs a backend, GitHub Action, or manual developer push because the browser should not hold Git credentials.</span>
+          <strong>Built-in workout content</strong>
+          <span>Workouts, exercises, packages, and plan offerings are fixed app content for now. They will load the same on every device from the app files, while client-specific coaching records come from Supabase.</span>
         </div>
         ${state.syncStatus ? `<div class="result-band"><strong>Sync status</strong><span>${escapeHtml(state.syncStatus)}</span></div>` : ""}
         <div class="result-band warning-band">
           <strong>Automatic multi-device access</strong>
           <span>The Supabase connection is embedded and login now loads the newest backup before checking the PIN. For production use with real client health data, Supabase Auth and Row Level Security still need to be added.</span>
-        </div>
-        <h3>Google Sheets Check-In and Assessment Sync</h3>
-        <p class="muted">Use Google Sheets for check-ins, assessments, and reassessments. Upload an Excel workbook to Google Drive, open it as a Google Sheet, add the Apps Script below, deploy it as a Web App, then paste the Web App URL here.</p>
-        <div class="form-grid">
-          <label>Google Apps Script Web App URL
-            <input id="googleSheetsWebAppUrl" value="${escapeHtml(store.settings.googleSheetsWebAppUrl || "")}" placeholder="https://script.google.com/macros/s/..." />
-          </label>
-          <label>Automatic Google Sheets sync
-            <select id="automaticGoogleSheetsSync">
-              <option value="true" ${store.settings.automaticGoogleSheetsSync === false ? "" : "selected"}>On</option>
-              <option value="false" ${store.settings.automaticGoogleSheetsSync === false ? "selected" : ""}>Off</option>
-            </select>
-          </label>
-        </div>
-        <label>Google Apps Script code
-          <textarea id="googleSheetsScriptCode" class="code-textarea" readonly>${escapeHtml(googleSheetsAppsScriptCode())}</textarea>
-        </label>
-        <div class="actions">
-          <button type="button" id="copyGoogleSheetsScript">Copy Google Script</button>
-          <button type="button" id="saveGoogleSheetsConfig">Save Google Sheets Settings</button>
-          <button type="button" id="testGoogleSheetsConnection">Test Google Sheets</button>
-          <button type="button" class="primary" id="pushGoogleSheetsData" ${state.googleSheetsBusy ? "disabled" : ""}>${state.googleSheetsBusy ? "Sending..." : "Send Existing Check-Ins / Assessments"}</button>
-          <button type="button" class="success" id="pullGoogleSheetsData" ${state.googleSheetsBusy ? "disabled" : ""}>${state.googleSheetsBusy ? "Loading..." : "Pull From Google Sheets"}</button>
         </div>
       </article>
       <div class="split">
@@ -3521,16 +3398,19 @@ function bindGlobal() {
   document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", () => {
     ensureMonthlyPlanHasWorkouts(store, button.dataset.approvePlan, latestClientAssessment(state.clientId));
     const plan = approveMonthlyPlan(store, button.dataset.approvePlan);
+    saveStore();
     state.planDraftNotice = `${plan.month} ${plan.trainingLevel} plan approved. The client can now open Monthly Plan and see the full month of workouts.`;
     render();
   }));
   document.querySelectorAll("[data-add-suggested-exercise]").forEach((button) => button.addEventListener("click", () => {
     addSuggestedExerciseToWorkout(button.dataset.addSuggestedExercise);
+    saveStore();
     state.planDraftNotice = "Suggested exercise added. Coach can keep editing before approval.";
     render();
   }));
   document.querySelectorAll("[data-replace-suggested-workout]").forEach((button) => button.addEventListener("click", () => {
     replaceSuggestedWorkout(button.dataset.replaceSuggestedWorkout);
+    saveStore();
     state.planDraftNotice = "Workout replaced with a fresh suggestion from the exercise library.";
     render();
   }));
@@ -3670,7 +3550,6 @@ function bindGlobal() {
   }));
   document.querySelector("#saveAssessment")?.addEventListener("click", () => {
     const saved = saveAssessment(store, state.assessment);
-    syncRecordToGoogleSheets("assessment", saved);
     state.planDraftNotice = `Assessment saved for ${selectedClient().name}. Coach can generate a draft monthly plan from the summary suggestion.`;
     state.assessmentStep = 5;
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
@@ -3678,7 +3557,6 @@ function bindGlobal() {
   });
   document.querySelector("#generateAssessmentPlan")?.addEventListener("click", () => {
     const saved = saveAssessment(store, state.assessment);
-    syncRecordToGoogleSheets("assessment", saved);
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
     const currentPlan = getClientVisiblePlan(store, saved.clientId);
     const result = createReassessmentDraftIfNeeded(store, saved, currentPlan, true);
@@ -3691,8 +3569,7 @@ function bindGlobal() {
   document.querySelector("#saveWeekly")?.addEventListener("click", () => {
     state.weekly.workoutCompletionPercent = Number(document.querySelector("#weeklyCompletion").value);
     state.weekly.workoutDifficulty = document.querySelector("#weeklyDifficulty").value;
-    const saved = saveWeeklyCheckIn(store, { ...state.weekly, clientId: state.clientId, checkInDate: today });
-    syncRecordToGoogleSheets("weeklyCheckIn", saved);
+    saveWeeklyCheckIn(store, { ...state.weekly, clientId: state.clientId, checkInDate: today });
     render();
   });
   document.querySelectorAll("[data-weekly-score]").forEach((button) => button.addEventListener("click", () => {
@@ -3726,8 +3603,7 @@ function bindGlobal() {
     state.daily.painCheckIn.feelsSafeToTrain = document.querySelector("#safeTrain")?.checked ?? true;
     state.daily.painCheckIn.painNotes = document.querySelector("#dailyPainNotes")?.value || "";
     try {
-      const saved = saveDailyCheckIn(store, { ...state.daily, clientId: state.clientId });
-      syncRecordToGoogleSheets("dailyCheckIn", saved.dailyCheckIn);
+      saveDailyCheckIn(store, { ...state.daily, clientId: state.clientId });
       state.view = "client";
       render();
     } catch (error) {
@@ -3977,7 +3853,7 @@ function bindGlobal() {
   });
   document.querySelector("#copySupabaseEraseSql")?.addEventListener("click", async () => {
     await copyTextToClipboard(supabaseEraseSql(document.querySelector("#supabaseBackupTable")?.value || store.settings.supabaseBackupTable));
-    state.syncStatus = "Erase Supabase SQL copied. Run it in Supabase SQL Editor only if you want to remove old cloud backups, then click Backup to Supabase to create a fresh profile-only backup.";
+    state.syncStatus = "Erase Supabase SQL copied. Run it in Supabase SQL Editor only if you want to remove old cloud backups, then click Backup to Supabase to create a fresh coaching-data backup.";
     render();
   });
   document.querySelector("#saveSupabaseConfig")?.addEventListener("click", () => {
@@ -4002,7 +3878,7 @@ function bindGlobal() {
         table: store.settings.supabaseBackupTable
       });
       state.syncStatus = result.rowCount
-        ? `Supabase connection works. The latest profile backup pointer is available from ${result.latest?.created_at || "Unknown date"}.`
+        ? `Supabase connection works. The latest coaching-data backup pointer is available from ${result.latest?.created_at || "Unknown date"}.`
         : "Supabase connection works, but the backup table has 0 rows. Click Backup to Supabase to create the first backup.";
     } catch (error) {
       state.syncStatus = `Supabase connection test failed: ${error.message}`;
@@ -4029,7 +3905,7 @@ function bindGlobal() {
       });
       lastCloudBackupFingerprint = cloudBackupFingerprint();
       lastCloudBackupId = result.backupId;
-      state.syncStatus = `Supabase profile backup complete: ${result.backupId}. Saved ${result.summary.users || 0} users, ${result.summary.clients || 0} client profiles, ${result.summary.coaches || 0} coach/admin profiles, app settings, and admin permissions. Workouts, exercises, packages, plan offerings, chats, and check-ins were not sent to Supabase.`;
+      state.syncStatus = `Supabase coaching backup complete: ${result.backupId}. Saved ${result.summary.users || 0} users, ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coach/admin profiles, ${result.summary.chatMessages || 0} chat messages, ${result.summary.assessments || 0} assessments, ${result.summary.dailyCheckIns || 0} daily check-ins, ${result.summary.weeklyCheckIns || 0} weekly check-ins, and ${result.summary.monthlyPlans || 0} client monthly plans. Built-in workouts, exercise library, templates, offerings, and packages stay inside the app files.`;
     } catch (error) {
       state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
         ? "Supabase is connected, but Row Level Security is blocking backups. In Supabase, open SQL Editor and run the Setup SQL shown in this app's Data Sync section, then click Backup to Supabase again."
@@ -4040,75 +3916,29 @@ function bindGlobal() {
       render();
     }
   });
-  document.querySelector("#copyGoogleSheetsScript")?.addEventListener("click", async () => {
-    await copyTextToClipboard(googleSheetsAppsScriptCode());
-    state.syncStatus = "Google Apps Script copied. Paste it into Extensions > Apps Script in your Google Sheet, deploy as Web App, then paste the Web App URL here.";
-    render();
-  });
-  document.querySelector("#saveGoogleSheetsConfig")?.addEventListener("click", () => {
-    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || "";
-    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
+  document.querySelector("#resetSupabaseTable")?.addEventListener("click", async () => {
+    const confirmed = window.confirm("This will clear every backup row in the Supabase backup table. The app data on this device will stay here. After reset, click Backup to Supabase to create a fresh cloud copy. Continue?");
+    if (!confirmed) return;
+    store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
+    store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || store.settings.supabaseAnonKey || "";
+    store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || store.settings.supabaseBackupTable || "smart_coach_backups";
     saveStore();
-    state.syncStatus = "Google Sheets settings saved on this device.";
-    render();
-  });
-  document.querySelector("#testGoogleSheetsConnection")?.addEventListener("click", async () => {
-    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || store.settings.googleSheetsWebAppUrl || "";
-    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
-    saveStore();
-    state.googleSheetsBusy = true;
-    state.syncStatus = "Testing Google Sheets connection...";
+    state.supabaseResetBusy = true;
+    state.syncStatus = "Resetting Supabase backup table...";
     render();
     try {
-      const separator = googleSheetsWebAppUrl().includes("?") ? "&" : "?";
-      const response = await fetch(`${googleSheetsWebAppUrl()}${separator}action=status`);
-      if (!response.ok) throw new Error(await response.text() || `Google Sheets returned ${response.status}`);
-      state.syncStatus = "Google Sheets connection works.";
+      await resetSupabaseBackupTable({
+        url: store.settings.supabaseUrl,
+        anonKey: store.settings.supabaseAnonKey,
+        table: store.settings.supabaseBackupTable
+      });
+      state.syncStatus = "Supabase backup table reset. Click Backup to Supabase now to create a fresh cloud copy from this device.";
     } catch (error) {
-      state.syncStatus = `Google Sheets connection failed: ${error.message}`;
+      state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
+        ? "Supabase reset is blocked by permissions. Copy and run the updated Setup SQL in Supabase SQL Editor, then try Reset Supabase Table again."
+        : `Supabase reset failed: ${error.message}. Check the URL, publishable key, table exists, and updated Setup SQL has been run.`;
     } finally {
-      state.googleSheetsBusy = false;
-      window.alert(state.syncStatus);
-      render();
-    }
-  });
-  document.querySelector("#pushGoogleSheetsData")?.addEventListener("click", async () => {
-    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || store.settings.googleSheetsWebAppUrl || "";
-    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
-    saveStore();
-    const rows = [
-      ...store.assessments.map((record) => googleSheetRow("assessment", record)),
-      ...store.dailyCheckIns.map((record) => googleSheetRow("dailyCheckIn", record)),
-      ...store.weeklyCheckIns.map((record) => googleSheetRow("weeklyCheckIn", record))
-    ];
-    state.googleSheetsBusy = true;
-    state.syncStatus = `Sending ${rows.length} existing assessment/check-in rows to Google Sheets...`;
-    render();
-    try {
-      await sendRowsToGoogleSheets(rows, { waitForResponse: true });
-      state.syncStatus = `Sent ${rows.length} existing assessment/check-in rows to Google Sheets.`;
-    } catch (error) {
-      state.syncStatus = `Google Sheets send failed: ${error.message}`;
-    } finally {
-      state.googleSheetsBusy = false;
-      window.alert(state.syncStatus);
-      render();
-    }
-  });
-  document.querySelector("#pullGoogleSheetsData")?.addEventListener("click", async () => {
-    store.settings.googleSheetsWebAppUrl = document.querySelector("#googleSheetsWebAppUrl")?.value.trim() || store.settings.googleSheetsWebAppUrl || "";
-    store.settings.automaticGoogleSheetsSync = document.querySelector("#automaticGoogleSheetsSync")?.value !== "false";
-    saveStore();
-    state.googleSheetsBusy = true;
-    state.syncStatus = "Pulling assessments and check-ins from Google Sheets...";
-    render();
-    try {
-      const counts = await pullGoogleSheetsData();
-      state.syncStatus = `Pulled Google Sheets rows: ${counts.assessments} assessments, ${counts.dailyCheckIns} daily check-ins, ${counts.weeklyCheckIns} weekly check-ins.`;
-    } catch (error) {
-      state.syncStatus = `Google Sheets pull failed: ${error.message}`;
-    } finally {
-      state.googleSheetsBusy = false;
+      state.supabaseResetBusy = false;
       window.alert(state.syncStatus);
       render();
     }
