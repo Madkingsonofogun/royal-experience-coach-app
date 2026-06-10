@@ -1275,6 +1275,154 @@ dd {
   align-items: end;
 }
 
+.nutrition-demo-results .compact-plan-list {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.meal-demo-row {
+  grid-template-columns: 1fr;
+}
+
+.meal-preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.meal-preview-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(110, 72, 211, 0.22);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.meal-preview-card:hover,
+.meal-preview-card:focus {
+  transform: translateY(-1px);
+  border-color: rgba(214, 178, 77, 0.7);
+  box-shadow: 0 10px 24px rgba(31, 18, 58, 0.12);
+}
+
+.meal-preview-card small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.meal-preview-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.nutrition-client-actions {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.nutrition-client-actions > button {
+  justify-self: start;
+}
+
+.nutrition-day-card.open {
+  border-color: rgba(255, 215, 102, 0.42);
+}
+
+.meal-instruction-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.meal-instruction-card {
+  border: 1px solid rgba(110, 72, 211, 0.22);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.nutrition-day-modal .meal-instruction-card {
+  background: #fff;
+}
+
+.nutrition-swap-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(214, 178, 77, 0.35);
+  border-radius: 8px;
+  background: rgba(110, 72, 211, 0.08);
+}
+
+.nutrition-swap-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.meal-steps {
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+
+.meal-steps li {
+  margin-bottom: 6px;
+}
+
+.shopping-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.shopping-columns ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .printable-shopping-list,
+  .printable-shopping-list * {
+    visibility: visible;
+  }
+
+  .printable-shopping-list {
+    display: block;
+    position: absolute;
+    inset: 0;
+    box-shadow: none;
+    border: 0;
+    color: #17141d;
+    background: #fff;
+    padding: 20px;
+  }
+
+  .printable-shopping-list button {
+    display: none;
+  }
+
+  .printable-shopping-list .shopping-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 980px) {
   .topbar,
   .section-head,
@@ -1359,7 +1507,8 @@ dd {
 
   .role-tabs,
   .actions,
-  .dashboard-actions {
+  .dashboard-actions,
+  .nutrition-swap-controls {
     display: grid;
     grid-template-columns: 1fr;
   }

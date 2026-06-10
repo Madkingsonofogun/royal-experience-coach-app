@@ -91,10 +91,12 @@ import {
   summarizeAssessment
 } from "./logic.js";
 import { blankAssessment, createStore } from "./data.js";
+import { mealDemoLibrary, nutritionDemoStats } from "./meal-demo-data.js";
 
 const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
+const nutritionDemoMealPool = buildExpandedNutritionDemoMealPool(mealDemoLibrary);
 const state = {
   currentUser: null,
   loginRole: "Client",
@@ -114,6 +116,18 @@ const state = {
   supabaseRestoreBusy: false,
   supabaseResetBusy: false,
   cloudSyncAttempted: false,
+  nutritionDemo: {
+    planLength: 7,
+    goal: "Weight Loss",
+    dietaryNeed: "High Protein",
+    allergy: "None",
+    cuisine: "Any",
+    budgetLevel: "Any",
+    openDay: 1,
+    dayModalOpen: false,
+    recipeModal: null,
+    generatedPlan: null
+  },
   signup: {
     firstName: "",
     lastName: "",
@@ -243,6 +257,7 @@ const state = {
   adminPanel: "overview",
   syncStatus: "",
   planDraftNotice: "",
+  nutritionAssignNotice: "",
   clientId: "client_ada",
   selectedWorkoutId: null,
   selectedExerciseId: null,
@@ -330,11 +345,18 @@ let cloudDataMonitorTimer = null;
 let cloudDataMonitorRunning = false;
 let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
+let lastShoppingListPrintAt = 0;
 
 const app = document.querySelector("#app");
 render();
 startLoginAccountAutoRefresh();
 startLoggedInCloudDataMonitor();
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !state.currentUser) return;
+  if (!hasOpenPopup()) return;
+  closeOpenPopups();
+  render();
+});
 
 function render() {
   saveStore();
@@ -375,8 +397,39 @@ function render() {
     </header>
     <main>${route()}</main>
     ${adminEditModal()}
+    ${nutritionDayModal()}
+    ${nutritionRecipeModal()}
   `;
   bindGlobal();
+}
+
+function closeOpenPopups() {
+  state.editModal = null;
+  state.editModalDirty = false;
+  state.exercisePopupMode = "view";
+  state.exercisePopupTab = "Overview";
+  state.nutritionDemo.dayModalOpen = false;
+  state.nutritionDemo.recipeModal = null;
+}
+
+function hasOpenPopup() {
+  return Boolean(state.editModal || state.nutritionDemo.dayModalOpen || state.nutritionDemo.recipeModal);
+}
+
+function openClientMealPlanView() {
+  closeOpenPopups();
+  const client = clientForCurrentUser();
+  if (client) state.clientId = client.id;
+  state.view = "nutrition";
+  state.nutritionAssignNotice = "";
+}
+
+function clientForCurrentUser() {
+  if (state.currentUser?.role !== "Client") return selectedClient();
+  return store.clients.find((client) => client.id === state.currentUser.linkedId)
+    || store.clients.find((client) => client.email && state.currentUser.email && client.email.toLowerCase() === state.currentUser.email.toLowerCase())
+    || store.clients.find((client) => client.phone && state.currentUser.phone && client.phone === state.currentUser.phone)
+    || selectedClient();
 }
 
 function startLoginAccountAutoRefresh() {
@@ -423,10 +476,25 @@ function mergeStore(defaultStore, savedStore) {
   merged.settings.supabaseAnonKey ||= defaultStore.settings.supabaseAnonKey;
   merged.settings.supabaseBackupTable ||= defaultStore.settings.supabaseBackupTable;
   merged.adminPermissions = { ...(defaultStore.adminPermissions || {}), ...(savedStore.adminPermissions || {}) };
+  ensureStoreListShape(merged);
   Object.keys(merged).forEach((key) => {
     if (Array.isArray(merged[key])) merged[key] = deduplicateRecords(merged[key]);
   });
   return merged;
+}
+
+function ensureStoreListShape(targetStore = store) {
+  [
+    "users", "clients", "coaches", "assessments", "assessmentSchedules", "weeklyCheckIns",
+    "dailyCheckIns", "painCheckIns", "pinResetRequests", "progressImages", "coachAlerts",
+    "mealPlans", "todayWorkoutAdjustments", "workoutCompletions", "chatMessages",
+    "notifications", "inviteCodes", "adminAuditLog", "planOfferings", "packages",
+    "workoutTemplates", "workoutTemplateItems", "monthlyPlans", "monthlyPlanItems",
+    "exercises", "assessmentTemplates"
+  ].forEach((key) => {
+    if (!Array.isArray(targetStore[key])) targetStore[key] = [];
+  });
+  return targetStore;
 }
 
 function deduplicateRecords(records) {
@@ -519,6 +587,7 @@ function backupPayload() {
     notifications: store.notifications || [],
     pinResetRequests: store.pinResetRequests || [],
     coachAlerts: store.coachAlerts || [],
+    mealPlans: store.mealPlans || [],
     adminAuditLog: store.adminAuditLog || []
   };
   Object.keys(payload).forEach((key) => {
@@ -819,6 +888,7 @@ function storeKeyForBackupCollection(collectionName) {
     notifications: "notifications",
     pin_reset_requests: "pinResetRequests",
     coach_alerts: "coachAlerts",
+    meal_plans: "mealPlans",
     admin_audit_log: "adminAuditLog"
   };
   return map[collectionName] || null;
@@ -995,12 +1065,16 @@ function route() {
   if (state.view === "workoutDetail") return workoutDetailPage();
   if (state.view === "exerciseDetail") return exerciseDetailPage();
   if (state.view === "alerts") return coachAlertsView();
+  if (state.view === "nutrition") return nutritionPlannerPage();
   if (state.view === "admin") return adminView();
   return homeDashboard();
 }
 
 function tabButton(id, label) {
   const badge = id === "chat" && unreadNotificationCount(store, state.currentUser.id) ? `<span class="nav-badge">${unreadNotificationCount(store, state.currentUser.id)}</span>` : "";
+  if (state.currentUser?.role === "Client" && id === "nutrition") {
+    return `<button class="tab ${state.view === id ? "active" : ""}" data-view="nutrition" data-open-client-meal-plan>${label}${badge}</button>`;
+  }
   return `<button class="tab ${state.view === id ? "active" : ""}" data-view="${id}">${label}${badge}</button>`;
 }
 
@@ -1012,12 +1086,13 @@ function navTabs() {
     { id: "schedule", label: "Scheduling" },
     { id: "chat", label: "Chat" }
   ];
-  if (state.currentUser.role === "Client") return [...shared, { id: "weekly", label: "Weekly Check-In" }, { id: "client", label: "Client View" }];
+  if (state.currentUser.role === "Client") return [...shared, { id: "nutrition", label: "Meal Plan" }, { id: "weekly", label: "Weekly Check-In" }, { id: "client", label: "Client View" }];
   if (state.currentUser.role === "Coach") {
     return [
       ...shared,
       { id: "assessment", label: "Assessment" },
       { id: "library", label: "Exercise Library" },
+      { id: "nutrition", label: "Meal Planner" },
       { id: "alerts", label: "Coach Alerts" }
     ];
   }
@@ -1025,6 +1100,7 @@ function navTabs() {
     ...shared,
     { id: "assessment", label: "Assessment" },
     { id: "library", label: "Exercise Library" },
+    { id: "nutrition", label: "Meal Planner" },
     { id: "alerts", label: "Coach Alerts" },
     { id: "admin", label: "Admin Control" }
   ];
@@ -1190,6 +1266,7 @@ function profilePage() {
         ${infoCard("Start date", client.startDate)}
       </div>
       <div class="split">
+        ${clientProgramSummaryPanel(client)}
         ${clientSafetyInfoPanel(client)}
         ${state.currentUser.role !== "Client" ? `<article class="card"><h3>Assigned coach emergency contact</h3><p>${assignedCoach?.emergencyContact || "No coach emergency contact saved."}</p></article>` : ""}
         <article class="card"><h3>Equipment available</h3>${chipSection("Available", client.equipmentAvailable)}</article>
@@ -1312,6 +1389,37 @@ function clientSafetyInfoPanel(client) {
   return `
     <article class="card"><h3>Injury notes</h3><p>${client.injuryNotes || "No injury notes saved."}</p></article>
     <article class="card"><h3>Client emergency contact</h3><p>${client.emergencyContact || "No emergency contact saved."}</p></article>
+  `;
+}
+
+function clientProgramSummaryPanel(client) {
+  const pkg = store.packages.find((item) => item.id === client.packageId || item.packageName === client.packageType);
+  const offering = store.planOfferings.find((item) => item.id === client.planOfferingId || item.id === pkg?.planOfferingId);
+  const activePlan = getClientVisiblePlan(store, client.id);
+  const mealPlan = activeMealPlanForClient(client.id);
+  const connectedOfferings = (pkg?.planOfferingIds?.length ? pkg.planOfferingIds : [pkg?.planOfferingId].filter(Boolean))
+    .map((id) => store.planOfferings.find((item) => item.id === id))
+    .filter(Boolean);
+  return `
+    <article class="card">
+      <h3>My Package and Plans</h3>
+      <p class="muted">This shows what is assigned to you right now.</p>
+      <div class="detail-grid">
+        <p><strong>Package:</strong> ${escapeHtml(client.packageType || pkg?.packageName || "Not assigned")}</p>
+        <p><strong>Plan offering:</strong> ${escapeHtml(offering?.planName || "Not assigned")}</p>
+        <p><strong>Training level:</strong> ${escapeHtml(activePlan?.trainingLevel || client.currentTrainingLevel || "Not set")}</p>
+        <p><strong>Workout plan:</strong> ${activePlan ? `${escapeHtml(activePlan.month || "Current month")} / ${escapeHtml(activePlan.status || "Active")}` : "No active approved workout plan"}</p>
+        <p><strong>Training days:</strong> ${client.trainingDaysPerWeek || offering?.trainingDaysPerWeek || "Not set"} per week</p>
+        <p><strong>Session length:</strong> ${client.sessionLength || offering?.sessionLength || "Not set"} min</p>
+        <p><strong>Sessions remaining:</strong> ${client.sessionsRemaining ?? "Not set"}</p>
+        <p><strong>Meal plan:</strong> ${mealPlan ? `${escapeHtml(mealPlan.planName)} assigned ${formatReadableDate(mealPlan.assignedAt)}` : "No active meal plan"}</p>
+      </div>
+      ${connectedOfferings.length > 1 ? `<p><strong>Package options:</strong> ${connectedOfferings.map((item) => escapeHtml(item.planName)).join(", ")}</p>` : ""}
+      <div class="actions">
+        <button class="ghost" data-view="plan">Open Monthly Plan</button>
+        <button class="ghost" data-open-client-meal-plan>Open Meal Plan</button>
+      </div>
+    </article>
   `;
 }
 
@@ -1848,6 +1956,7 @@ function clientDashboard() {
         <button class="primary" id="openDaily">Check In Before Workout</button>
         ${workout ? `<button class="primary" data-workout-detail="${workout.id}">View Full Workout</button>` : ""}
         <button class="ghost" data-view="plan">View Full Monthly Plan</button>
+        <button class="ghost" data-open-client-meal-plan>View Meal Plan</button>
         <button class="ghost" data-view="profile">Upload Progress Photo</button>
         ${workout?.coachAllowsMarkComplete && !dashboard.locked ? `<button class="success" id="markComplete">Mark Workout Complete</button>` : ""}
       </div>
@@ -2128,6 +2237,7 @@ function adminView() {
     { label: "Add Plan Offering", panel: "offerings" },
     { label: "Add Package", panel: "packages" },
     { label: "Add Assessment Template", panel: "assessmentTemplates" },
+    { label: "Meal Planner", panel: "nutritionDemo" },
     { label: "Assessment Scheduling", panel: "assessmentSchedules" },
     { label: "PINs / Security", panel: "security" },
     { label: "Data Sync", panel: "dataSync" }
@@ -2218,7 +2328,7 @@ function adminView() {
           ${[
             "Users and PIN hashes", "Client profiles", "Coach/Admin profiles", "App settings", "Admin permissions",
             "Chats", "Notifications", "Assessments and reassessments", "Assessment schedules",
-            "Daily check-ins", "Weekly check-ins", "Pain check-ins", "Coach alerts",
+            "Daily check-ins", "Weekly check-ins", "Pain check-ins", "Coach alerts", "Assigned meal plans",
             "Today workout adjustments", "Workout completions", "Client monthly plans", "Progress image records",
             "PIN reset requests", "Admin audit log"
           ].map((label) => `<span class="chip">${label}</span>`).join("")}
@@ -2235,6 +2345,7 @@ function adminView() {
         </div>
       </article>
       <div class="split">
+        ${nutritionDemoPanel()}
         <article class="card admin-card ${adminPanelClass("clients")}" id="admin-clients-new">
           <h3>Add Client</h3>
           <div class="form-grid">
@@ -3380,8 +3491,23 @@ function bindLogin() {
 }
 
 function bindGlobal() {
+  window.printNutritionShoppingList = printNutritionShoppingList;
   document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => {
+    if (button.dataset.view === "nutrition" && state.currentUser?.role === "Client") {
+      openClientMealPlanView();
+      render();
+      return;
+    }
+    closeOpenPopups();
     state.view = button.dataset.view;
+    if (state.view === "nutrition") {
+      const client = state.currentUser?.role === "Client" ? clientForCurrentUser() : null;
+      if (client) state.clientId = client.id;
+    }
+    render();
+  }));
+  document.querySelectorAll("[data-open-client-meal-plan]").forEach((button) => button.addEventListener("click", () => {
+    openClientMealPlanView();
     render();
   }));
   document.querySelectorAll("[data-workout-detail]").forEach((button) => button.addEventListener("click", () => {
@@ -3809,6 +3935,151 @@ function bindGlobal() {
     state.adminPanel = button.dataset.adminPanel;
     render();
   }));
+  document.querySelector("#nutritionDemoMode")?.addEventListener("change", (event) => {
+    store.settings.nutritionPlannerEnabled = event.target.value !== "Off";
+    store.settings.nutritionDemoMode = event.target.value === "Off" ? "Off" : "Active";
+    if (event.target.value === "Off") state.nutritionDemo.generatedPlan = null;
+    saveStore();
+    render();
+  });
+  ["#nutritionPlanLength", "#nutritionGoal", "#nutritionDietaryNeed", "#nutritionAllergy", "#nutritionCuisine", "#nutritionBudget"].forEach((selector) => {
+    document.querySelector(selector)?.addEventListener("change", () => {
+      state.nutritionDemo = { ...state.nutritionDemo, ...collectNutritionDemoOptions(), generatedPlan: null };
+      render();
+    });
+  });
+  document.querySelector("#generateNutritionDemo")?.addEventListener("click", () => {
+    resetNutritionPlannerForAction();
+    state.nutritionAssignNotice = "Fresh meal plan generated. Choose a client and press Assign Plan To Client.";
+    render();
+  });
+  document.querySelector("#resetNutritionPlanner")?.addEventListener("click", () => {
+    state.editModal = null;
+    state.editModalDirty = false;
+    store.settings.nutritionPlannerEnabled = true;
+    store.settings.nutritionDemoMode = "Active";
+    state.nutritionDemo = {
+      ...state.nutritionDemo,
+      ...collectNutritionDemoOptions(),
+      openDay: 1,
+      dayModalOpen: false,
+      recipeModal: null,
+      generatedPlan: null,
+      assignedPlanId: null
+    };
+    state.nutritionAssignNotice = "Meal planner reset. Press Generate Meal Plan to build a fresh plan.";
+    saveStore();
+    render();
+  });
+  document.querySelector("#nutritionAssignClient")?.addEventListener("change", (event) => {
+    state.clientId = event.target.value;
+    state.nutritionAssignNotice = "";
+    render();
+  });
+  document.querySelector("#assignNutritionPlan")?.addEventListener("click", () => {
+    state.editModal = null;
+    state.editModalDirty = false;
+    state.nutritionDemo.dayModalOpen = false;
+    state.nutritionDemo.recipeModal = null;
+    store.settings.nutritionPlannerEnabled = true;
+    store.settings.nutritionDemoMode = "Active";
+    try {
+      ensureStoreListShape(store);
+      const assigned = assignGeneratedMealPlanToClient(document.querySelector("#nutritionAssignClient")?.value || state.clientId);
+      if (!assigned) window.alert(state.nutritionAssignNotice || "Choose a client before assigning a meal plan.");
+    } catch (error) {
+      console.error("Meal plan assignment failed.", error);
+      state.nutritionAssignNotice = `Meal plan could not be assigned: ${error.message || "saved app data needed cleanup"}. Press Reset Meal Planner, then Generate Meal Plan.`;
+      window.alert(state.nutritionAssignNotice);
+    }
+    render();
+  });
+  document.querySelector("#requestMealPlanAddon")?.addEventListener("click", () => {
+    requestClientMealPlanAddon();
+    state.view = "chat";
+    render();
+  });
+  document.querySelectorAll("[data-open-nutrition-day]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = null;
+    state.editModalDirty = false;
+    state.nutritionDemo.recipeModal = null;
+    state.nutritionDemo.openDay = Number(button.dataset.openNutritionDay || 1);
+    state.nutritionDemo.dayModalOpen = true;
+    render();
+  }));
+  document.querySelectorAll("[data-open-meal-recipe]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = null;
+    state.editModalDirty = false;
+    state.nutritionDemo.dayModalOpen = false;
+    state.nutritionDemo.recipeModal = {
+      planId: button.dataset.planId,
+      day: Number(button.dataset.day || 1),
+      mealIndex: Number(button.dataset.mealIndex || 0)
+    };
+    render();
+  }));
+  document.querySelector("#closeNutritionDayModal")?.addEventListener("click", () => {
+    state.nutritionDemo.dayModalOpen = false;
+    render();
+  });
+  document.querySelector("#closeNutritionRecipeModal")?.addEventListener("click", () => {
+    state.nutritionDemo.recipeModal = null;
+    render();
+  });
+  document.querySelectorAll(".modal-backdrop").forEach((backdrop) => backdrop.addEventListener("click", (event) => {
+    if (event.target !== backdrop) return;
+    closeOpenPopups();
+    render();
+  }));
+  document.querySelector("[data-toggle-favorite-meal]")?.addEventListener("click", (event) => {
+    toggleFavoriteMealForClient(event.currentTarget.dataset.mealId);
+    render();
+  });
+  document.querySelector("[data-substitute-client-meal]")?.addEventListener("click", (event) => {
+    const planId = event.currentTarget.dataset.planId;
+    const dayNumber = Number(event.currentTarget.dataset.day || 1);
+    const mealIndex = Number(event.currentTarget.dataset.mealIndex || 0);
+    const selectedMealId = document.querySelector(`#clientMealSubstitute-${dayNumber}-${mealIndex}`)?.value;
+    replaceAssignedMeal(planId, dayNumber, mealIndex, selectedMealId);
+    state.nutritionDemo.recipeModal = { planId, day: dayNumber, mealIndex };
+    render();
+  });
+  document.querySelectorAll("[data-change-nutrition-meal]").forEach((button) => button.addEventListener("click", () => {
+    const dayNumber = Number(button.dataset.day || 1);
+    const mealIndex = Number(button.dataset.mealIndex || 0);
+    const selectedMealId = document.querySelector(`#nutritionSwap-${dayNumber}-${mealIndex}`)?.value;
+    replaceNutritionDemoMeal(dayNumber, mealIndex, selectedMealId);
+    state.nutritionDemo.dayModalOpen = true;
+    state.nutritionDemo.openDay = dayNumber;
+    render();
+  }));
+  document.querySelectorAll("[data-smart-nutrition-meal]").forEach((button) => button.addEventListener("click", () => {
+    const dayNumber = Number(button.dataset.day || 1);
+    const mealIndex = Number(button.dataset.mealIndex || 0);
+    smartReplaceNutritionDemoMeal(dayNumber, mealIndex);
+    state.nutritionDemo.dayModalOpen = true;
+    state.nutritionDemo.openDay = dayNumber;
+    render();
+  }));
+  document.querySelectorAll("[data-smart-nutrition-day]").forEach((button) => button.addEventListener("click", () => {
+    const dayNumber = Number(button.dataset.day || state.nutritionDemo.openDay || 1);
+    smartReplaceNutritionDemoDay(dayNumber);
+    state.nutritionDemo.dayModalOpen = true;
+    state.nutritionDemo.openDay = dayNumber;
+    render();
+  }));
+  document.querySelectorAll("[data-print-nutrition-shopping-list], #printNutritionShoppingList").forEach((button) => button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    printNutritionShoppingList();
+  }));
+  document.querySelector("#turnOffNutritionDemo")?.addEventListener("click", () => {
+    store.settings.nutritionDemoMode = "Off";
+    store.settings.nutritionPlannerEnabled = false;
+    state.nutritionDemo.generatedPlan = null;
+    saveStore();
+    render();
+  });
   document.querySelectorAll("[data-admin-open-schedule-client]").forEach((button) => button.addEventListener("click", () => {
     changeSelectedClient(button.dataset.adminOpenScheduleClient, false);
     state.view = "home";
@@ -4806,6 +5077,7 @@ function quickLinksPanel() {
         ["schedule", "Scheduling"],
         ["weekly", "Weekly Check-In"],
         ["plan", "Monthly Plan"],
+        ["nutrition", "Meal Plan"],
         ["client", "Today"],
         ["chat", "Chat"]
       ]
@@ -4823,7 +5095,10 @@ function quickLinksPanel() {
       <p class="eyebrow">Workflow</p>
       <h3>${isClient ? "Client tools" : state.currentUser.role === "Admin" ? "Admin tools" : "Coach tools"}</h3>
       <div class="quick-actions">
-        ${actions.map(([view, label]) => `<button data-view="${view}">${label}</button>`).join("")}
+        ${actions.map(([view, label]) => isClient && view === "nutrition"
+          ? `<button data-open-client-meal-plan>${label}</button>`
+          : `<button data-view="${view}">${label}</button>`
+        ).join("")}
       </div>
     </article>
   `;
@@ -4843,6 +5118,835 @@ function recommendPlanDirection(client, assessment) {
   if ((assessment.trainingLevel === "Advanced" || assessment.trainingLevel === "Pro") && strongTrend) return "Progress carefully with harder sport-specific variations";
   if (assessment.trainingLevel === "Pro") return "Pro plan with coach-supervised high-output options";
   return `${assessment.trainingLevel || "Intermediate"} plan with smart exercise rotation`;
+}
+
+function nutritionPlannerPage() {
+  if (state.currentUser?.role === "Client") return clientMealPlanPage();
+  return `
+    <section class="page-stack">
+      ${nutritionDemoPanel({ standalone: true })}
+    </section>
+  `;
+}
+
+function clientMealPlanPage() {
+  const client = clientForCurrentUser();
+  const plan = client ? activeMealPlanForClient(client.id) : null;
+  const requested = client ? client.mealPlanRequested : false;
+  return `
+    <section class="page-stack">
+      <article class="card">
+        <div class="section-head compact-head">
+          <div>
+            <p class="eyebrow">Nutrition</p>
+            <h2>${plan ? "Your Meal Plan" : "Meal Plan Add-On"}</h2>
+            <p class="muted">${plan ? "This plan was assigned by your coach or admin. Click any meal to see the recipe and step-by-step instructions." : "Meal planning is an optional nutrition add-on. It is an extra $50 added to your plan."}</p>
+          </div>
+          ${plan ? `<span class="badge green">${plan.days.length} days</span>` : `<span class="badge orange">No plan assigned</span>`}
+        </div>
+        <div class="result-band">
+          <strong>${plan ? "Meal plan ready" : requested ? "Request sent" : "Meal plan not active"}</strong>
+          <span>${plan ? `${escapeHtml(plan.planName || "Meal Plan")} was assigned ${formatReadableDate(plan.assignedAt || plan.createdAt)}.` : requested ? "Your coach/admin has been notified that you want the $50 meal plan add-on." : "Request the add-on here and your coach/admin will follow up."}</span>
+        </div>
+        ${plan ? nutritionAssignedPlanView(plan, { clientView: true }) : `
+          ${clientMealPlanRequestPanel(client, requested)}
+        `}
+      </article>
+    </section>
+  `;
+}
+
+function clientMealPlanRequestPanel(client, requested) {
+  return `
+    <div class="empty meal-plan-empty">
+      <h3>Request a Smart Meal Plan</h3>
+      <p>Get a weekly or monthly meal plan with recipe cards, step-by-step instructions, shopping support, and food swaps. This add-on is an extra <strong>$50</strong> added to your current plan.</p>
+      <div class="detail-grid">
+        <p><strong>Includes:</strong> meals matched to your goal, dietary needs, cuisine preferences, and allergies.</p>
+        <p><strong>Recipes:</strong> click each meal to see ingredients and how to make it step by step.</p>
+        <p><strong>Coach review:</strong> your coach/admin assigns the plan after approving the add-on.</p>
+      </div>
+      <div class="actions">
+        <button class="primary" id="requestMealPlanAddon" ${requested ? "disabled" : ""}>${requested ? "Meal Plan Requested" : "Request Meal Plan Add-On - $50"}</button>
+        <button class="ghost" data-view="chat">Message Coach</button>
+      </div>
+    </div>
+  `;
+}
+
+function nutritionDemoPanel(options = {}) {
+  const standalone = Boolean(options.standalone);
+  const mode = store.settings.nutritionPlannerEnabled === false ? "Off" : "Active";
+  const demo = state.nutritionDemo;
+  const plan = demo.generatedPlan;
+  const visibleClients = visibleClientsForUser(store, state.currentUser);
+  return `
+    <article class="card admin-card ${standalone ? "" : adminPanelClass("nutritionDemo")}" id="admin-nutrition-demo">
+      <div class="section-head compact-head">
+        <div>
+          <p class="eyebrow">Nutrition Add-On</p>
+          <h3>Meal Planner</h3>
+          <p class="muted">Build a weekly or monthly meal plan, change suggested meals, and assign the finished plan to a client.</p>
+        </div>
+        <span class="badge ${mode === "Off" ? "orange" : "green"}">${escapeHtml(mode)}</span>
+      </div>
+      <div class="result-band warning-band">
+        <strong>Client assignment</strong>
+        <span>Assigned meal plans are saved to the selected client profile and included in Supabase shared records. The planner is using the full ${nutritionDemoStats.totalMeals.toLocaleString()}-meal workbook library.</span>
+      </div>
+      <div class="grid-4 stat-strip">
+        ${infoCard("Workbook meals", nutritionDemoStats.totalMeals.toLocaleString())}
+        ${infoCard("Preview meals", nutritionDemoMealPool.length)}
+        ${infoCard("Breakfast", nutritionDemoStats.mealsByType.Breakfast)}
+        ${infoCard("Dinner choices", nutritionDemoMealPool.filter((meal) => meal.mealType === "Dinner").length)}
+        ${infoCard("Snack choices", nutritionDemoMealPool.filter((meal) => meal.mealType === "Snack").length)}
+      </div>
+      <div class="form-grid">
+        <label>Feature mode
+          <select id="nutritionDemoMode">
+            ${["Off", "Active"].map((option) => `<option value="${option}" ${mode === option ? "selected" : ""}>${option}</option>`).join("")}
+          </select>
+        </label>
+        <label>Assign to client
+          <select id="nutritionAssignClient">
+            ${visibleClients.map((client) => `<option value="${client.id}" ${client.id === state.clientId ? "selected" : ""}>${escapeHtml(client.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Plan length
+          <select id="nutritionPlanLength">
+            ${[7, 14, 30].map((days) => `<option value="${days}" ${Number(demo.planLength) === days ? "selected" : ""}>${days} days</option>`).join("")}
+          </select>
+        </label>
+        <label>Goal
+          <select id="nutritionGoal">
+            ${["Weight Loss", "Muscle Gain", "Maintenance", "Performance"].map((goal) => `<option value="${goal}" ${demo.goal === goal ? "selected" : ""}>${goal}</option>`).join("")}
+          </select>
+        </label>
+        <label>Dietary need
+          <select id="nutritionDietaryNeed">
+            ${["Any", "High Protein", "Low Carb", "Dairy-Free", "Gluten-Free", "Vegan"].map((tag) => `<option value="${tag}" ${demo.dietaryNeed === tag ? "selected" : ""}>${tag}</option>`).join("")}
+          </select>
+        </label>
+        <label>Allergy to avoid
+          <select id="nutritionAllergy">
+            ${["None", "Dairy", "Egg", "Tree Nuts", "Peanuts", "Soy", "Fish", "Sesame"].map((allergy) => `<option value="${allergy}" ${demo.allergy === allergy ? "selected" : ""}>${allergy}</option>`).join("")}
+          </select>
+        </label>
+        <label>Cuisine
+          <select id="nutritionCuisine">
+            ${["Any", "Mixed / General", "Mediterranean", "Black American / African Diaspora", "Latin", "Italian", "Indian", "Greek"].map((cuisine) => `<option value="${cuisine}" ${demo.cuisine === cuisine ? "selected" : ""}>${cuisine}</option>`).join("")}
+          </select>
+        </label>
+        <label>Budget
+          <select id="nutritionBudget">
+            ${["Any", "Low", "Medium", "High"].map((budget) => `<option value="${budget}" ${demo.budgetLevel === budget ? "selected" : ""}>${budget}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="primary" id="generateNutritionDemo">${mode === "Off" ? "Turn On & Generate Meal Plan" : "Generate Meal Plan"}</button>
+        <button class="ghost" id="resetNutritionPlanner">Reset Meal Planner</button>
+        <button class="success" id="assignNutritionPlan">${mode === "Off" ? "Turn On & Assign Plan" : "Assign Plan To Client"}</button>
+        <button id="printNutritionShoppingList" data-print-nutrition-shopping-list onclick="window.printNutritionShoppingList && window.printNutritionShoppingList()" ${!plan ? "disabled" : ""}>Print Shopping List</button>
+        ${state.currentUser?.role === "Admin" ? `<button class="danger" id="turnOffNutritionDemo">Turn Meal Planner Off</button>` : ""}
+      </div>
+      ${state.nutritionAssignNotice ? `<div class="result-band"><strong>Meal planner</strong><span>${escapeHtml(state.nutritionAssignNotice)}</span></div>` : ""}
+      ${nutritionAssignedPlanSummary(state.clientId)}
+      ${mode === "Off" ? `<div class="empty">Meal Planner is off. Turn Feature mode to Active when you want to use it again.</div>` : nutritionDemoResults(plan)}
+    </article>
+  `;
+}
+
+function nutritionDemoResults(plan) {
+  if (!plan) {
+    return `
+      <div class="empty">
+        Press Generate Meal Plan to preview weekly/monthly meals, then choose a client and press Assign Plan To Client.
+      </div>
+    `;
+  }
+  const shopping = buildNutritionShoppingList(plan.days);
+  return `
+    <section class="nutrition-demo-results">
+      <div class="section-head compact-head">
+        <div>
+          <p class="eyebrow">${plan.days.length}-day demo</p>
+          <h3>${escapeHtml(plan.summary.goal)} / ${escapeHtml(plan.summary.dietaryNeed)}</h3>
+          <p class="muted">Estimated daily average: ${plan.summary.averageCalories} cal, ${plan.summary.averageProtein}g protein, ${plan.summary.averageCarbs}g carbs, ${plan.summary.averageFat}g fat.</p>
+        </div>
+      </div>
+      <div class="card-list compact-plan-list">
+        ${plan.days.map((day) => {
+          return `
+          <article class="card nutrition-day-card">
+            <div class="section-head compact-head">
+              <div><p class="eyebrow">Day ${day.day}</p><h3>${day.totalCalories} cal / ${day.totalProtein}g protein</h3></div>
+              <button class="ghost" data-open-nutrition-day="${day.day}">Open Day</button>
+            </div>
+            ${day.meals.map((meal) => `
+              <div class="admin-row meal-demo-row">
+                <span><strong>${meal.mealType}:</strong> ${escapeHtml(meal.name)}<br><small>${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g / ${escapeHtml(meal.prepTime)}</small></span>
+              </div>
+            `).join("")}
+          </article>
+        `;
+        }).join("")}
+      </div>
+      <article class="card printable-shopping-list">
+        <div class="section-head compact-head">
+          <div><p class="eyebrow">Printable</p><h3>Shopping list preview</h3></div>
+        </div>
+        <div class="shopping-columns">
+          ${Object.entries(shopping).map(([category, items]) => `
+            <div>
+              <h4>${escapeHtml(category)}</h4>
+              <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    </section>
+  `;
+}
+
+function buildExpandedNutritionDemoMealPool(sourceMeals) {
+  if (sourceMeals.length > 1000) return sourceMeals;
+  const flavorProfiles = [
+    { label: "Cajun", cuisine: "Black American / African Diaspora", seasoning: "cajun seasoning", produce: "collard greens", budgetLevel: "Medium", calories: 24, protein: 2, carbs: 3, fat: 1 },
+    { label: "Jerk", cuisine: "Black American / African Diaspora", seasoning: "jerk seasoning", produce: "cabbage slaw", budgetLevel: "Medium", calories: 18, protein: 1, carbs: 4, fat: 0 },
+    { label: "Soul Herb", cuisine: "Black American / African Diaspora", seasoning: "smoked herb seasoning", produce: "okra tomato medley", budgetLevel: "Low", calories: 16, protein: 1, carbs: 3, fat: 1 },
+    { label: "Creole", cuisine: "Black American / African Diaspora", seasoning: "creole seasoning", produce: "pepper onion mix", budgetLevel: "Medium", calories: 20, protein: 1, carbs: 4, fat: 0 },
+    { label: "Lemon Pepper", cuisine: "Mixed / General", seasoning: "lemon pepper", produce: "green beans", budgetLevel: "Low", calories: -12, protein: 0, carbs: -2, fat: 0 },
+    { label: "Garlic Herb", cuisine: "Mediterranean", seasoning: "garlic herb blend", produce: "cucumber tomato salad", budgetLevel: "Medium", calories: 10, protein: 1, carbs: 2, fat: 0 },
+    { label: "Rosemary", cuisine: "Mediterranean", seasoning: "rosemary sea salt", produce: "roasted zucchini", budgetLevel: "Medium", calories: 12, protein: 1, carbs: 2, fat: 1 },
+    { label: "Fajita", cuisine: "Latin", seasoning: "fajita seasoning", produce: "sauteed peppers", budgetLevel: "Low", calories: 22, protein: 1, carbs: 5, fat: 0 },
+    { label: "Mango Lime", cuisine: "Latin", seasoning: "mango lime seasoning", produce: "corn pepper salsa", budgetLevel: "Medium", calories: 34, protein: 1, carbs: 7, fat: 0 },
+    { label: "Ginger Sesame", cuisine: "Asian Inspired", seasoning: "ginger sesame seasoning", produce: "snap peas", budgetLevel: "High", calories: 30, protein: 1, carbs: 3, fat: 2 },
+    { label: "Teriyaki Light", cuisine: "Asian Inspired", seasoning: "low-sugar teriyaki glaze", produce: "broccoli slaw", budgetLevel: "Medium", calories: 26, protein: 1, carbs: 5, fat: 0 },
+    { label: "Greek", cuisine: "Greek", seasoning: "oregano lemon seasoning", produce: "spinach cucumber mix", budgetLevel: "Medium", calories: 8, protein: 1, carbs: 1, fat: 0 },
+    { label: "Tzatziki Style", cuisine: "Greek", seasoning: "dill garlic seasoning", produce: "tomato cucumber relish", budgetLevel: "Medium", calories: 14, protein: 1, carbs: 2, fat: 1 },
+    { label: "Curry", cuisine: "Indian", seasoning: "mild curry seasoning", produce: "roasted cauliflower", budgetLevel: "Low", calories: 28, protein: 2, carbs: 5, fat: 0 },
+    { label: "Tandoori", cuisine: "Indian", seasoning: "tandoori spice blend", produce: "cabbage carrot mix", budgetLevel: "Medium", calories: 18, protein: 1, carbs: 4, fat: 0 },
+    { label: "Italian Herb", cuisine: "Italian", seasoning: "italian herb seasoning", produce: "roasted mushrooms", budgetLevel: "Medium", calories: 18, protein: 1, carbs: 3, fat: 1 },
+    { label: "Pesto Light", cuisine: "Italian", seasoning: "light basil pesto", produce: "arugula tomato mix", budgetLevel: "High", calories: 38, protein: 1, carbs: 2, fat: 3 }
+  ];
+  const cleanName = (name) => String(name || "Meal").replace(/^(Glow|Strong|Quick|Loaded)\s+/i, "").trim();
+  return sourceMeals.flatMap((meal) => [
+    meal,
+    ...flavorProfiles.map((profile, index) => ({
+      ...meal,
+      id: `${meal.id}-D${index + 1}`,
+      name: `${profile.label} ${cleanName(meal.name)}`,
+      calories: Math.max(90, Number(meal.calories || 0) + profile.calories),
+      protein: Math.max(8, Number(meal.protein || 0) + profile.protein),
+      carbs: Math.max(4, Number(meal.carbs || 0) + profile.carbs),
+      fat: Math.max(2, Number(meal.fat || 0) + profile.fat),
+      ingredients: `${meal.ingredients}; ${profile.produce}; ${profile.seasoning}`,
+      instructions: `Prepare the main ingredients from the original meal. Add ${profile.produce} and season with ${profile.seasoning}. Cook or assemble until the meal is hot or chilled as appropriate. Portion as listed and serve.`,
+      shoppingListItems: `${meal.shoppingListItems}; Produce: ${profile.produce}; Pantry: ${profile.seasoning}`,
+      cuisine: profile.cuisine,
+      budgetLevel: profile.budgetLevel,
+      coachOnlyNotes: "Demo-generated variety from the meal workbook sample. Review before using in a paid nutrition add-on."
+    }))
+  ]);
+}
+
+function nutritionMealInstructionCard(meal) {
+  return `
+    <article class="meal-instruction-card">
+      <div class="section-head compact-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(meal.mealType)} / ${escapeHtml(meal.cuisine || "General")}</p>
+          <h4>${escapeHtml(meal.name)}</h4>
+        </div>
+        <span class="badge green">${escapeHtml(meal.servingSize || "1 serving")}</span>
+      </div>
+      <div class="detail-grid">
+        <p><strong>Prep time:</strong> ${escapeHtml(meal.prepTime || "Not listed")}</p>
+        <p><strong>Diet tags:</strong> ${meal.dietTags.map(escapeHtml).join(", ") || "None listed"}</p>
+        <p><strong>Allergens:</strong> ${meal.allergens.map(escapeHtml).join(", ") || "None listed"}</p>
+        <p><strong>Macros:</strong> ${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g</p>
+      </div>
+      <p><strong>Ingredients:</strong> ${escapeHtml(meal.ingredients || "Not listed")}</p>
+      <div>
+        <strong>How to make it:</strong>
+        <ol class="meal-steps">
+          ${mealInstructionsToSteps(meal.instructions).map((step) => `<li>${escapeHtml(step)}</li>`).join("")}
+        </ol>
+      </div>
+    </article>
+  `;
+}
+
+function nutritionDayModal() {
+  const plan = state.nutritionDemo.generatedPlan;
+  if (!state.nutritionDemo.dayModalOpen || !plan) return "";
+  const day = plan.days.find((item) => Number(item.day) === Number(state.nutritionDemo.openDay || 1));
+  if (!day) return "";
+  const canChangeMeals = ["Admin", "Coach"].includes(state.currentUser?.role);
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal nutrition-day-modal">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Nutrition demo / Day ${day.day}</p>
+            <h2>Meal plan details</h2>
+            <p class="muted">${day.totalCalories} calories / P ${day.totalProtein}g / C ${day.totalCarbs}g / F ${day.totalFat}g</p>
+          </div>
+          <button id="closeNutritionDayModal">Close</button>
+        </div>
+        <div class="result-band warning-band">
+          <strong>Demo window</strong>
+          <span>Changes here update this generated meal plan before assignment. Smart choices pull from the meal library using cuisine, allergies, and dietary needs.</span>
+        </div>
+        ${canChangeMeals ? `
+          <div class="actions">
+            <button class="success" data-smart-nutrition-day data-day="${day.day}">Smart Choice For Whole Day</button>
+          </div>
+        ` : ""}
+        <div class="meal-instruction-list">
+          ${day.meals.map((meal, index) => nutritionMealInstructionCardWithSwap(meal, day.day, index, canChangeMeals)).join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function nutritionMealInstructionCardWithSwap(meal, dayNumber, mealIndex, canChangeMeals) {
+  const swapOptions = nutritionReplacementOptions(meal);
+  return `
+    <article class="meal-instruction-card">
+      ${nutritionMealInstructionCard(meal).replace(/^<article class="meal-instruction-card">|<\/article>\s*$/g, "")}
+      ${canChangeMeals ? `
+        <div class="nutrition-swap-panel">
+          <div>
+            <p class="eyebrow">Change suggested ${escapeHtml(meal.mealType)}</p>
+            <p class="muted">Pick from a wider library match by cuisine, allergy, and dietary need, or let the app make a smart choice.</p>
+          </div>
+          <div class="nutrition-swap-controls">
+            <select id="nutritionSwap-${dayNumber}-${mealIndex}">
+              ${swapOptions.map((option) => `<option value="${option.id}" ${option.id === meal.id ? "selected" : ""}>${escapeHtml(option.name)} / ${option.calories} cal / P ${option.protein}g</option>`).join("")}
+            </select>
+            <button class="success" data-change-nutrition-meal data-day="${dayNumber}" data-meal-index="${mealIndex}">Apply Change</button>
+            <button class="ghost" data-smart-nutrition-meal data-day="${dayNumber}" data-meal-index="${mealIndex}">Smart Meal</button>
+          </div>
+        </div>
+      ` : ""}
+    </article>
+  `;
+}
+
+function nutritionMealPreviewCard(meal, planId, dayNumber, mealIndex) {
+  const plan = (store.mealPlans || []).find((item) => item.id === planId);
+  const favoriteIds = clientFavoriteMealIds(plan?.clientId);
+  const isFavorite = favoriteIds.includes(meal.id);
+  return `
+    <button class="meal-preview-card" data-open-meal-recipe data-plan-id="${escapeHtml(planId)}" data-day="${dayNumber}" data-meal-index="${mealIndex}" title="Open recipe for ${escapeHtml(meal.name)}">
+      <span>
+        <strong>${escapeHtml(meal.mealType)}:</strong> ${escapeHtml(meal.name)}
+        <small>${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g / ${escapeHtml(meal.prepTime || "Prep time not listed")}</small>
+      </span>
+      <span class="meal-preview-badges">
+        ${isFavorite ? `<span class="badge green">Favorite</span>` : ""}
+        <span class="badge green">Recipe</span>
+      </span>
+    </button>
+  `;
+}
+
+function nutritionRecipeModal() {
+  const modal = state.nutritionDemo.recipeModal;
+  if (!modal) return "";
+  const plan = (store.mealPlans || []).find((item) => item.id === modal.planId);
+  const day = plan?.days?.find((item) => Number(item.day) === Number(modal.day));
+  const meal = day?.meals?.[modal.mealIndex];
+  if (!plan || !day || !meal) return "";
+  const client = clientForCurrentUser();
+  const canClientAdjust = state.currentUser?.role === "Client" && client?.id === plan.clientId;
+  const favoriteIds = clientFavoriteMealIds(plan.clientId);
+  const isFavorite = favoriteIds.includes(meal.id);
+  const alternatives = nutritionReplacementOptions(meal, { favoriteMealIds: favoriteIds, limit: 80, includeCurrent: false, broaden: true });
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card nutrition-recipe-modal">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Day ${day.day} / ${escapeHtml(meal.mealType)}</p>
+            <h2>${escapeHtml(meal.name)}</h2>
+            <p class="muted">${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g</p>
+          </div>
+          <button id="closeNutritionRecipeModal">Close</button>
+        </div>
+        ${canClientAdjust ? `
+          <div class="nutrition-client-actions">
+            <button class="${isFavorite ? "success" : "ghost"}" data-toggle-favorite-meal="${meal.id}" data-meal-id="${meal.id}">
+              ${isFavorite ? "Favorited" : "Mark Favorite"}
+            </button>
+            <div class="nutrition-swap-panel">
+              <div>
+                <p class="eyebrow">Substitute this meal</p>
+                <p class="muted">Favorite meals appear first. Choose a different ${escapeHtml(meal.mealType)} and apply it to this day only.</p>
+              </div>
+              <div class="nutrition-swap-controls">
+                <select id="clientMealSubstitute-${day.day}-${modal.mealIndex}">
+                  ${alternatives.map((option) => `<option value="${option.id}">${favoriteIds.includes(option.id) ? "Favorite - " : ""}${escapeHtml(option.name)} / ${option.calories} cal / P ${option.protein}g</option>`).join("")}
+                </select>
+                <button class="success" data-substitute-client-meal data-plan-id="${plan.id}" data-day="${day.day}" data-meal-index="${modal.mealIndex}">Use This Meal</button>
+              </div>
+            </div>
+          </div>
+        ` : ""}
+        ${nutritionMealInstructionCard(meal)}
+      </section>
+    </div>
+  `;
+}
+
+function mealInstructionsToSteps(instructions) {
+  const text = String(instructions || "").trim();
+  if (!text) return ["Review ingredients.", "Prepare the meal in a clean cooking area.", "Serve in the listed portion size."];
+  const split = text
+    .replace(/\s+/g, " ")
+    .split(/\s+(?=\d+\.\s)/)
+    .map((step) => step.replace(/^\d+\.\s*/, "").trim())
+    .filter(Boolean);
+  return split.length > 1 ? split : text.split(". ").map((step) => step.trim().replace(/\.$/, "")).filter(Boolean);
+}
+
+function nutritionReplacementOptions(currentMeal, config = {}) {
+  const options = state.nutritionDemo || {};
+  const favoriteMealIds = config.favoriteMealIds || [];
+  const sameMealType = nutritionDemoMealPool.filter((meal) =>
+    meal.mealType === currentMeal.mealType &&
+    (config.includeCurrent !== false || meal.id !== currentMeal.id) &&
+    mealFitsNutritionPreferences(meal, options)
+  );
+  const allergySafeFallback = nutritionDemoMealPool.filter((meal) =>
+    meal.mealType === currentMeal.mealType &&
+    (config.includeCurrent !== false || meal.id !== currentMeal.id) &&
+    !mealHasAllergy(meal, options.allergy)
+  );
+  const pool = sameMealType.length ? sameMealType : allergySafeFallback.length ? allergySafeFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === currentMeal.mealType);
+  return [...pool]
+    .sort((a, b) =>
+      Number(favoriteMealIds.includes(b.id)) - Number(favoriteMealIds.includes(a.id)) ||
+      nutritionMealSmartScore(b, options, currentMeal.mealType) - nutritionMealSmartScore(a, options, currentMeal.mealType) ||
+      String(a.name).localeCompare(String(b.name))
+    )
+    .slice(0, config.limit || 120);
+}
+
+function mealFitsNutritionPreferences(meal, options) {
+  if (mealHasAllergy(meal, options.allergy)) return false;
+  if (options.dietaryNeed && options.dietaryNeed !== "Any" && !meal.dietTags.includes(options.dietaryNeed)) return false;
+  if (options.cuisine && options.cuisine !== "Any" && meal.cuisine !== options.cuisine) return false;
+  return true;
+}
+
+function nutritionMealSmartScore(meal, options, mealType) {
+  let score = 0;
+  if (meal.mealType === mealType) score += 20;
+  if (!mealHasAllergy(meal, options.allergy)) score += 20;
+  if (!options.dietaryNeed || options.dietaryNeed === "Any" || meal.dietTags.includes(options.dietaryNeed)) score += 16;
+  if (!options.cuisine || options.cuisine === "Any" || meal.cuisine === options.cuisine) score += 14;
+  if (!options.goal || options.goal === "Any" || meal.goal === options.goal) score += 8;
+  if (!options.budgetLevel || options.budgetLevel === "Any" || meal.budgetLevel === options.budgetLevel) score += 4;
+  if (meal.dietTags.includes("High Protein")) score += 2;
+  return score;
+}
+
+function replaceNutritionDemoMeal(dayNumber, mealIndex, mealId) {
+  const plan = state.nutritionDemo.generatedPlan;
+  const day = plan?.days.find((item) => Number(item.day) === Number(dayNumber));
+  const replacement = nutritionDemoMealPool.find((meal) => meal.id === mealId);
+  if (!day || !replacement || !day.meals[mealIndex]) return;
+  day.meals[mealIndex] = replacement;
+  recalculateNutritionDemoPlan(plan);
+}
+
+function smartReplaceNutritionDemoMeal(dayNumber, mealIndex) {
+  const plan = state.nutritionDemo.generatedPlan;
+  const day = plan?.days.find((item) => Number(item.day) === Number(dayNumber));
+  const currentMeal = day?.meals?.[mealIndex];
+  if (!plan || !day || !currentMeal) return;
+  const usedIds = new Set(day.meals.map((meal) => meal.id));
+  const replacement = pickSmartNutritionMeal(currentMeal.mealType, state.nutritionDemo, usedIds, currentMeal.id);
+  if (!replacement) return;
+  day.meals[mealIndex] = replacement;
+  recalculateNutritionDemoPlan(plan);
+}
+
+function smartReplaceNutritionDemoDay(dayNumber) {
+  const plan = state.nutritionDemo.generatedPlan;
+  const day = plan?.days.find((item) => Number(item.day) === Number(dayNumber));
+  if (!plan || !day) return;
+  const usedIds = new Set();
+  day.meals = day.meals.map((meal) => {
+    const replacement = pickSmartNutritionMeal(meal.mealType, state.nutritionDemo, usedIds, meal.id);
+    if (replacement) {
+      usedIds.add(replacement.id);
+      return replacement;
+    }
+    usedIds.add(meal.id);
+    return meal;
+  });
+  recalculateNutritionDemoPlan(plan);
+}
+
+function pickSmartNutritionMeal(mealType, options, usedIds = new Set(), currentMealId = "") {
+  const strict = nutritionDemoMealPool.filter((meal) =>
+    meal.mealType === mealType &&
+    meal.id !== currentMealId &&
+    !usedIds.has(meal.id) &&
+    mealFitsNutritionPreferences(meal, options)
+  );
+  const fallback = nutritionDemoMealPool.filter((meal) =>
+    meal.mealType === mealType &&
+    meal.id !== currentMealId &&
+    !usedIds.has(meal.id) &&
+    !mealHasAllergy(meal, options.allergy)
+  );
+  const pool = strict.length ? strict : fallback.length ? fallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && meal.id !== currentMealId);
+  return [...pool].sort((a, b) =>
+    nutritionMealSmartScore(b, options, mealType) - nutritionMealSmartScore(a, options, mealType) ||
+    String(a.name).localeCompare(String(b.name))
+  )[0] || null;
+}
+
+function clientFavoriteMealIds(clientId) {
+  const client = store.clients.find((item) => item.id === clientId);
+  return Array.isArray(client?.favoriteMealIds) ? client.favoriteMealIds : [];
+}
+
+function toggleFavoriteMealForClient(mealId) {
+  const client = clientForCurrentUser();
+  if (!client || !mealId) return;
+  client.favoriteMealIds ||= [];
+  if (client.favoriteMealIds.includes(mealId)) {
+    client.favoriteMealIds = client.favoriteMealIds.filter((id) => id !== mealId);
+  } else {
+    client.favoriteMealIds.push(mealId);
+  }
+  saveStore();
+}
+
+function replaceAssignedMeal(planId, dayNumber, mealIndex, mealId) {
+  const plan = (store.mealPlans || []).find((item) => item.id === planId);
+  const day = plan?.days?.find((item) => Number(item.day) === Number(dayNumber));
+  const replacement = nutritionDemoMealPool.find((meal) => meal.id === mealId);
+  if (!plan || !day || !replacement || !day.meals?.[mealIndex]) return;
+  day.meals[mealIndex] = replacement;
+  plan.updatedAt = new Date().toISOString();
+  recalculateNutritionDemoPlan(plan);
+  saveStore();
+}
+
+function recalculateNutritionDemoPlan(plan) {
+  plan.days.forEach((day) => {
+    day.totalCalories = day.meals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0);
+    day.totalProtein = day.meals.reduce((sum, meal) => sum + Number(meal.protein || 0), 0);
+    day.totalCarbs = day.meals.reduce((sum, meal) => sum + Number(meal.carbs || 0), 0);
+    day.totalFat = day.meals.reduce((sum, meal) => sum + Number(meal.fat || 0), 0);
+  });
+  const totals = plan.days.reduce((sum, day) => ({
+    calories: sum.calories + day.totalCalories,
+    protein: sum.protein + day.totalProtein,
+    carbs: sum.carbs + day.totalCarbs,
+    fat: sum.fat + day.totalFat
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  plan.summary.averageCalories = Math.round(totals.calories / plan.days.length);
+  plan.summary.averageProtein = Math.round(totals.protein / plan.days.length);
+  plan.summary.averageCarbs = Math.round(totals.carbs / plan.days.length);
+  plan.summary.averageFat = Math.round(totals.fat / plan.days.length);
+}
+
+function formatReadableDate(value) {
+  if (!value) return "Not set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toLocaleDateString();
+}
+
+function activeMealPlanForClient(clientId) {
+  return (store.mealPlans || [])
+    .filter((plan) => plan.clientId === clientId && plan.status === "Active")
+    .sort((a, b) => String(b.assignedAt || b.createdAt).localeCompare(String(a.assignedAt || a.createdAt)))[0] || null;
+}
+
+function printNutritionShoppingList() {
+  const now = Date.now();
+  if (now - lastShoppingListPrintAt < 700) return;
+  lastShoppingListPrintAt = now;
+  const shoppingList = document.querySelector(".printable-shopping-list");
+  if (!shoppingList) {
+    alert("No shopping list is ready to print yet. Generate or assign a meal plan first.");
+    return;
+  }
+  document.body.classList.add("printing-shopping-list");
+  const cleanup = () => {
+    document.body.classList.remove("printing-shopping-list");
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  window.print();
+  setTimeout(cleanup, 3000);
+}
+
+function requestClientMealPlanAddon() {
+  ensureStoreListShape(store);
+  const client = clientForCurrentUser();
+  if (!client || state.currentUser?.role !== "Client") return;
+  const coachUser = store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId) || store.users.find((user) => user.role === "Coach");
+  const adminUser = store.users.find((user) => user.role === "Admin");
+  const now = new Date().toISOString();
+  client.mealPlanRequested = true;
+  client.mealPlanRequestedAt = now;
+  client.mealPlanAddonPrice = 50;
+  if (coachUser) {
+    sendChatMessage(store, {
+      fromUserId: state.currentUser.id,
+      toUserId: coachUser.id,
+      clientId: client.id,
+      body: `${client.name} requested the Smart Meal Plan add-on. Add-on price: $50.`
+    });
+  }
+  if (adminUser) {
+    store.notifications.push({
+      id: `notification_meal_request_${Date.now()}`,
+      userId: adminUser.id,
+      clientId: client.id,
+      type: "Meal Plan Request",
+      title: "Meal plan add-on requested",
+      body: `${client.name} requested the $50 Smart Meal Plan add-on.`,
+      read: false,
+      createdAt: now
+    });
+  }
+  store.adminAuditLog.push({
+    id: `audit_meal_request_${Date.now()}`,
+    adminUserId: state.currentUser.id,
+    action: `${client.name} requested the $50 Smart Meal Plan add-on`,
+    createdAt: now
+  });
+  saveStore();
+}
+
+function resetNutritionPlannerForAction() {
+  state.editModal = null;
+  state.editModalDirty = false;
+  state.nutritionDemo.dayModalOpen = false;
+  state.nutritionDemo.recipeModal = null;
+  store.settings.nutritionPlannerEnabled = true;
+  store.settings.nutritionDemoMode = "Active";
+  const options = collectNutritionDemoOptions();
+  state.nutritionDemo = {
+    ...state.nutritionDemo,
+    ...options,
+    openDay: 1,
+    dayModalOpen: false,
+    recipeModal: null,
+    generatedPlan: generateNutritionDemoPlan(options)
+  };
+  return state.nutritionDemo.generatedPlan;
+}
+
+function assignGeneratedMealPlanToClient(clientId) {
+  ensureStoreListShape(store);
+  const client = store.clients.find((item) => item.id === clientId);
+  if (!state.nutritionDemo.generatedPlan) {
+    resetNutritionPlannerForAction();
+  }
+  const plan = state.nutritionDemo.generatedPlan;
+  if (!client || !plan) {
+    state.nutritionAssignNotice = "Generate a meal plan and choose a client first.";
+    return false;
+  }
+  if (!Array.isArray(plan.days) || !plan.days.length || !plan.summary) {
+    resetNutritionPlannerForAction();
+  }
+  const planToSave = state.nutritionDemo.generatedPlan;
+  if (!Array.isArray(planToSave.days) || !planToSave.days.length || !planToSave.summary) {
+    state.nutritionAssignNotice = "Meal plan could not be built. Please adjust the meal planner filters and try again.";
+    return false;
+  }
+  state.clientId = clientId;
+  store.mealPlans.forEach((item) => {
+    if (item.clientId === clientId && item.status === "Active") {
+      item.status = "Archived";
+      item.archivedAt = new Date().toISOString();
+    }
+  });
+  const savedPlan = {
+    id: `meal_plan_${clientId}_${Date.now()}`,
+    clientId,
+    clientName: client.name,
+    createdByUserId: state.currentUser.id,
+    createdByName: state.currentUser.name,
+    status: "Active",
+    planName: `${planToSave.days.length}-Day ${planToSave.summary.goal} Meal Plan`,
+    assignedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    options: { ...(planToSave.options || collectNutritionDemoOptions()) },
+    summary: { ...planToSave.summary },
+    days: JSON.parse(JSON.stringify(planToSave.days))
+  };
+  store.mealPlans.push(savedPlan);
+  state.nutritionDemo.assignedPlanId = savedPlan.id;
+  store.adminAuditLog.push({
+    id: `audit_meal_plan_${Date.now()}`,
+    adminUserId: state.currentUser.id,
+    action: `Assigned meal plan ${savedPlan.id} to ${client.name}`,
+    createdAt: new Date().toISOString()
+  });
+  state.nutritionAssignNotice = `Meal plan assigned to ${client.name}. The client can now see it on their Meal Plan tab.`;
+  try {
+    window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+  } catch (error) {
+    console.warn("Meal plan assigned, but local browser save hit a storage limit.", error);
+    state.nutritionAssignNotice = `Meal plan assigned to ${client.name}, but this browser could not save it locally because storage is full.`;
+  }
+  scheduleAutomaticCloudBackup();
+  return true;
+}
+
+function nutritionAssignedPlanSummary(clientId) {
+  const client = store.clients.find((item) => item.id === clientId);
+  if (!client) return "";
+  const plan = activeMealPlanForClient(clientId);
+  return `
+    <div class="result-band">
+      <strong>Current assigned meal plan</strong>
+      <span>${plan ? `${escapeHtml(client.name)} has ${escapeHtml(plan.planName)} assigned on ${formatReadableDate(plan.assignedAt)}.` : `${escapeHtml(client.name)} does not have an active meal plan assigned yet.`}</span>
+    </div>
+  `;
+}
+
+function nutritionAssignedPlanView(plan, options = {}) {
+  const shopping = buildNutritionShoppingList(plan.days || []);
+  return `
+    <section class="nutrition-demo-results">
+      <div class="section-head compact-head">
+        <div>
+          <p class="eyebrow">${escapeHtml(plan.status || "Active")} / ${escapeHtml(plan.planName || "Meal Plan")}</p>
+          <h3>${escapeHtml(plan.summary?.goal || "Goal")} / ${escapeHtml(plan.summary?.dietaryNeed || "Nutrition")}</h3>
+          <p class="muted">Assigned ${formatReadableDate(plan.assignedAt || plan.createdAt)}. Estimated daily average: ${plan.summary?.averageCalories || 0} cal, ${plan.summary?.averageProtein || 0}g protein.</p>
+          ${options.clientView ? `<p class="muted">Click any meal card to open the recipe, ingredients, and step-by-step instructions.</p>` : ""}
+        </div>
+      </div>
+      <div class="card-list compact-plan-list">
+        ${(plan.days || []).map((day) => `
+          <article class="card nutrition-day-card">
+            <div class="section-head compact-head">
+              <div><p class="eyebrow">Day ${day.day}</p><h3>${day.totalCalories} cal / ${day.totalProtein}g protein</h3></div>
+            </div>
+            <div class="meal-preview-list">
+              ${day.meals.map((meal, mealIndex) => nutritionMealPreviewCard(meal, plan.id, day.day, mealIndex)).join("")}
+            </div>
+          </article>
+        `).join("")}
+      </div>
+      ${options.clientView ? `
+        <article class="card printable-shopping-list">
+          <div class="section-head compact-head">
+            <div><p class="eyebrow">Shopping</p><h3>Shopping list</h3></div>
+            <button id="printNutritionShoppingList" data-print-nutrition-shopping-list onclick="window.printNutritionShoppingList && window.printNutritionShoppingList()">Print Shopping List</button>
+          </div>
+          <div class="shopping-columns">
+            ${Object.entries(shopping).map(([category, items]) => `
+              <div>
+                <h4>${escapeHtml(category)}</h4>
+                <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+      ` : ""}
+    </section>
+  `;
+}
+
+function collectNutritionDemoOptions() {
+  return {
+    planLength: Number(document.querySelector("#nutritionPlanLength")?.value || state.nutritionDemo.planLength || 7),
+    goal: document.querySelector("#nutritionGoal")?.value || state.nutritionDemo.goal,
+    dietaryNeed: document.querySelector("#nutritionDietaryNeed")?.value || state.nutritionDemo.dietaryNeed,
+    allergy: document.querySelector("#nutritionAllergy")?.value || state.nutritionDemo.allergy,
+    cuisine: document.querySelector("#nutritionCuisine")?.value || state.nutritionDemo.cuisine,
+    budgetLevel: document.querySelector("#nutritionBudget")?.value || state.nutritionDemo.budgetLevel
+  };
+}
+
+function generateNutritionDemoPlan(options) {
+  const mealTypes = ["Breakfast", "Lunch", "Dinner", "Snack"];
+  const days = [];
+  const counters = {};
+  for (let day = 1; day <= options.planLength; day += 1) {
+    const meals = mealTypes.map((mealType) => pickNutritionDemoMeal(mealType, options, day, counters));
+    days.push({
+      day,
+      meals,
+      totalCalories: meals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0),
+      totalProtein: meals.reduce((sum, meal) => sum + Number(meal.protein || 0), 0),
+      totalCarbs: meals.reduce((sum, meal) => sum + Number(meal.carbs || 0), 0),
+      totalFat: meals.reduce((sum, meal) => sum + Number(meal.fat || 0), 0)
+    });
+  }
+  const totals = days.reduce((sum, day) => ({
+    calories: sum.calories + day.totalCalories,
+    protein: sum.protein + day.totalProtein,
+    carbs: sum.carbs + day.totalCarbs,
+    fat: sum.fat + day.totalFat
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return {
+    options,
+    days,
+    summary: {
+      goal: options.goal,
+      dietaryNeed: options.dietaryNeed,
+      averageCalories: Math.round(totals.calories / days.length),
+      averageProtein: Math.round(totals.protein / days.length),
+      averageCarbs: Math.round(totals.carbs / days.length),
+      averageFat: Math.round(totals.fat / days.length)
+    }
+  };
+}
+
+function pickNutritionDemoMeal(mealType, options, day, counters) {
+  const matches = nutritionDemoMealPool.filter((meal) => nutritionMealMatches(meal, mealType, options));
+  const fallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !mealHasAllergy(meal, options.allergy));
+  const pool = matches.length ? matches : fallback.length ? fallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType);
+  const sorted = [...pool].sort((a, b) => (counters[a.id] || 0) - (counters[b.id] || 0) || String(a.name).localeCompare(String(b.name)));
+  const picked = sorted[(day - 1) % Math.max(1, sorted.length)] || pool[0] || nutritionDemoMealPool[0];
+  counters[picked.id] = (counters[picked.id] || 0) + 1;
+  return picked;
+}
+
+function nutritionMealMatches(meal, mealType, options) {
+  if (meal.mealType !== mealType) return false;
+  if (mealHasAllergy(meal, options.allergy)) return false;
+  if (options.goal !== "Any" && meal.goal && meal.goal !== options.goal) return false;
+  if (options.dietaryNeed !== "Any" && !meal.dietTags.includes(options.dietaryNeed)) return false;
+  if (options.cuisine !== "Any" && meal.cuisine !== options.cuisine) return false;
+  if (options.budgetLevel !== "Any" && meal.budgetLevel !== options.budgetLevel) return false;
+  return true;
+}
+
+function mealHasAllergy(meal, allergy) {
+  return allergy && allergy !== "None" && meal.allergens.includes(allergy);
+}
+
+function buildNutritionShoppingList(days) {
+  const categories = {};
+  days.flatMap((day) => day.meals).forEach((meal) => {
+    String(meal.shoppingListItems || "").split(";").forEach((group) => {
+      const [rawCategory, rawItems] = group.split(":");
+      const category = String(rawCategory || "Other").trim() || "Other";
+      const items = String(rawItems || rawCategory || "").split(",").map((item) => item.trim()).filter(Boolean);
+      categories[category] ||= new Set();
+      items.forEach((item) => categories[category].add(item));
+    });
+  });
+  return Object.fromEntries(Object.entries(categories).map(([category, items]) => [category, [...items].sort()]));
 }
 
 function addSuggestedExerciseToWorkout(workoutId) {
