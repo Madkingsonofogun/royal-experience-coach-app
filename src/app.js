@@ -2008,8 +2008,8 @@ function workoutExerciseCard(item, canEdit) {
         <div><p class="eyebrow">${item.sessionPart}</p><h4>${item.exerciseName}</h4></div>
         <span class="badge ${item.difficulty === "Hard" ? "red" : item.difficulty === "Medium" ? "orange" : "green"}">${item.difficulty}</span>
       </div>
+      ${doseDetailGrid(item)}
       <div class="chips">
-        <span>${formatDose(item)}</span>
         <span>${Array.isArray(item.equipment) ? item.equipment.join(", ") : item.equipment || "Bodyweight"}</span>
         <span>${detail.trainingLevel || "Intermediate"}</span>
       </div>
@@ -2017,9 +2017,25 @@ function workoutExerciseCard(item, canEdit) {
       <div class="actions">
         ${item.hasVideo ? `<a class="button-link" href="${detail.videoUrl}" target="_blank" rel="noopener">Watch Video</a>` : ""}
         <button class="primary" data-exercise-detail="${item.exerciseId}" data-workout-context="${state.selectedWorkoutId}">View Details</button>
-        ${canEdit ? `<button class="ghost">Replace</button><button class="ghost">Edit Dose</button><button class="ghost">Add Coach Note</button>` : ""}
+        ${canEdit ? `<button class="ghost" data-coach-workout-item="${state.selectedWorkoutId}:${item.itemIndex}" data-coach-workout-mode="replace">Replace Exercise</button><button class="ghost" data-coach-workout-item="${state.selectedWorkoutId}:${item.itemIndex}" data-coach-workout-mode="dose">Edit Rounds / Sets / Time</button><button class="ghost" data-coach-workout-item="${state.selectedWorkoutId}:${item.itemIndex}" data-coach-workout-mode="note">Add Coach Note</button>` : ""}
       </div>
     </article>
+  `;
+}
+
+function doseDetailGrid(item) {
+  const fields = [
+    ["Sets", item.sets],
+    ["Reps", item.reps],
+    ["Rounds", item.rounds],
+    ["Round time", item.time],
+    ["Rest", item.rest]
+  ].filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "");
+  if (!fields.length) return `<div class="dose-grid"><span><small>Suggested rounds</small><strong>Coach set</strong></span></div>`;
+  return `
+    <div class="dose-grid">
+      ${fields.map(([label, value]) => `<span><small>${label}</small><strong>${escapeHtml(formatDoseValue(label, value))}</strong></span>`).join("")}
+    </div>
   `;
 }
 
@@ -2029,6 +2045,9 @@ function exerciseDetailPage() {
   if (!detail) {
     return `<section class="workspace"><div class="empty">This exercise detail is not available for this account.</div><button class="ghost" data-view="workoutDetail">Back</button></section>`;
   }
+  const workoutDetail = getWorkoutDetailForUser(store, state.currentUser, client.id, state.selectedWorkoutId, today);
+  const workoutItem = workoutDetail?.sections?.flatMap((section) => section.items || []).find((item) => item.exerciseId === state.selectedExerciseId);
+  const suggestedWork = workoutItem || detail;
   return `
     <section class="workspace">
       <div class="section-head">
@@ -2061,14 +2080,8 @@ function exerciseDetailPage() {
           <h3>Pain warnings</h3><p>${detail.painWarnings}</p>
         </article>
         <aside class="card exercise-detail-side">
-          <h3>Dose</h3>
-          <dl>
-            <div><dt>Sets</dt><dd>${detail.sets ?? "Coach set"}</dd></div>
-            <div><dt>Reps</dt><dd>${detail.reps ?? "Coach set"}</dd></div>
-            <div><dt>Time</dt><dd>${detail.time ?? "Coach set"}</dd></div>
-            <div><dt>Rest</dt><dd>${detail.rest ?? "Coach set"}</dd></div>
-            <div><dt>Rounds</dt><dd>${detail.rounds ?? "Coach set"}</dd></div>
-          </dl>
+          <h3>Suggested rounds / work</h3>
+          ${doseDetailGrid(suggestedWork)}
           <h3>Options</h3>
           <p><strong>Easier:</strong> ${detail.easierVersion}</p>
           <p><strong>Harder:</strong> ${detail.harderVersion}</p>
@@ -2079,10 +2092,24 @@ function exerciseDetailPage() {
           ${detail.clientNotes ? `<h3>Client notes</h3><p>${detail.clientNotes}</p>` : ""}
           ${detail.coachOnlyNotes ? `<h3>Coach notes</h3><p>${detail.coachOnlyNotes}</p>` : ""}
           ${detail.replacementOptions.length ? `<h3>Replacement options</h3>${chipSection("Options", detail.replacementOptions.map((item) => item.name))}` : ""}
-          ${detail.canAdjustInWorkout ? `<div class="actions vertical"><button>Replace Exercise</button><button>Edit Sets/Reps/Time/Rest</button><button>Add Coach Note</button><button>Approve Adjusted Workout</button></div>` : ""}
+          ${detail.canAdjustInWorkout ? exerciseDetailCoachActions() : ""}
         </aside>
       </div>
     </section>
+  `;
+}
+
+function exerciseDetailCoachActions() {
+  const workout = store.monthlyPlanItems.find((item) => item.id === state.selectedWorkoutId);
+  const itemIndex = workout?.items?.findIndex((item) => item.exerciseId === state.selectedExerciseId);
+  const disabled = itemIndex === undefined || itemIndex < 0;
+  return `
+    <div class="actions vertical">
+      <button ${disabled ? "disabled" : ""} data-coach-workout-item="${state.selectedWorkoutId}:${itemIndex}" data-coach-workout-mode="replace">Replace Exercise</button>
+      <button ${disabled ? "disabled" : ""} data-coach-workout-item="${state.selectedWorkoutId}:${itemIndex}" data-coach-workout-mode="dose">Edit Sets/Reps/Time/Rest</button>
+      <button ${disabled ? "disabled" : ""} data-coach-workout-item="${state.selectedWorkoutId}:${itemIndex}" data-coach-workout-mode="note">Add Coach Note</button>
+      <button ${disabled ? "disabled" : ""} data-coach-workout-item="${state.selectedWorkoutId}:${itemIndex}" data-coach-workout-mode="approve">Approve Adjusted Workout</button>
+    </div>
   `;
 }
 
@@ -2197,6 +2224,7 @@ function alertCard(alert) {
   const client = store.clients.find((item) => item.id === alert.clientId);
   const daily = store.dailyCheckIns.find((item) => item.id === alert.dailyCheckInId);
   const pain = alert.painSummary;
+  const isScheduleAlert = alert.alertType === "Assessment Schedule";
   return `
     <article class="card alert-card ${alert.alertSeverity.toLowerCase()}">
       <div class="section-head">
@@ -2208,18 +2236,19 @@ function alertCard(alert) {
         <span class="badge ${alert.alertSeverity === "Serious" ? "red" : alert.alertSeverity === "Moderate" ? "orange" : "green"}">${alert.status}</span>
       </div>
       <div class="split">
-        <div><h4>Check-in answers</h4><p>Energy ${daily.energyScore}, pain ${daily.painScore}, soreness ${daily.sorenessScore}, sleep ${daily.sleepScore}, stress ${daily.stressScore}, readiness ${daily.readinessScore}</p></div>
+        <div><h4>${isScheduleAlert ? "Appointment" : "Check-in answers"}</h4><p>${daily ? `Energy ${daily.energyScore}, pain ${daily.painScore}, soreness ${daily.sorenessScore}, sleep ${daily.sleepScore}, stress ${daily.stressScore}, readiness ${daily.readinessScore}` : escapeHtml(alert.scheduleSummary || "Assessment appointment update.")}</p></div>
         <div><h4>Pain details</h4><p>${pain ? `Location: ${pain.locations.join(", ") || "Not selected"}. Type: ${pain.types.join(", ") || "Not selected"}. Level: ${pain.level}/10.${pain.worseWithMovement ? " Worse with movement." : ""}` : "No pain reported."}</p></div>
         <div><h4>App recommendation</h4><p>${alert.appRecommendation}</p></div>
         <div><h4>Suggested adjustment</h4><p>${alert.suggestedAdjustmentType}</p></div>
       </div>
-      <div class="workout-compare">
+      ${alert.originalWorkoutSnapshot || alert.suggestedWorkoutSnapshot ? `<div class="workout-compare">
         ${compactWorkout("Original workout", alert.originalWorkoutSnapshot)}
         ${compactWorkout("Suggested workout", alert.suggestedWorkoutSnapshot)}
-      </div>
+      </div>` : ""}
       <div class="actions">
-        ${["Approved Suggested Change", "Edited Suggested Change", "Kept Original Workout", "Replaced Workout", "Coach Review Needed", "No Workout Today"].map((decision) => `<button data-alert-decision="${alert.id}:${decision}">${decision}</button>`).join("")}
-        <button class="ghost">Message Client</button>
+        ${alert.suggestedWorkoutSnapshot ? `<button class="primary" data-edit-alert-workout="${alert.id}">Edit Suggested Workout</button>` : ""}
+        ${isScheduleAlert ? `<button data-view="schedule">Open Schedule</button><button data-alert-decision="${alert.id}:Reviewed">Mark Reviewed</button>` : ["Approved Suggested Change", "Edited Suggested Change", "Kept Original Workout", "Replaced Workout", "Coach Review Needed", "No Workout Today"].map((decision) => `<button data-alert-decision="${alert.id}:${decision}">${decision}</button>`).join("")}
+        <button class="ghost" data-view="chat">Message Client</button>
       </div>
     </article>
   `;
@@ -2549,7 +2578,12 @@ function adminView() {
 }
 
 function adminEditModal() {
-  if (!state.editModal || state.currentUser?.role !== "Admin") return "";
+  if (!state.editModal) return "";
+  if (["coachWorkoutItem", "coachAlertWorkout"].includes(state.editModal.type) && ["Coach", "Admin"].includes(state.currentUser?.role)) {
+    if (state.editModal.type === "coachWorkoutItem") return coachWorkoutItemModal();
+    if (state.editModal.type === "coachAlertWorkout") return coachAlertWorkoutModal(state.editModal.id);
+  }
+  if (state.currentUser?.role !== "Admin") return "";
   if (state.editModal.type === "client") return clientEditModal(state.editModal.id);
   if (state.editModal.type === "exercise") return exerciseEditModal(state.editModal.id);
   if (state.editModal.type === "workout") return workoutEditModal(state.editModal.id);
@@ -2561,6 +2595,341 @@ function adminEditModal() {
   if (state.editModal.type === "assessmentTemplate") return assessmentTemplateEditModal(state.editModal.id);
   if (state.editModal.type === "account") return accountReviewModal(state.editModal.id);
   return "";
+}
+
+function coachWorkoutItemModal() {
+  const modal = state.editModal || {};
+  const workout = store.monthlyPlanItems.find((item) => item.id === modal.workoutId);
+  const item = workout?.items?.[Number(modal.itemIndex)];
+  if (!workout || !item) return "";
+  const client = store.clients.find((entry) => entry.id === workout.clientId) || selectedClient();
+  if (state.currentUser.role === "Coach" && client.coachId !== state.currentUser.linkedId) {
+    return `<div class="modal-backdrop"><section class="modal-card"><h2>Not available</h2><p>This client is not assigned to this coach.</p><button id="closeEditModal">Close</button></section></div>`;
+  }
+  const options = exerciseReplacementOptionsForItem(item, client);
+  const smart = smartCoachExerciseReplacement(item, client, workout);
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Coach workout control / ${escapeHtml(client.name)}</p>
+            <h2>${escapeHtml(item.name || item.exerciseName || "Workout exercise")}</h2>
+            <p class="muted">Change this exercise only for this client's workout. Pick from the exercise library or use Smart Coaching.</p>
+          </div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="result-band">
+          <strong>Current exercise</strong>
+          <span>${escapeHtml(item.sessionPart || "Training")} / ${formatDose(item)}${item.replacementReason ? ` / ${escapeHtml(item.replacementReason)}` : ""}</span>
+        </div>
+        <div class="form-grid">
+          <label>Replace with exercise
+            <select id="coachReplacementExercise">
+              ${options.map((exercise) => `<option value="${exercise.id}" ${exercise.id === item.exerciseId ? "selected" : ""}>${escapeHtml(exercise.exerciseName || exercise.name)} / ${escapeHtml(exercise.sessionPart || exercise.category || "Training")} / ${escapeHtml(exercise.difficulty || "Medium")}</option>`).join("")}
+            </select>
+          </label>
+          <label>Sets <input id="coachItemSets" type="number" value="${escapeHtml(item.sets || "")}" /></label>
+          <label>Reps <input id="coachItemReps" value="${escapeHtml(item.reps || "")}" /></label>
+          <label>Round time <input id="coachItemTime" value="${escapeHtml(item.time || "")}" placeholder="3 min, 45 sec, 30s" /></label>
+          <label>Rest <input id="coachItemRest" value="${escapeHtml(item.rest || "")}" /></label>
+          <label>Rounds <input id="coachItemRounds" type="number" value="${escapeHtml(item.rounds || "")}" /></label>
+        </div>
+        <label>Coach note <textarea id="coachItemCoachNote">${escapeHtml(item.coachingNotes || item.coachNote || "")}</textarea></label>
+        <label>Client-visible note <textarea id="coachItemClientNote">${escapeHtml(item.clientNotes || item.clientNote || "")}</textarea></label>
+        <div class="result-band">
+          <strong>Smart Coaching suggestion</strong>
+          <span>${smart ? `${escapeHtml(smart.exerciseName || smart.name)} - ${escapeHtml(smart.difficulty || "Medium")} ${smart.lowImpact ? "/ low impact" : ""}` : "No smart replacement found for this section."}</span>
+        </div>
+        <div class="modal-actions sticky-modal-actions">
+          <button class="success" data-save-coach-workout-item>Save Changes</button>
+          ${smart ? `<button class="ghost" data-smart-coach-replace-item="${smart.id}">Use Smart Coaching Pick</button>` : ""}
+          <button class="primary" data-approve-current-adjusted-workout>Approve Adjusted Workout</button>
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function coachAlertWorkoutModal(alertId) {
+  const alert = store.coachAlerts.find((item) => item.id === alertId);
+  if (!alert) return "";
+  const client = store.clients.find((entry) => entry.id === alert.clientId) || selectedClient();
+  if (state.currentUser.role === "Coach" && client.coachId !== state.currentUser.linkedId) {
+    return `<div class="modal-backdrop"><section class="modal-card"><h2>Not available</h2><p>This client is not assigned to this coach.</p><button id="closeEditModal">Close</button></section></div>`;
+  }
+  const workout = alert.suggestedWorkoutSnapshot || { items: [] };
+  return `
+    <div class="modal-backdrop" role="dialog" aria-modal="true">
+      <section class="modal-card large-modal">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Coach alert workout editor / ${escapeHtml(client.name)}</p>
+            <h2>${escapeHtml(workout.title || "Suggested adjusted workout")}</h2>
+            <p class="muted">Edit the app suggestion before approving it for today. This changes today's adjusted workout only.</p>
+          </div>
+          <button class="ghost" id="closeEditModal">Close</button>
+        </div>
+        <div class="card-list compact-plan-list">
+          ${(workout.items || []).map((item, index) => {
+            const options = exerciseReplacementOptionsForItem(item, client);
+            const smart = smartCoachExerciseReplacement(item, client, workout);
+            return `
+              <article class="card coach-alert-item-editor">
+                <div class="section-head compact-head">
+                  <div><p class="eyebrow">${escapeHtml(item.sessionPart || "Training")}</p><h3>${escapeHtml(item.name || item.exerciseName || "Exercise")}</h3></div>
+                  ${smart ? `<button class="ghost" data-smart-alert-item="${alert.id}:${index}:${smart.id}">Smart Pick</button>` : ""}
+                </div>
+                <div class="form-grid compact-form">
+                  <label>Replace exercise
+                    <select id="alertReplace-${index}">
+                      ${options.map((exercise) => `<option value="${exercise.id}" ${exercise.id === item.exerciseId ? "selected" : ""}>${escapeHtml(exercise.exerciseName || exercise.name)} / ${escapeHtml(exercise.difficulty || "Medium")}</option>`).join("")}
+                    </select>
+                  </label>
+                  <label>Sets <input id="alertSets-${index}" value="${escapeHtml(item.sets || "")}" /></label>
+                  <label>Reps <input id="alertReps-${index}" value="${escapeHtml(item.reps || "")}" /></label>
+                  <label>Round time <input id="alertTime-${index}" value="${escapeHtml(item.time || "")}" /></label>
+                  <label>Rest <input id="alertRest-${index}" value="${escapeHtml(item.rest || "")}" /></label>
+                  <label>Rounds <input id="alertRounds-${index}" value="${escapeHtml(item.rounds || "")}" /></label>
+                </div>
+                <label>Coach note <textarea id="alertCoachNote-${index}">${escapeHtml(item.coachingNotes || item.coachNote || "")}</textarea></label>
+              </article>
+            `;
+          }).join("") || `<div class="empty">No workout items available in this suggestion.</div>`}
+        </div>
+        <label>Coach approval note <textarea id="alertCoachApprovalNote">${escapeHtml(alert.coachNotes || "")}</textarea></label>
+        <div class="modal-actions sticky-modal-actions">
+          <button class="success" data-save-alert-suggested-workout="${alert.id}">Save Edited Suggestion</button>
+          <button class="primary" data-approve-edited-alert-workout="${alert.id}">Approve Edited Workout</button>
+          <button class="ghost" id="closeEditModalSecondary">Cancel</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function exerciseReplacementOptionsForItem(item, client) {
+  const section = normalizeText(item.sessionPart || item.replacementCategory || "");
+  const currentExercise = store.exercises.find((exercise) => exercise.id === item.exerciseId);
+  const currentCategory = normalizeText(currentExercise?.replacementCategory || currentExercise?.category || item.sessionPart || "");
+  const restrictions = appValueList(client?.currentRestrictions || client?.restrictions || client?.injuryNotes || []);
+  const options = store.exercises.filter((exercise) => {
+    if (exercise.active === false || exercise.archived) return false;
+    const exerciseSection = normalizeText(exercise.sessionPart || exercise.category || exercise.replacementCategory || "");
+    const exerciseCategory = normalizeText(exercise.replacementCategory || exercise.category || "");
+    const matchesSection = section && (exerciseSection.includes(section.split(" ")[0]) || section.includes(exerciseSection.split(" ")[0]));
+    const matchesCategory = currentCategory && (exerciseCategory.includes(currentCategory.split(" ")[0]) || currentCategory.includes(exerciseCategory.split(" ")[0]));
+    if (!matchesSection && !matchesCategory) return false;
+    const contraindications = appValueList(exercise.contraindications).map(normalizeText).join(" ");
+    if (restrictions.some((restriction) => contraindications.includes(normalizeText(restriction)))) return false;
+    return true;
+  });
+  const fallback = store.exercises.filter((exercise) => exercise.active !== false && !exercise.archived && (exercise.lowImpact || exercise.recoveryAlternative));
+  return uniqueById([currentExercise, ...options, ...fallback].filter(Boolean)).slice(0, 80);
+}
+
+function smartCoachExerciseReplacement(item, client, workout) {
+  const options = exerciseReplacementOptionsForItem(item, client).filter((exercise) => exercise.id !== item.exerciseId);
+  const workoutText = normalizeText(`${workout?.adjustmentMode || ""} ${workout?.title || ""} ${item.replacementReason || ""}`);
+  const recoveryPreferred = workoutText.includes("recovery") || workoutText.includes("pain") || workoutText.includes("lower");
+  return options.find((exercise) => recoveryPreferred && (exercise.lowImpact || exercise.recoveryAlternative))
+    || options.find((exercise) => exercise.lowImpact)
+    || options.find((exercise) => normalizeText(exercise.difficulty) === "easy")
+    || options[0]
+    || null;
+}
+
+function uniqueById(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (!item?.id || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function normalizeText(value) {
+  return String(value || "").toLowerCase().trim();
+}
+
+function appValueList(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  return String(value).split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function applyExerciseToWorkoutItem(item, exercise, reason = "Coach replacement") {
+  if (!item || !exercise) return item;
+  item.exerciseId = exercise.id;
+  item.name = exercise.exerciseName || exercise.name;
+  item.exerciseName = exercise.exerciseName || exercise.name;
+  item.sessionPart = item.sessionPart || exercise.sessionPart || exercise.replacementCategory || "Strength";
+  item.difficulty = exercise.difficulty || item.difficulty || "Medium";
+  item.equipment = appValueList(exercise.equipment).join(", ");
+  item.replacementReason = reason;
+  if (!item.sets && exercise.sets) item.sets = exercise.sets;
+  if (!item.reps && exercise.reps) item.reps = exercise.reps;
+  if (!item.time && exercise.time) item.time = exercise.time;
+  if (!item.rest && exercise.rest) item.rest = exercise.rest;
+  if (!item.rounds && exercise.rounds) item.rounds = exercise.rounds;
+  return item;
+}
+
+function saveCoachWorkoutItemModal(approveToday = false) {
+  const modal = state.editModal || {};
+  const workout = store.monthlyPlanItems.find((item) => item.id === modal.workoutId);
+  const item = workout?.items?.[Number(modal.itemIndex)];
+  if (!workout || !item) return;
+  const exercise = store.exercises.find((entry) => entry.id === document.querySelector("#coachReplacementExercise")?.value);
+  if (exercise && exercise.id !== item.exerciseId) applyExerciseToWorkoutItem(item, exercise, "Coach selected replacement");
+  item.sets = fieldValue("#coachItemSets");
+  item.reps = fieldValue("#coachItemReps");
+  item.time = fieldValue("#coachItemTime");
+  item.rest = fieldValue("#coachItemRest");
+  item.rounds = fieldValue("#coachItemRounds");
+  item.coachingNotes = document.querySelector("#coachItemCoachNote")?.value || "";
+  item.clientNotes = document.querySelector("#coachItemClientNote")?.value || "";
+  syncCoachEditedWorkoutItemToTodayAdjustment(workout, Number(modal.itemIndex));
+  workout.coachEditedAt = new Date().toISOString();
+  workout.coachEditedByUserId = state.currentUser.id;
+  workout.source = "Coach edited workout";
+  store.adminAuditLog.push({
+    id: `audit_coach_workout_${Date.now()}`,
+    adminUserId: state.currentUser.id,
+    action: `${state.currentUser.name} edited workout item for ${workout.clientId}`,
+    createdAt: new Date().toISOString()
+  });
+  if (approveToday && workout.workoutDate === today) {
+    approveWorkoutSnapshotForToday(workout, "Edited Suggested Change", "Coach approved adjusted workout from workout detail.");
+  }
+  state.editModal = null;
+  window.alert(approveToday ? "Adjusted workout approved for today." : "Workout exercise updated.");
+}
+
+function syncCoachEditedWorkoutItemToTodayAdjustment(workout, itemIndex) {
+  if (!workout?.clientId || workout.workoutDate !== today) return;
+  const editedItem = workout.items?.[itemIndex];
+  if (!editedItem) return;
+  const latestAdjustment = store.todayWorkoutAdjustments
+    .filter((item) => item.clientId === workout.clientId && item.workoutDate === workout.workoutDate)
+    .at(-1);
+  if (!latestAdjustment) return;
+  ["coachApprovedWorkoutSnapshot", "adjustedWorkoutSnapshot", "appSuggestedWorkoutSnapshot"].forEach((key) => {
+    const snapshot = latestAdjustment[key];
+    if (!snapshot?.items?.length) return;
+    const targetIndex = Math.min(itemIndex, snapshot.items.length - 1);
+    const targetItem = snapshot.items[targetIndex];
+    if (!targetItem) return;
+    snapshot.items[targetIndex] = {
+      ...targetItem,
+      exerciseId: editedItem.exerciseId,
+      name: editedItem.name || editedItem.exerciseName,
+      exerciseName: editedItem.exerciseName || editedItem.name,
+      sessionPart: editedItem.sessionPart,
+      difficulty: editedItem.difficulty,
+      equipment: editedItem.equipment,
+      sets: editedItem.sets,
+      reps: editedItem.reps,
+      time: editedItem.time,
+      rest: editedItem.rest,
+      rounds: editedItem.rounds,
+      coachingNotes: editedItem.coachingNotes,
+      clientNotes: editedItem.clientNotes,
+      replacementReason: editedItem.replacementReason || "Coach updated this client's workout"
+    };
+  });
+  latestAdjustment.coachDecision = latestAdjustment.coachDecision || "Edited Suggested Change";
+  latestAdjustment.coachNotes = "Coach updated this client's suggested rounds/work.";
+  latestAdjustment.approvedAt = new Date().toISOString();
+}
+
+function saveAlertSuggestedWorkout(alertId) {
+  const alert = store.coachAlerts.find((item) => item.id === alertId);
+  if (!alert?.suggestedWorkoutSnapshot) return;
+  alert.suggestedWorkoutSnapshot.items = (alert.suggestedWorkoutSnapshot.items || []).map((item, index) => {
+    const next = { ...item };
+    const exercise = store.exercises.find((entry) => entry.id === document.querySelector(`#alertReplace-${index}`)?.value);
+    if (exercise && exercise.id !== next.exerciseId) applyExerciseToWorkoutItem(next, exercise, "Coach edited alert suggestion");
+    next.sets = fieldValue(`#alertSets-${index}`);
+    next.reps = fieldValue(`#alertReps-${index}`);
+    next.time = fieldValue(`#alertTime-${index}`);
+    next.rest = fieldValue(`#alertRest-${index}`);
+    next.rounds = fieldValue(`#alertRounds-${index}`);
+    next.coachingNotes = document.querySelector(`#alertCoachNote-${index}`)?.value || "";
+    return next;
+  });
+  alert.coachNotes = document.querySelector("#alertCoachApprovalNote")?.value || alert.coachNotes || "";
+  alert.appRecommendation = `${alert.appRecommendation || "Coach review"} Coach has edited the suggested workout.`;
+}
+
+function approveWorkoutSnapshotForToday(workout, decision, note) {
+  const client = store.clients.find((item) => item.id === workout.clientId);
+  const daily = store.dailyCheckIns.find((item) => item.clientId === workout.clientId && item.workoutDate === workout.workoutDate);
+  store.todayWorkoutAdjustments.push({
+    id: `today-adjustment_${Date.now()}`,
+    clientId: workout.clientId,
+    coachId: client?.coachId || state.currentUser.linkedId,
+    dailyCheckInId: daily?.id || null,
+    monthlyPlanId: workout.monthlyPlanId,
+    workoutDate: workout.workoutDate,
+    alertId: null,
+    originalWorkoutSnapshot: cloneLocal(workout),
+    appSuggestedWorkoutSnapshot: cloneLocal(workout),
+    coachApprovedWorkoutSnapshot: cloneLocal(workout),
+    adjustedWorkoutSnapshot: cloneLocal(workout),
+    adjustmentType: workout.adjustmentMode || "Coach Edited",
+    adjustmentReason: note,
+    coachDecision: decision,
+    coachNotes: note,
+    approvedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  });
+}
+
+function cloneLocal(value) {
+  return JSON.parse(JSON.stringify(value || null));
+}
+
+function fieldValue(selector) {
+  const field = document.querySelector(selector);
+  return field ? field.value.trim() : "";
+}
+
+function createAssessmentScheduleCoachAlert(schedule, reason = "Assessment schedule updated") {
+  if (!schedule?.coachId) return null;
+  const existing = store.coachAlerts.find((alert) =>
+    alert.alertType === "Assessment Schedule" &&
+    alert.scheduleId === schedule.id &&
+    alert.status === "New" &&
+    alert.alertReason === reason
+  );
+  if (existing) return existing;
+  const alert = {
+    id: `alert_schedule_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    clientId: schedule.clientId,
+    coachId: schedule.coachId,
+    dailyCheckInId: null,
+    scheduleId: schedule.id,
+    alertType: "Assessment Schedule",
+    alertSeverity: schedule.status === "Needs Chat" ? "Moderate" : "Mild",
+    alertReason: reason,
+    scheduleSummary: `${schedule.assessmentType || "Assessment"}: ${schedule.proposedDate || "date needed"} at ${schedule.proposedTime || "time needed"} / ${schedule.status || "Pending"}`,
+    painSummary: null,
+    appRecommendation: schedule.status === "Needs Chat"
+      ? "Open chat with the client to agree on the assessment time."
+      : "Review the assessment appointment and follow up if needed.",
+    suggestedAdjustmentType: "Schedule Review",
+    originalWorkoutSnapshot: null,
+    suggestedWorkoutSnapshot: null,
+    status: "New",
+    coachDecision: null,
+    coachNotes: "",
+    createdAt: new Date().toISOString(),
+    resolvedAt: null
+  };
+  store.coachAlerts.push(alert);
+  return alert;
 }
 
 function exerciseLibraryAdminList() {
@@ -3567,13 +3936,16 @@ function bindGlobal() {
     const proposedDate = document.querySelector("#assessmentScheduleDate")?.value;
     const proposedTime = document.querySelector("#assessmentScheduleTime")?.value;
     try {
-      proposeAssessmentSchedule(store, state.currentUser, {
+      const schedule = proposeAssessmentSchedule(store, state.currentUser, {
         clientId: state.clientId,
         assessmentType: document.querySelector("#assessmentScheduleType")?.value || "Initial Assessment",
         proposedDate,
         proposedTime,
         coachNotes: document.querySelector("#assessmentScheduleCoachNote")?.value || ""
       });
+      if (state.currentUser.role === "Client") {
+        createAssessmentScheduleCoachAlert(schedule, "Client requested an assessment appointment.");
+      }
       state.planDraftNotice = "Assessment time sent to the client for approval.";
       render();
     } catch (error) {
@@ -3581,12 +3953,14 @@ function bindGlobal() {
     }
   });
   document.querySelector("#clientApproveAssessmentSchedule")?.addEventListener("click", (event) => {
-    respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, { action: "approve" });
+    const schedule = respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, { action: "approve" });
+    createAssessmentScheduleCoachAlert(schedule, "Client approved the assessment appointment.");
     state.planDraftNotice = "Assessment appointment approved.";
     render();
   });
   document.querySelector("#coachApproveAssessmentSchedule")?.addEventListener("click", (event) => {
-    respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, { action: "approve" });
+    const schedule = respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, { action: "approve" });
+    createAssessmentScheduleCoachAlert(schedule, "Coach approved the client suggested assessment time.");
     state.planDraftNotice = "Client suggested time approved.";
     render();
   });
@@ -3596,20 +3970,22 @@ function bindGlobal() {
     const proposedTime = document.querySelector("#assessmentCounterTime")?.value;
     try {
       if (scheduleId) {
-        respondToAssessmentSchedule(store, state.currentUser, scheduleId, {
+        const schedule = respondToAssessmentSchedule(store, state.currentUser, scheduleId, {
           action: "counter",
           proposedDate,
           proposedTime,
           clientNotes: document.querySelector("#assessmentScheduleClientNote")?.value || ""
         });
+        createAssessmentScheduleCoachAlert(schedule, "Client suggested a different assessment time.");
       } else {
-        proposeAssessmentSchedule(store, state.currentUser, {
+        const schedule = proposeAssessmentSchedule(store, state.currentUser, {
           clientId: state.clientId,
           assessmentType: "Initial Assessment",
           proposedDate,
           proposedTime,
           clientNotes: document.querySelector("#assessmentScheduleClientNote")?.value || ""
         });
+        createAssessmentScheduleCoachAlert(schedule, "Client requested an assessment appointment.");
       }
       state.planDraftNotice = "Your suggested assessment time was sent to the coach.";
       render();
@@ -3618,10 +3994,11 @@ function bindGlobal() {
     }
   });
   document.querySelector("#rejectAssessmentScheduleOpenChat")?.addEventListener("click", (event) => {
-    respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, {
+    const schedule = respondToAssessmentSchedule(store, state.currentUser, event.target.dataset.scheduleId, {
       action: "reject",
       rejectionReason: "Coach rejected the suggested time. Open chat to agree on a better appointment."
     });
+    createAssessmentScheduleCoachAlert(schedule, "Assessment schedule needs a coach-client chat.");
     state.view = "chat";
     render();
   });
@@ -3739,10 +4116,60 @@ function bindGlobal() {
   document.querySelectorAll("[data-alert-decision]").forEach((button) => button.addEventListener("click", () => {
     const [alertId, decision] = button.dataset.alertDecision.split(":");
     const alert = store.coachAlerts.find((item) => item.id === alertId);
+    if (!alert) return;
+    if (!alert.dailyCheckInId || decision === "Reviewed") {
+      alert.status = "Reviewed";
+      alert.coachDecision = decision;
+      alert.resolvedAt = new Date().toISOString();
+      render();
+      return;
+    }
     const workoutSnapshot = decision === "Edited Suggested Change" || decision === "Replaced Workout"
       ? { ...alert.suggestedWorkoutSnapshot, title: decision === "Replaced Workout" ? "Coach replacement recovery session" : `${alert.suggestedWorkoutSnapshot.title} (Coach edited)` }
       : undefined;
     resolveCoachAlert(store, alertId, decision, { workoutSnapshot, coachNotes: "Coach reviewed in dashboard." });
+    render();
+  }));
+  document.querySelectorAll("[data-edit-alert-workout]").forEach((button) => button.addEventListener("click", () => {
+    state.editModal = { type: "coachAlertWorkout", id: button.dataset.editAlertWorkout };
+    render();
+  }));
+  document.querySelectorAll("[data-coach-workout-item]").forEach((button) => button.addEventListener("click", () => {
+    const [workoutId, itemIndex] = button.dataset.coachWorkoutItem.split(":");
+    state.editModal = { type: "coachWorkoutItem", workoutId, itemIndex: Number(itemIndex), mode: button.dataset.coachWorkoutMode || "dose" };
+    render();
+  }));
+  document.querySelector("[data-save-coach-workout-item]")?.addEventListener("click", () => {
+    saveCoachWorkoutItemModal(false);
+    render();
+  });
+  document.querySelector("[data-approve-current-adjusted-workout]")?.addEventListener("click", () => {
+    saveCoachWorkoutItemModal(true);
+    render();
+  });
+  document.querySelectorAll("[data-smart-coach-replace-item]").forEach((button) => button.addEventListener("click", () => {
+    const select = document.querySelector("#coachReplacementExercise");
+    if (select) select.value = button.dataset.smartCoachReplaceItem;
+  }));
+  document.querySelectorAll("[data-smart-alert-item]").forEach((button) => button.addEventListener("click", () => {
+    const [, index, exerciseId] = button.dataset.smartAlertItem.split(":");
+    const select = document.querySelector(`#alertReplace-${index}`);
+    if (select) select.value = exerciseId;
+  }));
+  document.querySelectorAll("[data-save-alert-suggested-workout]").forEach((button) => button.addEventListener("click", () => {
+    saveAlertSuggestedWorkout(button.dataset.saveAlertSuggestedWorkout);
+    window.alert("Suggested workout updated for coach approval.");
+    render();
+  }));
+  document.querySelectorAll("[data-approve-edited-alert-workout]").forEach((button) => button.addEventListener("click", () => {
+    const alertId = button.dataset.approveEditedAlertWorkout;
+    saveAlertSuggestedWorkout(alertId);
+    const alert = store.coachAlerts.find((item) => item.id === alertId);
+    resolveCoachAlert(store, alertId, "Edited Suggested Change", {
+      workoutSnapshot: cloneLocal(alert.suggestedWorkoutSnapshot),
+      coachNotes: document.querySelector("#alertCoachApprovalNote")?.value || "Coach edited and approved today's workout."
+    });
+    state.editModal = null;
     render();
   }));
   document.querySelector("#chatDraft")?.addEventListener("input", (event) => {
@@ -4092,7 +4519,8 @@ function bindGlobal() {
     render();
   }));
   document.querySelectorAll("[data-admin-approve-schedule]").forEach((button) => button.addEventListener("click", () => {
-    respondToAssessmentSchedule(store, state.currentUser, button.dataset.adminApproveSchedule, { action: "approve" });
+    const schedule = respondToAssessmentSchedule(store, state.currentUser, button.dataset.adminApproveSchedule, { action: "approve" });
+    createAssessmentScheduleCoachAlert(schedule, "Admin approved the assessment appointment.");
     state.planDraftNotice = "Admin approved the assessment appointment.";
     render();
   }));
@@ -4101,6 +4529,7 @@ function bindGlobal() {
       action: "reject",
       rejectionReason: "Admin moved this schedule to chat so coach and client can agree on a better time."
     });
+    createAssessmentScheduleCoachAlert(schedule, "Admin moved the assessment appointment into chat.");
     changeSelectedClient(schedule.clientId, false);
     state.view = "chat";
     render();
@@ -6081,9 +6510,17 @@ function formatDose(item) {
   if (item.sets) parts.push(`${item.sets} sets`);
   if (item.reps) parts.push(`${item.reps} reps`);
   if (item.rounds) parts.push(`${item.rounds} rounds`);
-  if (item.time) parts.push(`${item.time}s`);
-  if (item.rest) parts.push(`${item.rest}s rest`);
+  if (item.time) parts.push(formatDoseValue("Round time", item.time));
+  if (item.rest) parts.push(`${formatDoseValue("Rest", item.rest)} rest`);
   return parts.join(" / ");
+}
+
+function formatDoseValue(label, value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (!["Round time", "Rest"].includes(label)) return text;
+  if (/[a-z]/i.test(text)) return text;
+  return `${text}s`;
 }
 
 function escapeHtml(value) {

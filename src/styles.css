@@ -1066,6 +1066,35 @@ dd {
   margin: 0;
 }
 
+.dose-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.dose-grid span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #faf8ff;
+  padding: 8px 10px;
+}
+
+.dose-grid small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dose-grid strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.98rem;
+  margin-top: 2px;
+}
+
 .exercise-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
