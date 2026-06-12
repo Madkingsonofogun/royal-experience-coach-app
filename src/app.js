@@ -1288,6 +1288,8 @@ function profilePage() {
       ${profileImagePanel(profileUser, client)}
       <div class="grid-3 stat-strip">
         ${infoCard("Age", client.age)}
+        ${infoCard("Height", formatClientHeight(client))}
+        ${infoCard("Current weight", formatClientWeight(client.currentWeightLb || client.weight))}
         ${infoCard("Goal", client.goal)}
         ${infoCard("Sport focus", client.sportFocus)}
         ${infoCard("Training days", `${client.trainingDaysPerWeek} per week`)}
@@ -1403,8 +1405,18 @@ function clientSafetyInfoPanel(client) {
           <label>Email <input id="clientEmail" value="${escapeHtml(client.email || "")}" /></label>
           <label>Phone number <input id="clientPhone" value="${escapeHtml(client.phone || "")}" /></label>
           <label>Age <input id="clientAge" type="number" min="0" max="120" value="${escapeHtml(client.age || "")}" /></label>
+          <label>Sex <select id="clientSex">
+            ${["Female", "Male", "Prefer not to say"].map((option) => `<option value="${option}" ${String(client.sex || "") === option ? "selected" : ""}>${option}</option>`).join("")}
+          </select></label>
+          <label>Height in inches <input id="clientHeightInches" type="number" min="24" max="96" value="${escapeHtml(client.heightInches || "")}" placeholder="Example: 66" /></label>
+          <label>Current weight lb <input id="clientCurrentWeight" type="number" min="0" max="800" value="${escapeHtml(client.currentWeightLb || client.weight || "")}" /></label>
+          <label>Goal weight lb <input id="clientGoalWeight" type="number" min="0" max="800" value="${escapeHtml(client.goalWeightLb || "")}" /></label>
           <label>Goal <input id="clientGoal" value="${escapeHtml(client.goal || "")}" /></label>
         </div>
+        <label>Medical problems / health conditions <textarea id="clientMedicalProblems">${escapeHtml(client.medicalProblems || client.medicalConditions || "")}</textarea></label>
+        <label>Medications or medical notes <textarea id="clientMedications">${escapeHtml(client.medications || "")}</textarea></label>
+        <label>Allergies <textarea id="clientAllergies">${escapeHtml(client.allergies || "")}</textarea></label>
+        <label>Doctor restrictions or clearance notes <textarea id="clientMedicalRestrictions">${escapeHtml(client.medicalRestrictions || "")}</textarea></label>
         <label>Injury notes <textarea id="clientInjuryNotes">${escapeHtml(client.injuryNotes || "")}</textarea></label>
         <label>Emergency contact <input id="clientEmergencyContact" value="${escapeHtml(client.emergencyContact || "")}" placeholder="Name / phone" /></label>
         <div class="form-grid">
@@ -1416,9 +1428,34 @@ function clientSafetyInfoPanel(client) {
     `;
   }
   return `
+    <article class="card">
+      <h3>Health details</h3>
+      <div class="detail-grid">
+        <p><strong>Age:</strong> ${escapeHtml(client.age || "Not saved")}</p>
+        <p><strong>Sex:</strong> ${escapeHtml(client.sex || "Not saved")}</p>
+        <p><strong>Height:</strong> ${escapeHtml(formatClientHeight(client))}</p>
+        <p><strong>Current weight:</strong> ${escapeHtml(formatClientWeight(client.currentWeightLb || client.weight))}</p>
+        <p><strong>Goal weight:</strong> ${escapeHtml(formatClientWeight(client.goalWeightLb))}</p>
+        <p><strong>Medical problems:</strong> ${escapeHtml(client.medicalProblems || client.medicalConditions || "None saved")}</p>
+        <p><strong>Medications:</strong> ${escapeHtml(client.medications || "None saved")}</p>
+        <p><strong>Allergies:</strong> ${escapeHtml(client.allergies || "None saved")}</p>
+        <p><strong>Medical restrictions:</strong> ${escapeHtml(client.medicalRestrictions || "None saved")}</p>
+      </div>
+    </article>
     <article class="card"><h3>Injury notes</h3><p>${client.injuryNotes || "No injury notes saved."}</p></article>
     <article class="card"><h3>Client emergency contact</h3><p>${client.emergencyContact || "No emergency contact saved."}</p></article>
   `;
+}
+
+function formatClientHeight(client) {
+  const inches = Number(client?.heightInches || 0);
+  if (!inches) return "Not saved";
+  return `${Math.floor(inches / 12)}'${inches % 12}"`;
+}
+
+function formatClientWeight(value) {
+  const weight = Number(value || 0);
+  return weight ? `${weight} lb` : "Not saved";
 }
 
 function clientProgramSummaryPanel(client) {
@@ -3061,10 +3098,18 @@ function clientEditModal(clientId) {
             ${editInput("client", "email", "Email", client.email || user?.email || "")}
             ${editInput("client", "phone", "Phone", client.phone || user?.phone || "")}
             ${editInput("client", "age", "Age", client.age || "", "number")}
+            ${editSelect("client", "sex", "Sex", ["Female", "Male", "Prefer not to say"], client.sex || "Prefer not to say")}
+            ${editInput("client", "heightInches", "Height in inches", client.heightInches || "", "number")}
+            ${editInput("client", "currentWeightLb", "Current weight lb", client.currentWeightLb || client.weight || "", "number")}
+            ${editInput("client", "goalWeightLb", "Goal weight lb", client.goalWeightLb || "", "number")}
             ${editInput("client", "dateOfBirth", "Date of birth", client.dateOfBirth || "", "date")}
             ${editInput("client", "emergencyContact", "Emergency contact", client.emergencyContact || "")}
             ${editSelect("client", "status", "Status", ["Pending", "Active", "Locked", "Suspended", "Archived"], client.status || user?.accountStatus || "Active")}
           </div>
+          <label>Medical problems / health conditions <textarea data-edit-client-field="medicalProblems">${escapeHtml(client.medicalProblems || client.medicalConditions || "")}</textarea></label>
+          <label>Medications or medical notes <textarea data-edit-client-field="medications">${escapeHtml(client.medications || "")}</textarea></label>
+          <label>Allergies <textarea data-edit-client-field="allergies">${escapeHtml(client.allergies || "")}</textarea></label>
+          <label>Doctor restrictions or clearance notes <textarea data-edit-client-field="medicalRestrictions">${escapeHtml(client.medicalRestrictions || "")}</textarea></label>
           <div class="admin-row avatar-row">
             ${avatar(client.profileImageUrl || user?.profileImageUrl, client.name)}
             <span>Profile image can still be managed from Admin Overview or the client profile controls.</span>
@@ -3758,6 +3803,9 @@ function adminClientDetail(client) {
       <p><strong>Workouts:</strong> ${workouts}</p>
       <p><strong>Package history:</strong> ${(client.packageHistory || []).length}</p>
       <p><strong>Chats:</strong> ${chats}</p>
+      <p><strong>Age / height / weight:</strong> ${escapeHtml(client.age || "Not saved")} / ${escapeHtml(formatClientHeight(client))} / ${escapeHtml(formatClientWeight(client.currentWeightLb || client.weight))}</p>
+      <p><strong>Medical problems:</strong> ${escapeHtml(client.medicalProblems || client.medicalConditions || "None saved")}</p>
+      <p><strong>Allergies:</strong> ${escapeHtml(client.allergies || "None saved")}</p>
       <p><strong>Notes:</strong> ${client.notes || client.progressNotes || "No notes yet."}</p>
     </div>
   `;
@@ -4241,7 +4289,15 @@ function bindGlobal() {
         email: document.querySelector("#clientEmail")?.value || "",
         phone: document.querySelector("#clientPhone")?.value || "",
         age: document.querySelector("#clientAge")?.value || "",
+        sex: document.querySelector("#clientSex")?.value || "",
+        heightInches: document.querySelector("#clientHeightInches")?.value || "",
+        currentWeightLb: document.querySelector("#clientCurrentWeight")?.value || "",
+        goalWeightLb: document.querySelector("#clientGoalWeight")?.value || "",
         goal: document.querySelector("#clientGoal")?.value || "",
+        medicalProblems: document.querySelector("#clientMedicalProblems")?.value || "",
+        medications: document.querySelector("#clientMedications")?.value || "",
+        allergies: document.querySelector("#clientAllergies")?.value || "",
+        medicalRestrictions: document.querySelector("#clientMedicalRestrictions")?.value || "",
         injuryNotes: document.querySelector("#clientInjuryNotes")?.value || "",
         emergencyContact: document.querySelector("#clientEmergencyContact")?.value || "",
         ...(pin || confirmPin ? { pin, confirmPin } : {})
@@ -4991,6 +5047,10 @@ function bindGlobal() {
       patch.fullName = patch.name;
       patch.assignedCoach = patch.coachId;
       patch.age = Number(patch.age || 0);
+      patch.heightInches = Number(patch.heightInches || 0);
+      patch.currentWeightLb = Number(patch.currentWeightLb || 0);
+      patch.weight = patch.currentWeightLb;
+      patch.goalWeightLb = Number(patch.goalWeightLb || 0);
       patch.trainingDaysPerWeek = Number(patch.trainingDaysPerWeek || 0);
       patch.sessionLength = Number(patch.sessionLength || 0);
       patch.sessionsPurchased = Number(patch.sessionsPurchased || 0);

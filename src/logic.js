@@ -550,11 +550,12 @@ export function getExerciseDetailForUser(store, user, exerciseId, context = {}) 
 }
 
 function buildWorkoutDetail(store, workout, role, meta = {}) {
-  const items = (workout.items || []).map((item) => {
+  const items = (workout.items || []).map((item, itemIndex) => {
     const exercise = store.exercises.find((entry) => entry.id === item.exerciseId);
     const detail = exercise ? formatExerciseDetail(store, exercise, role) : null;
     return {
       ...item,
+      itemIndex,
       exerciseId: item.exerciseId || exercise?.id || null,
       exerciseName: item.name || item.exerciseName || exercise?.exerciseName || "Exercise",
       sessionPart: normalizeSessionPart(item.sessionPart || exercise?.sessionPart || "Strength"),
@@ -1868,6 +1869,30 @@ export function updateClientSelfProfile(store, clientUser, patch) {
     if (!Number.isInteger(age) || age < 0 || age > 120) throw new Error("Enter a valid age.");
     client.age = age;
   }
+  if (patch.sex !== undefined) client.sex = String(patch.sex || "").trim();
+  if (patch.heightInches !== undefined) {
+    const height = Number(patch.heightInches || 0);
+    if (height && (height < 24 || height > 96)) throw new Error("Enter a valid height in inches.");
+    client.heightInches = height || null;
+  }
+  if (patch.currentWeightLb !== undefined) {
+    const weight = Number(patch.currentWeightLb || 0);
+    if (weight && (weight < 1 || weight > 800)) throw new Error("Enter a valid current weight.");
+    client.currentWeightLb = weight || null;
+    client.weight = client.currentWeightLb;
+  }
+  if (patch.goalWeightLb !== undefined) {
+    const goalWeight = Number(patch.goalWeightLb || 0);
+    if (goalWeight && (goalWeight < 1 || goalWeight > 800)) throw new Error("Enter a valid goal weight.");
+    client.goalWeightLb = goalWeight || null;
+  }
+  if (patch.medicalProblems !== undefined) {
+    client.medicalProblems = String(patch.medicalProblems || "");
+    client.medicalConditions = client.medicalProblems;
+  }
+  if (patch.medications !== undefined) client.medications = String(patch.medications || "");
+  if (patch.allergies !== undefined) client.allergies = String(patch.allergies || "");
+  if (patch.medicalRestrictions !== undefined) client.medicalRestrictions = String(patch.medicalRestrictions || "");
   if (patch.injuryNotes !== undefined) {
     client.injuryNotes = String(patch.injuryNotes || "");
     client.injuryRestrictionNotes = client.injuryNotes;
