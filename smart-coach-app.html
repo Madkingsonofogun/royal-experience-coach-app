@@ -398277,6 +398277,11 @@ const nutritionMealCounts = nutritionDemoMealPool.reduce((counts, meal) => {
   counts[meal.mealType] = (counts[meal.mealType] || 0) + 1;
   return counts;
 }, {});
+const nutritionMealsByType = nutritionDemoMealPool.reduce((groups, meal) => {
+  groups[meal.mealType] ||= [];
+  groups[meal.mealType].push(meal);
+  return groups;
+}, {});
 const nutritionCuisineList = [...new Set(nutritionDemoMealPool.map((meal) => meal.cuisine).filter(Boolean))].sort();
 const state = {
   currentUser: null,
@@ -404351,6 +404356,24 @@ function uniqueNutritionMealOptions(meals, options = {}) {
   });
 }
 
+function selectFastNutritionCandidate(pool, options, mealType, { usedIds = new Set(), usedKeys = new Set(), currentMealId = "", limit = 180 } = {}) {
+  let best = null;
+  let bestScore = -Infinity;
+  let checked = 0;
+  const start = Math.floor(Math.random() * Math.max(1, pool.length));
+  for (let offset = 0; offset < pool.length && checked < limit; offset += 1) {
+    const meal = pool[(start + offset) % pool.length];
+    if (!meal || meal.id === currentMealId || usedIds.has(meal.id) || usedKeys.has(nutritionMealPlanRepeatKey(meal))) continue;
+    checked += 1;
+    const score = nutritionMealSmartScore(meal, options, mealType) + Math.random() * 4;
+    if (score > bestScore) {
+      best = meal;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function nutritionMealInstructionCard(meal) {
   return `
     <article class="meal-instruction-card">
@@ -404684,26 +404707,15 @@ function smartReplaceNutritionDemoDay(dayNumber) {
 }
 
 function pickSmartNutritionMeal(mealType, options, usedIds = new Set(), currentMealId = "", usedKeys = new Set()) {
-  const strict = nutritionDemoMealPool.filter((meal) =>
-    meal.mealType === mealType &&
-    meal.id !== currentMealId &&
-    !usedIds.has(meal.id) &&
-    !usedKeys.has(nutritionMealPlanRepeatKey(meal)) &&
-    mealFitsNutritionPreferences(meal, options)
-  );
-  const fallback = nutritionDemoMealPool.filter((meal) =>
-    meal.mealType === mealType &&
-    meal.id !== currentMealId &&
-    !usedIds.has(meal.id) &&
-    !usedKeys.has(nutritionMealPlanRepeatKey(meal)) &&
-    !mealHasAllergy(meal, options.allergy)
-  );
-  const looseFallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && meal.id !== currentMealId && !usedIds.has(meal.id));
-  const pool = strict.length ? strict : fallback.length ? fallback : looseFallback.length ? looseFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && meal.id !== currentMealId);
-  return uniqueNutritionMealOptions(shuffledNutritionMeals(pool), { planWide: true }).sort((a, b) =>
-    nutritionMealSmartScore(b, options, mealType) - nutritionMealSmartScore(a, options, mealType) ||
-    Math.random() - 0.5
-  )[0] || null;
+  const typePool = nutritionMealsByType[mealType] || nutritionDemoMealPool;
+  const strictPool = typePool.filter((meal) => mealFitsNutritionPreferences(meal, options));
+  const allergySafePool = typePool.filter((meal) => !mealHasAllergy(meal, options.allergy));
+  return selectFastNutritionCandidate(strictPool.length ? strictPool : allergySafePool.length ? allergySafePool : typePool, options, mealType, {
+    usedIds,
+    usedKeys,
+    currentMealId,
+    limit: 220
+  });
 }
 
 function clientFavoriteMealIds(clientId) {
@@ -405168,18 +405180,18 @@ function generateNutritionDemoPlan(options) {
 }
 
 function pickNutritionDemoMeal(mealType, options, day, counters, usedIds = new Set(), usedKeys = new Set()) {
-  const planSafe = (meal) => !usedIds.has(meal.id) && !usedKeys.has(nutritionMealPlanRepeatKey(meal));
-  const matches = nutritionDemoMealPool.filter((meal) => nutritionMealMatches(meal, mealType, options) && planSafe(meal));
-  const fallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !mealHasAllergy(meal, options.allergy) && planSafe(meal));
-  const noRepeatNameFallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !usedKeys.has(nutritionMealPlanRepeatKey(meal)) && !mealHasAllergy(meal, options.allergy));
-  const sameTypeFallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !mealHasAllergy(meal, options.allergy));
-  const pool = matches.length ? matches : fallback.length ? fallback : noRepeatNameFallback.length ? noRepeatNameFallback : sameTypeFallback.length ? sameTypeFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType);
-  const sorted = uniqueNutritionMealOptions(shuffledNutritionMeals(pool), { planWide: true }).sort((a, b) =>
-    (counters[a.id] || 0) - (counters[b.id] || 0) ||
-    nutritionMealSmartScore(b, options, mealType) - nutritionMealSmartScore(a, options, mealType) ||
-    Math.random() - 0.5
-  );
-  const picked = sorted[0] || pool[(day - 1) % Math.max(1, pool.length)] || nutritionDemoMealPool[0];
+  const typePool = nutritionMealsByType[mealType] || nutritionDemoMealPool;
+  const matches = typePool.filter((meal) => nutritionMealMatches(meal, mealType, options));
+  const fallback = typePool.filter((meal) => !mealHasAllergy(meal, options.allergy));
+  let picked = selectFastNutritionCandidate(matches.length ? matches : fallback.length ? fallback : typePool, options, mealType, {
+    usedIds,
+    usedKeys,
+    limit: 240
+  });
+  if (!picked) {
+    picked = selectFastNutritionCandidate(fallback.length ? fallback : typePool, options, mealType, { usedIds: new Set(), usedKeys: new Set(), limit: 120 });
+  }
+  picked ||= typePool[(day - 1) % Math.max(1, typePool.length)] || nutritionDemoMealPool[0];
   counters[picked.id] = (counters[picked.id] || 0) + 1;
   return picked;
 }
