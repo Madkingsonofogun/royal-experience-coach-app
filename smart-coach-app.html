@@ -400538,7 +400538,9 @@ function coachAlertsView() {
 
 function chatPage() {
   const client = selectedClient();
-  const messages = getChatMessages(store, state.currentUser, client.id);
+  const messages = getChatMessages(store, state.currentUser, client.id)
+    .slice()
+    .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
   const partner = chatPartnerFor(client);
   return `
     <section class="workspace">
@@ -400546,7 +400548,7 @@ function chatPage() {
         <div>
           <p class="eyebrow">Secure Coach / Client Chat</p>
           <h2>${client.name}</h2>
-          <p class="muted">Messages create notifications for the receiver. Admins can audit and intervene when needed.</p>
+          <p class="muted">Messages save to Supabase and refresh across devices while both users are logged in. Admins can audit and intervene when needed.</p>
         </div>
         <button class="ghost" id="markReadButton">Mark Messages Read</button>
       </div>
@@ -400578,6 +400580,26 @@ function chatPartnerFor(client) {
   if (state.currentUser.role === "Client") return store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
   if (state.currentUser.role === "Coach") return store.users.find((user) => user.role === "Client" && user.linkedId === client.id);
   return store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
+}
+
+function hasUnreadChatActivity(userId, clientId) {
+  return (store.notifications || []).some((item) => item.userId === userId && item.clientId === clientId && !item.read)
+    || (store.chatMessages || []).some((message) =>
+      message.clientId === clientId &&
+      (message.toUserId === userId || message.fromUserId === userId) &&
+      !(message.readBy || []).includes(userId)
+    );
+}
+
+function markVisibleChatReadIfNeeded() {
+  if (state.view !== "chat" || !state.currentUser || !state.clientId) return;
+  if (!hasUnreadChatActivity(state.currentUser.id, state.clientId)) return;
+  markNotificationsRead(store, state.currentUser.id, state.clientId);
+  saveStore();
+  backupPublicChangeToCloud();
+  setTimeout(() => {
+    if (state.view === "chat") render();
+  }, 0);
 }
 
 function alertCard(alert) {
@@ -402549,19 +402571,25 @@ function bindGlobal() {
   document.querySelector("#sendChatButton")?.addEventListener("click", () => {
     const partner = chatPartnerFor(selectedClient());
     if (!partner) return;
-    sendChatMessage(store, {
+    const message = sendChatMessage(store, {
       fromUserId: state.currentUser.id,
       toUserId: partner.id,
       clientId: state.clientId,
       body: state.chatDraft
     });
     state.chatDraft = "";
+    saveStore();
+    backupPublicChangeToCloud();
+    state.syncStatus = `Message sent to ${partner.name}.`;
     render();
   });
   document.querySelector("#markReadButton")?.addEventListener("click", () => {
     markNotificationsRead(store, state.currentUser.id, state.clientId);
+    saveStore();
+    backupPublicChangeToCloud();
     render();
   });
+  markVisibleChatReadIfNeeded();
   const bindLibraryFilter = (selector, key, eventName = "input") => {
     document.querySelector(selector)?.addEventListener(eventName, (event) => {
       state.libraryFilters[key] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
@@ -403696,6 +403724,8 @@ function bindGlobal() {
   document.querySelector("#adminInterveneButton")?.addEventListener("click", () => {
     const body = document.querySelector("#adminIntervention").value;
     adminInterveneInChat(store, state.currentUser, state.clientId, body);
+    saveStore();
+    backupPublicChangeToCloud();
     render();
   });
 }
