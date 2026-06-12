@@ -403834,7 +403834,7 @@ function nutritionDemoPanel(options = {}) {
       </div>
       <div class="result-band warning-band">
         <strong>Client assignment</strong>
-        <span>Assigned meal plans are saved to the selected client profile and included in Supabase shared records. The planner is using the full ${nutritionDemoStats.totalMeals.toLocaleString()}-meal workbook library.</span>
+        <span>Assigned meal plans are saved to the selected client profile and included in Supabase shared records. The planner is using the Royal Elixir ${Number(nutritionDemoStats.uniqueMealNames || nutritionDemoStats.totalMeals).toLocaleString()}-meal library with old recipe data cleaned out.</span>
       </div>
       <div class="grid-4 stat-strip">
         ${infoCard("Workbook meals", nutritionDemoStats.totalMeals.toLocaleString())}
