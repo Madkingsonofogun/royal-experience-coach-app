@@ -398662,6 +398662,7 @@ let lastCloudBackupFingerprint = "";
 let lastCloudBackupId = "";
 let cloudDataMonitorTimer = null;
 let cloudDataMonitorRunning = false;
+let liveChatSyncRunning = false;
 let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
 let lastShoppingListPrintAt = 0;
@@ -398998,6 +398999,109 @@ async function backupPublicChangeToCloud() {
   }
 }
 
+async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
+  if (!canUseSupabaseBackup()) return false;
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?on_conflict=backup_id,collection_name,record_id`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      ...supabaseHeaders(key),
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify([{
+      backup_id: "live",
+      collection_name: collectionName,
+      record_id: backupRecordId(data, recordId),
+      data: cleanBackupValue(data)
+    }])
+  });
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  return true;
+}
+
+async function pushLiveChatMessage(message) {
+  if (!message?.id) return false;
+  try {
+    await upsertLiveSupabaseRecord("chat_messages", message.id, message);
+    return true;
+  } catch (error) {
+    console.warn("Could not save live chat message.", error);
+    return false;
+  }
+}
+
+async function pushLiveChatMessagesForClient(clientId) {
+  const messages = (store.chatMessages || []).filter((message) => message.clientId === clientId);
+  await Promise.all(messages.map((message) => pushLiveChatMessage(message)));
+}
+
+function ensureLiveChatNotification(message) {
+  if (!state.currentUser || message.toUserId !== state.currentUser.id || (message.readBy || []).includes(state.currentUser.id)) return false;
+  const notificationId = `notification_live_${message.id}_${state.currentUser.id}`;
+  if ((store.notifications || []).some((item) => item.id === notificationId || (item.userId === state.currentUser.id && item.body === message.body && item.createdAt === message.createdAt))) return false;
+  const sender = store.users.find((user) => user.id === message.fromUserId);
+  store.notifications.push({
+    id: notificationId,
+    userId: state.currentUser.id,
+    clientId: message.clientId,
+    type: "Chat Message",
+    title: `New message from ${sender?.name || "Chat"}`,
+    body: message.body,
+    read: false,
+    createdAt: message.createdAt
+  });
+  return true;
+}
+
+async function syncLiveChatRecords() {
+  if (!canUseSupabaseBackup() || state.supabaseRestoreBusy || liveChatSyncRunning) return false;
+  liveChatSyncRunning = true;
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  try {
+    const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.chat_messages&select=record_id,data&order=id.asc`;
+    const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 7000);
+    if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+    const rows = await response.json();
+    let changed = false;
+    rows.forEach((row) => {
+      const message = row.data;
+      if (!message?.id || !message.clientId) return;
+      if (state.currentUser && !canUserAccessClient(store, state.currentUser, message.clientId)) return;
+      const existingIndex = (store.chatMessages || []).findIndex((item) => item.id === message.id);
+      if (existingIndex >= 0) {
+        const existing = store.chatMessages[existingIndex];
+        const mergedReadBy = [...new Set([...(existing.readBy || []), ...(message.readBy || [])])];
+        const merged = { ...existing, ...message, readBy: mergedReadBy };
+        if (JSON.stringify(existing) !== JSON.stringify(merged)) {
+          store.chatMessages[existingIndex] = merged;
+          changed = true;
+        }
+        changed = ensureLiveChatNotification(merged) || changed;
+      } else {
+        store.chatMessages.push(message);
+        changed = true;
+        changed = ensureLiveChatNotification(message) || changed;
+      }
+    });
+    if (changed) {
+      store.chatMessages = deduplicateRecords(store.chatMessages);
+      try {
+        window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+      } catch (error) {
+        console.warn("Could not save live chat data locally.", error);
+      }
+    }
+    return changed;
+  } finally {
+    liveChatSyncRunning = false;
+  }
+}
+
 async function getLatestSupabaseBackupId({ url, anonKey, table }) {
   const projectUrl = normalizeSupabaseUrl(url);
   const key = (anonKey || "").trim();
@@ -399016,6 +399120,8 @@ async function checkCloudDataUpdates() {
   if (!state.currentUser || cloudDataMonitorRunning || autoCloudBackupRunning || state.supabaseBackupBusy || state.supabaseRestoreBusy || !canUseSupabaseBackup()) return;
   cloudDataMonitorRunning = true;
   try {
+    const liveChatChanged = await syncLiveChatRecords();
+    if (liveChatChanged && state.view === "chat") render();
     const currentFingerprint = cloudBackupFingerprint();
     if (currentFingerprint !== lastCloudBackupFingerprint) {
       await runAutomaticCloudBackup(currentFingerprint);
@@ -400537,7 +400643,15 @@ function coachAlertsView() {
 }
 
 function chatPage() {
-  const client = selectedClient();
+  const client = currentChatClient();
+  if (!client) {
+    return `
+      <section class="workspace">
+        <div class="empty">No client chat is available for this account yet.</div>
+      </section>
+    `;
+  }
+  state.clientId = client.id;
   const messages = getChatMessages(store, state.currentUser, client.id)
     .slice()
     .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
@@ -400576,7 +400690,12 @@ function chatPage() {
   `;
 }
 
+function currentChatClient() {
+  return state.currentUser?.role === "Client" ? clientForCurrentUser() : selectedClient();
+}
+
 function chatPartnerFor(client) {
+  if (!client) return null;
   if (state.currentUser.role === "Client") return store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
   if (state.currentUser.role === "Coach") return store.users.find((user) => user.role === "Client" && user.linkedId === client.id);
   return store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
@@ -400592,10 +400711,12 @@ function hasUnreadChatActivity(userId, clientId) {
 }
 
 function markVisibleChatReadIfNeeded() {
-  if (state.view !== "chat" || !state.currentUser || !state.clientId) return;
-  if (!hasUnreadChatActivity(state.currentUser.id, state.clientId)) return;
-  markNotificationsRead(store, state.currentUser.id, state.clientId);
+  const client = currentChatClient();
+  if (state.view !== "chat" || !state.currentUser || !client?.id) return;
+  if (!hasUnreadChatActivity(state.currentUser.id, client.id)) return;
+  markNotificationsRead(store, state.currentUser.id, client.id);
   saveStore();
+  pushLiveChatMessagesForClient(client.id);
   backupPublicChangeToCloud();
   setTimeout(() => {
     if (state.view === "chat") render();
@@ -402568,28 +402689,59 @@ function bindGlobal() {
   document.querySelector("#chatDraft")?.addEventListener("input", (event) => {
     state.chatDraft = event.target.value;
   });
-  document.querySelector("#sendChatButton")?.addEventListener("click", () => {
-    const partner = chatPartnerFor(selectedClient());
-    if (!partner) return;
-    const message = sendChatMessage(store, {
-      fromUserId: state.currentUser.id,
-      toUserId: partner.id,
-      clientId: state.clientId,
-      body: state.chatDraft
-    });
-    state.chatDraft = "";
-    saveStore();
-    backupPublicChangeToCloud();
-    state.syncStatus = `Message sent to ${partner.name}.`;
-    render();
+  document.querySelector("#sendChatButton")?.addEventListener("click", async () => {
+    let client = currentChatClient();
+    try {
+      const body = state.chatDraft;
+      let partner = chatPartnerFor(client);
+      if (!partner || !client) return;
+      if (canUseSupabaseBackup()) {
+        await syncLatestCloudData(false);
+        await syncLiveChatRecords();
+        client = currentChatClient();
+        partner = chatPartnerFor(client);
+      }
+      if (!partner || !client) return;
+      state.clientId = client.id;
+      const message = sendChatMessage(store, {
+        fromUserId: state.currentUser.id,
+        toUserId: partner.id,
+        clientId: client.id,
+        body
+      });
+      state.chatDraft = "";
+      saveStore();
+      await pushLiveChatMessage(message);
+      backupPublicChangeToCloud();
+      state.syncStatus = `Message sent to ${partner.name}.`;
+    } catch (error) {
+      state.syncStatus = `Message could not be sent: ${error.message}`;
+      window.alert(state.syncStatus);
+    } finally {
+      client = currentChatClient();
+      if (client) state.clientId = client.id;
+      render();
+    }
   });
   document.querySelector("#markReadButton")?.addEventListener("click", () => {
-    markNotificationsRead(store, state.currentUser.id, state.clientId);
+    const client = currentChatClient();
+    if (!client) return;
+    markNotificationsRead(store, state.currentUser.id, client.id);
     saveStore();
+    pushLiveChatMessagesForClient(client.id);
     backupPublicChangeToCloud();
     render();
   });
   markVisibleChatReadIfNeeded();
+  if (state.view === "chat" && canUseSupabaseBackup()) {
+    syncLiveChatRecords()
+      .then((changed) => {
+        if (changed && state.view === "chat") render();
+      })
+      .catch((error) => {
+        state.syncStatus = `Live chat sync failed: ${error.message}`;
+      });
+  }
   const bindLibraryFilter = (selector, key, eventName = "input") => {
     document.querySelector(selector)?.addEventListener(eventName, (event) => {
       state.libraryFilters[key] = event.target.type === "checkbox" ? event.target.checked : event.target.value;
@@ -403723,8 +403875,9 @@ function bindGlobal() {
   }));
   document.querySelector("#adminInterveneButton")?.addEventListener("click", () => {
     const body = document.querySelector("#adminIntervention").value;
-    adminInterveneInChat(store, state.currentUser, state.clientId, body);
+    const message = adminInterveneInChat(store, state.currentUser, state.clientId, body);
     saveStore();
+    pushLiveChatMessage(message);
     backupPublicChangeToCloud();
     render();
   });
