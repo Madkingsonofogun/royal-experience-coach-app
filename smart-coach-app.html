@@ -398770,8 +398770,9 @@ function startLoggedInCloudDataMonitor() {
 async function refreshLoginAccountsAutomatically(showResult) {
   if (state.currentUser || state.supabaseRestoreBusy) return;
   const restored = await syncLatestCloudData(false);
+  const liveIdentityRestored = await syncLiveIdentityRecords().catch(() => false);
   if (showResult) {
-    state.syncStatus = restored
+    state.syncStatus = restored || liveIdentityRestored
       ? "Accounts automatically updated from Supabase."
       : "Automatic account updates are on. Log in when your account has been approved.";
     render();
@@ -398835,6 +398836,15 @@ function saveStore() {
     console.warn("Could not save app data.", error);
   }
   scheduleAutomaticCloudBackup();
+}
+
+function saveAndSyncIdentity({ userIds = [], clientIds = [], coachIds = [], includeAll = false } = {}) {
+  saveStore();
+  pushLiveIdentityRecordsFor({ userIds, clientIds, coachIds, includeAll })
+    .catch((error) => {
+      state.syncStatus = `Supabase account/profile save failed: ${error.message}`;
+    });
+  backupPublicChangeToCloud();
 }
 
 function replaceStoreWith(nextStore) {
@@ -399033,6 +399043,96 @@ async function pushLiveChatMessage(message) {
   }
 }
 
+function liveIdentityCollections() {
+  return [
+    { storeKey: "users", collectionName: "users" },
+    { storeKey: "clients", collectionName: "clients" },
+    { storeKey: "coaches", collectionName: "coaches" }
+  ];
+}
+
+async function pushLiveIdentityRecord(collectionName, record) {
+  if (!record?.id) return false;
+  try {
+    await upsertLiveSupabaseRecord(collectionName, record.id, record);
+    return true;
+  } catch (error) {
+    console.warn(`Could not save live ${collectionName} record.`, error);
+    return false;
+  }
+}
+
+async function pushLiveIdentityRecordsFor({ userIds = [], clientIds = [], coachIds = [], includeAll = false } = {}) {
+  if (!canUseSupabaseBackup()) return false;
+  const jobs = [];
+  if (includeAll) {
+    jobs.push(...(store.users || []).map((record) => pushLiveIdentityRecord("users", record)));
+    jobs.push(...(store.clients || []).map((record) => pushLiveIdentityRecord("clients", record)));
+    jobs.push(...(store.coaches || []).map((record) => pushLiveIdentityRecord("coaches", record)));
+  } else {
+    userIds.forEach((id) => {
+      const record = store.users.find((item) => item.id === id);
+      if (record) jobs.push(pushLiveIdentityRecord("users", record));
+    });
+    clientIds.forEach((id) => {
+      const record = store.clients.find((item) => item.id === id);
+      if (record) jobs.push(pushLiveIdentityRecord("clients", record));
+      const user = store.users.find((item) => item.role === "Client" && item.linkedId === id);
+      if (user) jobs.push(pushLiveIdentityRecord("users", user));
+    });
+    coachIds.forEach((id) => {
+      const record = store.coaches.find((item) => item.id === id);
+      if (record) jobs.push(pushLiveIdentityRecord("coaches", record));
+      const user = store.users.find((item) => ["Coach", "Admin"].includes(item.role) && item.linkedId === id);
+      if (user) jobs.push(pushLiveIdentityRecord("users", user));
+    });
+  }
+  await Promise.all(jobs);
+  return Boolean(jobs.length);
+}
+
+function mergeLiveRecordIntoStore(storeKey, record) {
+  if (!record?.id || !Array.isArray(store[storeKey])) return false;
+  const existingIndex = store[storeKey].findIndex((item) => item.id === record.id);
+  if (existingIndex >= 0) {
+    const existing = store[storeKey][existingIndex];
+    const merged = { ...existing, ...record };
+    if (JSON.stringify(existing) === JSON.stringify(merged)) return false;
+    store[storeKey][existingIndex] = merged;
+    return true;
+  }
+  store[storeKey].push(record);
+  return true;
+}
+
+async function syncLiveIdentityRecords() {
+  if (!canUseSupabaseBackup() || state.supabaseRestoreBusy) return false;
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  let changed = false;
+  for (const { storeKey, collectionName } of liveIdentityCollections()) {
+    const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data&order=id.asc`;
+    const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 7000);
+    if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+    const rows = await response.json();
+    rows.forEach((row) => {
+      changed = mergeLiveRecordIntoStore(storeKey, row.data) || changed;
+    });
+  }
+  if (changed) {
+    store.users = deduplicateRecords(store.users);
+    store.clients = deduplicateRecords(store.clients);
+    store.coaches = deduplicateRecords(store.coaches);
+    try {
+      window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+      console.warn("Could not save live identity records locally.", error);
+    }
+  }
+  return changed;
+}
+
 async function pushLiveChatMessagesForClient(clientId) {
   const messages = (store.chatMessages || []).filter((message) => message.clientId === clientId);
   await Promise.all(messages.map((message) => pushLiveChatMessage(message)));
@@ -399121,7 +399221,9 @@ async function checkCloudDataUpdates() {
   cloudDataMonitorRunning = true;
   try {
     const liveChatChanged = await syncLiveChatRecords();
+    const liveIdentityChanged = await syncLiveIdentityRecords();
     if (liveChatChanged && state.view === "chat") render();
+    if (liveIdentityChanged && ["profile", "admin"].includes(state.view)) render();
     const currentFingerprint = cloudBackupFingerprint();
     if (currentFingerprint !== lastCloudBackupFingerprint) {
       await runAutomaticCloudBackup(currentFingerprint);
@@ -399178,6 +399280,18 @@ function supabaseBackupRows() {
       });
     }
   }
+  ["users", "clients", "coaches"].forEach((key) => {
+    const collectionName = backupCollectionName(key);
+    (payload[key] || []).forEach((record, index) => {
+      const item = cleanBackupValue(record);
+      rows.push({
+        backup_id: "live",
+        collection_name: collectionName,
+        record_id: backupRecordId(item, `${key}_${index}`),
+        data: item
+      });
+    });
+  });
   rows.push({
     backup_id: "latest",
     collection_name: "_backup_metadata",
@@ -402294,6 +402408,9 @@ function bindLogin() {
       loginButton.textContent = "Log In";
     }
     await syncLatestCloudData(false);
+    await syncLiveIdentityRecords().catch((error) => {
+      state.syncStatus = `Could not load live account records: ${error.message}`;
+    });
     const loginKey = state.loginRole;
     const user = authenticateUser(store, loginKey, state.loginPin);
     if (!user) {
@@ -402324,6 +402441,7 @@ function bindLogin() {
   document.querySelector("#submitForgotPinRequest")?.addEventListener("click", () => {
     try {
       submitPinResetRequest(store, state.forgotPin);
+      saveStore();
       backupPublicChangeToCloud();
       state.forgotPinSuccess = "Your PIN reset request was sent to Admin.";
       state.forgotPinError = "";
@@ -402361,6 +402479,15 @@ function bindLogin() {
   document.querySelector("#createLoginButton")?.addEventListener("click", () => {
     try {
       requestLockedAccount(store, state.signup);
+      const user = [...(store.users || [])].reverse().find((item) =>
+        item.email === state.signup.email ||
+        (item.phone && item.phone === state.signup.phone)
+      );
+      saveAndSyncIdentity({
+        userIds: user ? [user.id] : [],
+        clientIds: user?.role === "Client" && user.linkedId ? [user.linkedId] : [],
+        coachIds: ["Coach", "Admin"].includes(user?.role) && user.linkedId ? [user.linkedId] : []
+      });
       backupPublicChangeToCloud();
       state.signupOpen = false;
       state.signupSuccess = "Account request submitted. Admin must approve and unlock your account before you can log in.";
@@ -402776,6 +402903,8 @@ function bindGlobal() {
         emergencyContact: document.querySelector("#clientEmergencyContact")?.value || "",
         ...(pin || confirmPin ? { pin, confirmPin } : {})
       });
+      const client = clientForCurrentUser();
+      saveAndSyncIdentity({ userIds: [state.currentUser.id], clientIds: client?.id ? [client.id] : [] });
       window.alert("Profile info saved.");
       render();
     } catch (error) {
@@ -402800,6 +402929,7 @@ function bindGlobal() {
         bio: document.querySelector("#coachSelfBio")?.value || "",
         ...(pin || confirmPin ? { pin, confirmPin } : {})
       });
+      saveAndSyncIdentity({ userIds: [state.currentUser.id], coachIds: state.currentUser.linkedId ? [state.currentUser.linkedId] : [] });
       window.alert("Coach profile saved.");
       render();
     } catch (error) {
@@ -402824,6 +402954,7 @@ function bindGlobal() {
         bio: document.querySelector("#adminSelfBio")?.value || "",
         ...(pin || confirmPin ? { pin, confirmPin } : {})
       });
+      saveAndSyncIdentity({ userIds: [state.currentUser.id], coachIds: state.currentUser.linkedId ? [state.currentUser.linkedId] : [] });
       window.alert("Admin profile saved.");
       render();
     } catch (error) {
@@ -403298,6 +403429,12 @@ function bindGlobal() {
       coachId: document.querySelector("#reviewCoachId")?.value,
       unlockProfile: document.querySelector("#reviewUnlockProfile")?.checked || false
     });
+    const user = store.users.find((item) => item.id === userId);
+    saveAndSyncIdentity({
+      userIds: user ? [user.id] : [],
+      clientIds: user?.role === "Client" && user.linkedId ? [user.linkedId] : [],
+      coachIds: ["Coach", "Admin"].includes(user?.role) && user.linkedId ? [user.linkedId] : []
+    });
     state.editModal = null;
     render();
   }));
@@ -403482,6 +403619,7 @@ function bindGlobal() {
     patch.fullName = patch.name;
     patch.profileLocked = patch.profileLocked === "true";
     adminUpdateCoach(store, state.currentUser, coachId, patch);
+    saveAndSyncIdentity({ coachIds: [coachId] });
     state.editModal = null;
     render();
   });
@@ -403491,6 +403629,7 @@ function bindGlobal() {
     const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
     const currentlyLocked = Boolean(coach?.profileLocked || user?.profileLocked);
     adminUpdateCoach(store, state.currentUser, coachId, { profileLocked: !currentlyLocked });
+    saveAndSyncIdentity({ userIds: user ? [user.id] : [], coachIds: [coachId] });
     window.alert(currentlyLocked ? "Coach profile page unlocked." : "Coach profile page locked.");
     render();
   });
@@ -403502,6 +403641,7 @@ function bindGlobal() {
       let user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
       user = user || adminEnsureCoachLogin(store, state.currentUser, event.currentTarget.dataset.coachId, pin);
       adminSetUserPin(store, state.currentUser, user.id, pin);
+      saveAndSyncIdentity({ userIds: [user.id], coachIds: [event.currentTarget.dataset.coachId] });
       window.alert(`PIN updated for ${user.name}. They must use the new PIN next login.`);
       render();
     } catch (error) {
@@ -403511,7 +403651,9 @@ function bindGlobal() {
   document.querySelector("#coachModalResetPin")?.addEventListener("click", (event) => {
     let user = store.users.find((item) => item.role === "Coach" && item.linkedId === event.currentTarget.dataset.coachId);
     user = user || adminEnsureCoachLogin(store, state.currentUser, event.currentTarget.dataset.coachId, "0000");
-    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    const reset = adminResetUserPin(store, state.currentUser, user.id);
+    saveAndSyncIdentity({ userIds: [user.id], coachIds: [event.currentTarget.dataset.coachId] });
+    window.alert(`Temporary PIN for ${user.name}: ${reset.temporaryPin}`);
     render();
   });
   document.querySelector("#saveClientModal")?.addEventListener("click", (event) => {
@@ -403539,6 +403681,7 @@ function bindGlobal() {
         patch.packageType = pkg?.packageName || patch.packageType;
       }
       adminUpdateClient(store, state.currentUser, clientId, patch);
+      saveAndSyncIdentity({ clientIds: [clientId] });
       changeSelectedClient(clientId, false);
       window.alert("Client changes saved.");
       state.editModal = null;
@@ -403556,6 +403699,7 @@ function bindGlobal() {
       let user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
       user = user || adminEnsureClientLogin(store, state.currentUser, event.currentTarget.dataset.clientId, pin);
       adminSetUserPin(store, state.currentUser, user.id, pin);
+      saveAndSyncIdentity({ userIds: [user.id], clientIds: [event.currentTarget.dataset.clientId] });
       window.alert(`PIN updated for ${user.name}. They must use the new PIN next login.`);
       render();
     } catch (error) {
@@ -403623,12 +403767,16 @@ function bindGlobal() {
   }));
   document.querySelector("#adminCreateClient")?.addEventListener("click", () => {
     const client = adminCreateClient(store, state.currentUser, state.adminDrafts.client);
+    const user = store.users.find((item) => item.role === "Client" && item.linkedId === client.id);
+    saveAndSyncIdentity({ userIds: user ? [user.id] : [], clientIds: [client.id] });
     changeSelectedClient(client.id, false);
     render();
   });
   document.querySelector("#adminCreateCoach")?.addEventListener("click", () => {
     try {
-      adminCreateCoach(store, state.currentUser, state.adminDrafts.coach);
+      const coach = adminCreateCoach(store, state.currentUser, state.adminDrafts.coach);
+      const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coach.id);
+      saveAndSyncIdentity({ userIds: user ? [user.id] : [], coachIds: [coach.id] });
       state.adminDrafts.coach = {
         firstName: "",
         lastName: "",
@@ -403651,22 +403799,27 @@ function bindGlobal() {
   document.querySelectorAll("[data-save-client]").forEach((button) => button.addEventListener("click", () => {
     const name = document.querySelector(`[data-client-name="${button.dataset.saveClient}"]`).value;
     adminUpdateClient(store, state.currentUser, button.dataset.saveClient, { name, fullName: name });
+    saveAndSyncIdentity({ clientIds: [button.dataset.saveClient] });
     render();
   }));
   document.querySelector("#clientModalResetPin")?.addEventListener("click", (event) => {
     let user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
     user = user || adminEnsureClientLogin(store, state.currentUser, event.currentTarget.dataset.clientId, "0000");
-    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    const reset = adminResetUserPin(store, state.currentUser, user.id);
+    saveAndSyncIdentity({ userIds: [user.id], clientIds: [event.currentTarget.dataset.clientId] });
+    window.alert(`Temporary PIN for ${user.name}: ${reset.temporaryPin}`);
     render();
   });
   document.querySelector("#clientModalToggleLock")?.addEventListener("click", (event) => {
     const user = store.users.find((item) => item.role === "Client" && item.linkedId === event.currentTarget.dataset.clientId);
     if (user) adminUpdateClient(store, state.currentUser, event.currentTarget.dataset.clientId, { accountLocked: !user.accountLocked });
+    saveAndSyncIdentity({ userIds: user ? [user.id] : [], clientIds: [event.currentTarget.dataset.clientId] });
     render();
   });
   document.querySelector("#clientModalToggleProfileLock")?.addEventListener("click", (event) => {
     const client = store.clients.find((item) => item.id === event.currentTarget.dataset.clientId);
     adminUpdateClient(store, state.currentUser, event.currentTarget.dataset.clientId, { profileLocked: !client?.profileLocked });
+    saveAndSyncIdentity({ clientIds: [event.currentTarget.dataset.clientId] });
     render();
   });
   document.querySelector("#clientModalGenerateDraft")?.addEventListener("click", (event) => {
@@ -403695,6 +403848,7 @@ function bindGlobal() {
   });
   document.querySelectorAll("[data-archive-client]").forEach((button) => button.addEventListener("click", () => {
     adminArchiveClient(store, state.currentUser, button.dataset.archiveClient);
+    saveAndSyncIdentity({ clientIds: [button.dataset.archiveClient] });
     render();
   }));
   document.querySelectorAll("[data-delete-client]").forEach((button) => button.addEventListener("click", () => {
@@ -403706,7 +403860,9 @@ function bindGlobal() {
   document.querySelectorAll("[data-reset-client-pin]").forEach((button) => button.addEventListener("click", () => {
     let user = store.users.find((item) => item.role === "Client" && item.linkedId === button.dataset.resetClientPin);
     user = user || adminEnsureClientLogin(store, state.currentUser, button.dataset.resetClientPin, "0000");
-    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    const reset = adminResetUserPin(store, state.currentUser, user.id);
+    saveAndSyncIdentity({ userIds: [user.id], clientIds: [button.dataset.resetClientPin] });
+    window.alert(`Temporary PIN for ${user.name}: ${reset.temporaryPin}`);
     render();
   }));
   document.querySelector("#adminCreateExercise")?.addEventListener("click", () => {
@@ -403814,24 +403970,41 @@ function bindGlobal() {
   document.querySelectorAll("[data-save-pin]").forEach((button) => button.addEventListener("click", () => {
     const userId = button.dataset.savePin;
     const pin = document.querySelector(`[data-pin-user="${userId}"]`).value;
-    adminSetUserPin(store, state.currentUser, userId, pin);
+    const user = adminSetUserPin(store, state.currentUser, userId, pin);
+    saveAndSyncIdentity({
+      userIds: [user.id],
+      clientIds: user.role === "Client" && user.linkedId ? [user.linkedId] : [],
+      coachIds: ["Coach", "Admin"].includes(user.role) && user.linkedId ? [user.linkedId] : []
+    });
     render();
   }));
   document.querySelectorAll("[data-temp-pin]").forEach((button) => button.addEventListener("click", () => {
     const result = adminResetUserPin(store, state.currentUser, button.dataset.tempPin);
+    saveAndSyncIdentity({
+      userIds: [result.user.id],
+      clientIds: result.user.role === "Client" && result.user.linkedId ? [result.user.linkedId] : [],
+      coachIds: ["Coach", "Admin"].includes(result.user.role) && result.user.linkedId ? [result.user.linkedId] : []
+    });
     window.alert(`Temporary PIN for ${result.user.name}: ${result.temporaryPin}`);
     render();
   }));
   document.querySelectorAll("[data-reset-coach-pin]").forEach((button) => button.addEventListener("click", () => {
     let user = store.users.find((item) => item.role === "Coach" && item.linkedId === button.dataset.resetCoachPin);
     user = user || adminEnsureCoachLogin(store, state.currentUser, button.dataset.resetCoachPin, "0000");
-    window.alert(`Temporary PIN for ${user.name}: ${adminResetUserPin(store, state.currentUser, user.id).temporaryPin}`);
+    const reset = adminResetUserPin(store, state.currentUser, user.id);
+    saveAndSyncIdentity({ userIds: [user.id], coachIds: [button.dataset.resetCoachPin] });
+    window.alert(`Temporary PIN for ${user.name}: ${reset.temporaryPin}`);
     render();
   }));
   document.querySelectorAll("[data-resolve-pin-request]").forEach((button) => button.addEventListener("click", () => {
     const [requestId, method] = button.dataset.resolvePinRequest.split(":");
     try {
       const result = adminResolvePinResetRequest(store, state.currentUser, requestId, method);
+      saveAndSyncIdentity({
+        userIds: [result.user.id],
+        clientIds: result.user.role === "Client" && result.user.linkedId ? [result.user.linkedId] : [],
+        coachIds: ["Coach", "Admin"].includes(result.user.role) && result.user.linkedId ? [result.user.linkedId] : []
+      });
       window.alert(result.request.adminMessage);
       render();
     } catch (error) {
@@ -403841,6 +404014,11 @@ function bindGlobal() {
   document.querySelectorAll("[data-toggle-login]").forEach((button) => button.addEventListener("click", () => {
     const user = store.users.find((item) => item.id === button.dataset.toggleLogin);
     adminSetLoginDisabled(store, state.currentUser, user.id, !user.disabled);
+    saveAndSyncIdentity({
+      userIds: [user.id],
+      clientIds: user.role === "Client" && user.linkedId ? [user.linkedId] : [],
+      coachIds: ["Coach", "Admin"].includes(user.role) && user.linkedId ? [user.linkedId] : []
+    });
     render();
   }));
   document.querySelectorAll("[data-delete-coach]").forEach((button) => button.addEventListener("click", () => {
@@ -403851,6 +404029,7 @@ function bindGlobal() {
   document.querySelectorAll("[data-save-coach-emergency]").forEach((button) => button.addEventListener("click", () => {
     const emergencyContact = document.querySelector(`[data-coach-emergency="${button.dataset.saveCoachEmergency}"]`)?.value || "";
     adminUpdateCoach(store, state.currentUser, button.dataset.saveCoachEmergency, { emergencyContact });
+    saveAndSyncIdentity({ coachIds: [button.dataset.saveCoachEmergency] });
     render();
   }));
   document.querySelectorAll("[data-template-test]").forEach((button) => button.addEventListener("click", () => {
