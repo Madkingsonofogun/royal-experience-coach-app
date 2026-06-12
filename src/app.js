@@ -97,6 +97,11 @@ const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
 const nutritionDemoMealPool = buildExpandedNutritionDemoMealPool(mealDemoLibrary);
+const nutritionMealCounts = nutritionDemoMealPool.reduce((counts, meal) => {
+  counts[meal.mealType] = (counts[meal.mealType] || 0) + 1;
+  return counts;
+}, {});
+const nutritionCuisineList = [...new Set(nutritionDemoMealPool.map((meal) => meal.cuisine).filter(Boolean))].sort();
 const state = {
   currentUser: null,
   loginRole: "Client",
@@ -365,7 +370,7 @@ let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
 let lastShoppingListPrintAt = 0;
 
-sanitizeLegacyMealPlans();
+scheduleLegacyMealPlanCleanup();
 const app = document.querySelector("#app");
 render();
 startLoginAccountAutoRefresh();
@@ -5663,9 +5668,9 @@ function nutritionDemoPanel(options = {}) {
       <div class="grid-4 stat-strip">
         ${infoCard("Workbook meals", nutritionDemoStats.totalMeals.toLocaleString())}
         ${infoCard("Preview meals", nutritionDemoMealPool.length)}
-        ${infoCard("Breakfast", nutritionDemoStats.mealsByType.Breakfast)}
-        ${infoCard("Dinner choices", nutritionDemoMealPool.filter((meal) => meal.mealType === "Dinner").length)}
-        ${infoCard("Snack choices", nutritionDemoMealPool.filter((meal) => meal.mealType === "Snack").length)}
+        ${infoCard("Breakfast", nutritionMealCounts.Breakfast || 0)}
+        ${infoCard("Dinner choices", nutritionMealCounts.Dinner || 0)}
+        ${infoCard("Snack choices", nutritionMealCounts.Snack || 0)}
       </div>
       <div class="form-grid">
         <label>Feature mode
@@ -5834,8 +5839,7 @@ function nutritionDemoResults(plan) {
 }
 
 function nutritionCuisineOptions() {
-  const cuisines = [...new Set(nutritionDemoMealPool.map((meal) => meal.cuisine).filter(Boolean))].sort();
-  return ["Any", ...cuisines];
+  return ["Any", ...nutritionCuisineList];
 }
 
 function nutritionProfileFromSelectedClient() {
@@ -6075,7 +6079,23 @@ function dedupeNutritionMeals(meals, options = {}) {
   });
 }
 
+function scheduleLegacyMealPlanCleanup() {
+  const runCleanup = () => {
+    try {
+      sanitizeLegacyMealPlans();
+    } catch (error) {
+      console.warn("Skipped legacy meal cleanup.", error);
+    }
+  };
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+    window.requestIdleCallback(runCleanup, { timeout: 4000 });
+  } else {
+    setTimeout(runCleanup, 1200);
+  }
+}
+
 function sanitizeLegacyMealPlans() {
+  if (!store.mealPlans?.length) return;
   const libraryById = new Map(nutritionDemoMealPool.map((meal) => [meal.id, meal]));
   const mealsByType = nutritionDemoMealPool.reduce((groups, meal) => {
     groups[meal.mealType] ||= [];
