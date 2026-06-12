@@ -404385,14 +404385,46 @@ function printNutritionShoppingList() {
     alert("No shopping list is ready to print yet. Generate or assign a meal plan first.");
     return;
   }
-  document.body.classList.add("printing-shopping-list");
-  const cleanup = () => {
-    document.body.classList.remove("printing-shopping-list");
-    window.removeEventListener("afterprint", cleanup);
-  };
-  window.addEventListener("afterprint", cleanup);
-  window.print();
-  setTimeout(cleanup, 3000);
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+  const title = shoppingList.querySelector("h3")?.textContent || "Shopping List";
+  printWindow.document.open();
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #17141d; margin: 28px; }
+          h1 { margin: 0 0 6px; font-size: 24px; }
+          .print-subtitle { margin: 0 0 20px; color: #5d5668; }
+          .shopping-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; }
+          .shopping-group { break-inside: avoid; border-top: 2px solid #d6b24d; padding-top: 8px; }
+          h4 { margin: 0 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+          ul { margin: 0; padding-left: 20px; }
+          li { margin-bottom: 5px; line-height: 1.25; }
+          button, .eyebrow { display: none !important; }
+          @media print { body { margin: 18mm; } }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(title)}</h1>
+        <p class="print-subtitle">Organized grocery list for the assigned meal plan.</p>
+        ${shoppingList.querySelector(".shopping-columns")?.outerHTML || shoppingList.innerHTML}
+        <script>
+          window.onload = function() {
+            window.focus();
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 function requestClientMealPlanAddon() {
@@ -404655,17 +404687,65 @@ function mealHasAllergy(meal, allergy) {
 }
 
 function buildNutritionShoppingList(days) {
-  const categories = {};
+  const categories = {
+    Protein: new Map(),
+    Produce: new Map(),
+    "Grains / Starches": new Map(),
+    "Dairy / Eggs": new Map(),
+    "Pantry / Seasoning": new Map(),
+    Other: new Map()
+  };
   days.flatMap((day) => day.meals).forEach((meal) => {
-    String(meal.shoppingListItems || "").split(";").forEach((group) => {
-      const [rawCategory, rawItems] = group.split(":");
-      const category = String(rawCategory || "Other").trim() || "Other";
-      const items = String(rawItems || rawCategory || "").split(",").map((item) => item.trim()).filter(Boolean);
-      categories[category] ||= new Set();
-      items.forEach((item) => categories[category].add(item));
+    parseNutritionShoppingItems(meal.shoppingListItems || meal.ingredients || "").forEach((item) => {
+      const normalized = normalizeShoppingItem(item);
+      if (!normalized) return;
+      const category = inferShoppingCategory(normalized);
+      const key = normalizeNutritionText(normalized);
+      if (!categories[category].has(key)) categories[category].set(key, titleCaseShoppingItem(normalized));
     });
   });
-  return Object.fromEntries(Object.entries(categories).map(([category, items]) => [category, [...items].sort()]));
+  return Object.fromEntries(Object.entries(categories)
+    .map(([category, items]) => [category, [...items.values()].sort((a, b) => a.localeCompare(b))])
+    .filter(([, items]) => items.length));
+}
+
+function parseNutritionShoppingItems(value) {
+  return String(value || "")
+    .split(";")
+    .flatMap((group) => {
+      const parts = group.split(":");
+      const rawItems = parts.length > 1 ? parts.slice(1).join(":") : group;
+      return rawItems.split(",");
+    })
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeShoppingItem(item) {
+  return String(item || "")
+    .replace(/\b(about|fresh|extra|light|low sodium|salt free|salt-free|no added sugar)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,;-]+|[\s,;-]+$/g, "")
+    .trim();
+}
+
+function titleCaseShoppingItem(item) {
+  const keepLower = new Set(["or", "and", "of"]);
+  return String(item || "").split(" ").map((word, index) => {
+    const lower = word.toLowerCase();
+    if (index > 0 && keepLower.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(" ");
+}
+
+function inferShoppingCategory(item) {
+  const text = normalizeNutritionText(item);
+  if (/\b(chicken|turkey|beef|fish|salmon|tilapia|catfish|shrimp|tuna|tofu|beans|lentils|chickpeas|peas|black eyed peas|black beans|kidney beans|protein)\b/.test(text)) return "Protein";
+  if (/\b(greek yogurt|yogurt|cottage cheese|cheese|feta|parmesan|milk|egg|eggs|egg whites)\b/.test(text)) return "Dairy / Eggs";
+  if (/\b(rice|oats|quinoa|bread|pita|roti|tortilla|noodles|pasta|potato|sweet potato|fonio|granola|wrap)\b/.test(text)) return "Grains / Starches";
+  if (/\b(spinach|greens|collard|green beans|okra|tomato|tomatoes|pepper|peppers|cabbage|onion|garlic|cucumber|lettuce|romaine|broccoli|carrots|cauliflower|zucchini|eggplant|mushrooms|berries|banana|mango|avocado|lemon|lime|mint|parsley|cilantro|herbs)\b/.test(text)) return "Produce";
+  if (/\b(oil|olive oil|avocado oil|seasoning|paprika|cumin|coriander|sumac|za atar|salsa|sauce|honey|chia|tahini|hummus|salt|pepper|ginger|thyme|cinnamon|granola)\b/.test(text)) return "Pantry / Seasoning";
+  return "Other";
 }
 
 function addSuggestedExerciseToWorkout(workoutId) {
