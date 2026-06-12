@@ -1440,15 +1440,47 @@ dd {
     border: 0;
     color: #17141d;
     background: #fff;
-    padding: 20px;
+    padding: 10mm;
+    font-size: 12px;
   }
 
-  .printable-shopping-list button {
+  .printable-shopping-list button,
+  .printable-shopping-list .section-head p,
+  .printable-shopping-list .eyebrow {
     display: none;
   }
 
   .printable-shopping-list .shopping-columns {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: block;
+    columns: 2;
+    column-gap: 22px;
+  }
+
+  .printable-shopping-list .shopping-columns > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 8px;
+  }
+
+  .printable-shopping-list h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+
+  .printable-shopping-list h4 {
+    margin: 0 0 3px;
+    font-size: 12px;
+    border-bottom: 1px solid #999;
+  }
+
+  .printable-shopping-list ul {
+    margin: 0;
+    padding-left: 16px;
+  }
+
+  .printable-shopping-list li {
+    margin: 0 0 2px;
+    line-height: 1.15;
   }
 }
 

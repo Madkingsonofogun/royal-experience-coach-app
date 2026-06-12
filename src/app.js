@@ -6822,6 +6822,13 @@ function printNutritionShoppingList() {
     return;
   }
   const title = shoppingList.querySelector("h3")?.textContent || "Shopping List";
+  const shoppingGroups = Array.from(shoppingList.querySelectorAll(".shopping-columns > div"))
+    .map((group) => {
+      const heading = group.querySelector("h4")?.textContent?.trim() || "";
+      const items = Array.from(group.querySelectorAll("li")).map((item) => item.textContent.trim()).filter(Boolean);
+      return { heading, items };
+    })
+    .filter((group) => group.items.length);
   printWindow.document.open();
   printWindow.document.write(`
     <!doctype html>
@@ -6829,22 +6836,31 @@ function printNutritionShoppingList() {
       <head>
         <title>${escapeHtml(title)}</title>
         <style>
-          body { font-family: Arial, sans-serif; color: #17141d; margin: 28px; }
-          h1 { margin: 0 0 6px; font-size: 24px; }
-          .print-subtitle { margin: 0 0 20px; color: #5d5668; }
-          .shopping-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; }
-          .shopping-group { break-inside: avoid; border-top: 2px solid #d6b24d; padding-top: 8px; }
-          h4 { margin: 0 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
-          ul { margin: 0; padding-left: 20px; }
-          li { margin-bottom: 5px; line-height: 1.25; }
-          button, .eyebrow { display: none !important; }
-          @media print { body { margin: 18mm; } }
+          @page { margin: 10mm; }
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; color: #111; margin: 0; font-size: 12px; }
+          h1 { margin: 0 0 8px; font-size: 18px; line-height: 1.1; }
+          .shopping-list-print { columns: 2; column-gap: 22px; }
+          .shopping-group { break-inside: avoid; page-break-inside: avoid; margin: 0 0 8px; }
+          h4 { margin: 0 0 3px; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid #999; }
+          ul { margin: 0; padding-left: 16px; }
+          li { margin: 0 0 2px; line-height: 1.15; }
+          @media print {
+            body { margin: 0; }
+            .shopping-list-print { columns: 2; }
+          }
         </style>
       </head>
       <body>
         <h1>${escapeHtml(title)}</h1>
-        <p class="print-subtitle">Organized grocery list for the assigned meal plan.</p>
-        ${shoppingList.querySelector(".shopping-columns")?.outerHTML || shoppingList.innerHTML}
+        <div class="shopping-list-print">
+          ${shoppingGroups.map((group) => `
+            <section class="shopping-group">
+              <h4>${escapeHtml(group.heading)}</h4>
+              <ul>${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+            </section>
+          `).join("")}
+        </div>
         <script>
           window.onload = function() {
             window.focus();
