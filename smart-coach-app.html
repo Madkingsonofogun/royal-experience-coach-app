@@ -404200,6 +404200,7 @@ function nutritionDemoResults(plan) {
           <h3>${escapeHtml(plan.summary.goal)} / ${escapeHtml(plan.summary.dietaryNeed)}</h3>
           <p class="muted">Estimated daily average: ${plan.summary.averageCalories} cal, ${plan.summary.averageProtein}g protein, ${plan.summary.averageCarbs}g carbs, ${plan.summary.averageFat}g fat.</p>
           ${targetLine ? `<p class="muted">${escapeHtml(targetLine)}</p>` : ""}
+          <p class="muted">Plan structure: ${Number(plan.summary?.mealsPerDay ?? 3)} meals + ${Number(plan.summary?.snacksPerDay ?? 1)} snacks per day.</p>
           ${plan.summary?.reviewRequired ? `<p class="badge danger">Coach/Admin review needed</p>` : ""}
         </div>
       </div>
@@ -404215,9 +404216,9 @@ function nutritionDemoResults(plan) {
               </div>
               <button class="ghost" data-open-nutrition-day="${day.day}">Open Day</button>
             </div>
-            ${day.meals.map((meal) => `
+            ${day.meals.map((meal, mealIndex) => `
               <div class="admin-row meal-demo-row">
-                <span><strong>${meal.mealType}:</strong> ${escapeHtml(meal.name)}<br><small>${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g / ${escapeHtml(meal.prepTime)}</small></span>
+                <span><strong>${escapeHtml(nutritionMealDisplayType(meal, mealIndex))}:</strong> ${escapeHtml(meal.name)}<br><small>${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g / ${escapeHtml(meal.prepTime)}</small></span>
               </div>
             `).join("")}
           </article>
@@ -404539,6 +404540,19 @@ function nutritionMealPlanRepeatKey(meal) {
   return [normalizeNutritionText(meal.mealType), normalizeNutritionText(meal.name)].join("|");
 }
 
+function nutritionMealDisplayType(meal, index = 0) {
+  return meal?.slotLabel || meal?.mealLabel || meal?.mealType || `Meal ${Number(index) + 1}`;
+}
+
+function nutritionMealWithSlot(meal, slot = {}) {
+  if (!meal) return null;
+  return {
+    ...meal,
+    mealType: meal.mealType || slot.type || "Dinner",
+    slotLabel: slot.label || meal.slotLabel || meal.mealLabel || meal.mealType || "Meal"
+  };
+}
+
 function dedupeNutritionMeals(meals, options = {}) {
   const seenIds = new Set();
   const seenMeals = new Set();
@@ -404582,13 +404596,13 @@ function sanitizeLegacyMealPlans() {
         const currentLibraryMeal = libraryById.get(meal?.id);
         if (currentLibraryMeal) {
           if (currentLibraryMeal.name !== meal.name) changed = true;
-          return currentLibraryMeal;
+          return nutritionMealWithSlot(currentLibraryMeal, { label: meal.slotLabel || meal.mealLabel || meal.mealType });
         }
         const mealType = meal?.mealType || "Dinner";
         const fallbackPool = mealsByType[mealType] || nutritionDemoMealPool;
         const replacement = fallbackPool[Math.floor(Math.random() * fallbackPool.length)] || nutritionDemoMealPool[0];
         changed = true;
-        return replacement;
+        return nutritionMealWithSlot(replacement, { label: meal.slotLabel || meal.mealLabel || meal.mealType, type: mealType });
       });
       day.totalCalories = day.meals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0);
       day.totalProtein = day.meals.reduce((sum, meal) => sum + Number(meal.protein || 0), 0);
@@ -404671,7 +404685,7 @@ function nutritionMealInstructionCard(meal) {
     <article class="meal-instruction-card">
       <div class="section-head compact-head">
         <div>
-          <p class="eyebrow">${escapeHtml(meal.mealType)} / ${escapeHtml(meal.cuisine || "General")}</p>
+          <p class="eyebrow">${escapeHtml(nutritionMealDisplayType(meal))} / ${escapeHtml(meal.cuisine || "General")}</p>
           <h4>${escapeHtml(meal.name)}</h4>
         </div>
         <span class="badge green">${escapeHtml(meal.servingSize || "1 serving")}</span>
@@ -404735,7 +404749,7 @@ function nutritionMealInstructionCardWithSwap(meal, dayNumber, mealIndex, canCha
       ${canChangeMeals ? `
         <div class="nutrition-swap-panel">
           <div>
-            <p class="eyebrow">Change suggested ${escapeHtml(meal.mealType)}</p>
+            <p class="eyebrow">Change suggested ${escapeHtml(nutritionMealDisplayType(meal, mealIndex))}</p>
             <p class="muted">Pick from a wider library match by cuisine, allergy, and dietary need, or let the app make a smart choice.</p>
           </div>
           <div class="nutrition-swap-controls">
@@ -404758,7 +404772,7 @@ function nutritionMealPreviewCard(meal, planId, dayNumber, mealIndex) {
   return `
     <button class="meal-preview-card" data-open-meal-recipe data-plan-id="${escapeHtml(planId)}" data-day="${dayNumber}" data-meal-index="${mealIndex}" title="Open recipe for ${escapeHtml(meal.name)}">
       <span>
-        <strong>${escapeHtml(meal.mealType)}:</strong> ${escapeHtml(meal.name)}
+        <strong>${escapeHtml(nutritionMealDisplayType(meal, mealIndex))}:</strong> ${escapeHtml(meal.name)}
         <small>${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g / ${escapeHtml(meal.prepTime || "Prep time not listed")}</small>
       </span>
       <span class="meal-preview-badges">
@@ -404796,7 +404810,7 @@ function nutritionRecipeModal() {
       <section class="modal-card nutrition-recipe-modal">
         <div class="modal-head">
           <div>
-            <p class="eyebrow">Day ${day.day} / ${escapeHtml(meal.mealType)}</p>
+            <p class="eyebrow">Day ${day.day} / ${escapeHtml(nutritionMealDisplayType(meal, modal.mealIndex))}</p>
             <h2>${escapeHtml(meal.name)}</h2>
             <p class="muted">${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g</p>
           </div>
@@ -404825,7 +404839,7 @@ function nutritionRecipeModal() {
             <div class="nutrition-swap-panel">
               <div>
                 <p class="eyebrow">Substitute this meal</p>
-                <p class="muted">Choose from favorites first, or pick another ${escapeHtml(meal.mealType)} that fits this plan's allergy, culture, and budget settings.</p>
+                <p class="muted">Choose from favorites first, or pick another ${escapeHtml(nutritionMealDisplayType(meal, modal.mealIndex))} that fits this plan's allergy, culture, and budget settings.</p>
               </div>
               <div class="nutrition-swap-controls">
                 <select id="clientMealSubstitute-${day.day}-${modal.mealIndex}">
@@ -404959,7 +404973,10 @@ function replaceNutritionDemoMeal(dayNumber, mealIndex, mealId) {
   const day = plan?.days.find((item) => Number(item.day) === Number(dayNumber));
   const replacement = nutritionDemoMealPool.find((meal) => meal.id === mealId);
   if (!day || !replacement || !day.meals[mealIndex]) return;
-  day.meals[mealIndex] = replacement;
+  day.meals[mealIndex] = nutritionMealWithSlot(replacement, {
+    label: day.meals[mealIndex].slotLabel || day.meals[mealIndex].mealLabel || day.meals[mealIndex].mealType,
+    type: replacement.mealType
+  });
   recalculateNutritionDemoPlan(plan);
 }
 
@@ -404974,7 +404991,10 @@ function smartReplaceNutritionDemoMeal(dayNumber, mealIndex) {
   usedKeys.delete(nutritionMealPlanRepeatKey(currentMeal));
   const replacement = pickSmartNutritionMeal(currentMeal.mealType, state.nutritionDemo, usedIds, currentMeal.id, usedKeys);
   if (!replacement) return;
-  day.meals[mealIndex] = replacement;
+  day.meals[mealIndex] = nutritionMealWithSlot(replacement, {
+    label: currentMeal.slotLabel || currentMeal.mealLabel || currentMeal.mealType,
+    type: replacement.mealType
+  });
   recalculateNutritionDemoPlan(plan);
 }
 
@@ -404989,7 +405009,10 @@ function smartReplaceNutritionDemoDay(dayNumber) {
     if (replacement) {
       usedIds.add(replacement.id);
       usedKeys.add(nutritionMealPlanRepeatKey(replacement));
-      return replacement;
+      return nutritionMealWithSlot(replacement, {
+        label: meal.slotLabel || meal.mealLabel || meal.mealType,
+        type: replacement.mealType
+      });
     }
     usedIds.add(meal.id);
     usedKeys.add(nutritionMealPlanRepeatKey(meal));
@@ -405093,7 +405116,10 @@ function replaceAssignedMeal(planId, dayNumber, mealIndex, mealId) {
   const day = plan?.days?.find((item) => Number(item.day) === Number(dayNumber));
   const replacement = nutritionDemoMealPool.find((meal) => meal.id === mealId);
   if (!plan || !day || !replacement || !day.meals?.[mealIndex]) return;
-  day.meals[mealIndex] = replacement;
+  day.meals[mealIndex] = nutritionMealWithSlot(replacement, {
+    label: day.meals[mealIndex].slotLabel || day.meals[mealIndex].mealLabel || day.meals[mealIndex].mealType,
+    type: replacement.mealType
+  });
   plan.updatedAt = new Date().toISOString();
   recalculateNutritionDemoPlan(plan);
   saveStore();
@@ -405355,6 +405381,7 @@ function nutritionAssignedPlanView(plan, options = {}) {
           <h3>${escapeHtml(plan.summary?.goal || "Goal")} / ${escapeHtml(plan.summary?.dietaryNeed || "Nutrition")}</h3>
           <p class="muted">Assigned ${formatReadableDate(plan.assignedAt || plan.createdAt)}. Estimated daily average: ${plan.summary?.averageCalories || 0} cal, ${plan.summary?.averageProtein || 0}g protein.</p>
           ${targetLine ? `<p class="muted">${escapeHtml(targetLine)}</p>` : ""}
+          <p class="muted">Plan structure: ${Number(plan.summary?.mealsPerDay ?? plan.options?.mealsPerDay ?? 3)} meals + ${Number(plan.summary?.snacksPerDay ?? plan.options?.snacksPerDay ?? 1)} snacks per day.</p>
           ${plan.summary?.reviewRequired ? `<p class="badge danger">Coach/Admin review needed</p>` : ""}
           ${options.clientView ? `<p class="muted">Click any meal card to open the recipe, ingredients, and step-by-step instructions.</p>` : ""}
         </div>
@@ -405435,19 +405462,19 @@ function collectNutritionDemoOptions() {
 
 function generateNutritionDemoPlan(options) {
   const targets = calculateNutritionTargets({ ...nutritionProfileFromSelectedClient(), ...options });
-  const mealTypes = ["Breakfast", "Lunch", "Dinner", "Snack"];
+  const mealSlots = nutritionDailyMealSlots(options);
   const days = [];
   const counters = {};
   const usedIds = new Set();
   const usedKeys = new Set();
   for (let day = 1; day <= options.planLength; day += 1) {
-    const meals = mealTypes.map((mealType) => {
-      const meal = pickNutritionDemoMeal(mealType, options, day, counters, usedIds, usedKeys);
+    const meals = mealSlots.map((slot) => {
+      const meal = pickNutritionDemoMeal(slot.type, options, day, counters, usedIds, usedKeys);
       if (meal) {
         usedIds.add(meal.id);
         usedKeys.add(nutritionMealPlanRepeatKey(meal));
       }
-      return meal;
+      return nutritionMealWithSlot(meal, slot);
     }).filter(Boolean);
     days.push({
       day,
@@ -405482,10 +405509,57 @@ function generateNutritionDemoPlan(options) {
       targetProtein: targets.proteinGrams,
       targetCarbs: targets.carbGrams,
       targetFat: targets.fatGrams,
+      mealsPerDay: nutritionDailyMainMealCount(options),
+      snacksPerDay: nutritionDailySnackCount(options),
+      dailyMealSlots: mealSlots.map((slot) => slot.label),
       reviewRequired: targets.reviewRequired,
       warnings: targets.warnings
     }
   };
+}
+
+function nutritionDailyMainMealCount(options = {}) {
+  return Math.max(1, Math.min(5, Number(options.mealsPerDay || 3)));
+}
+
+function nutritionDailySnackCount(options = {}) {
+  return Math.max(0, Math.min(4, Number(options.snacksPerDay ?? 1)));
+}
+
+function nutritionDailyMealSlots(options = {}) {
+  const mealsPerDay = nutritionDailyMainMealCount(options);
+  const snacksPerDay = nutritionDailySnackCount(options);
+  const mainMealPatterns = {
+    1: [{ type: "Dinner", label: "Meal 1" }],
+    2: [
+      { type: "Breakfast", label: "Breakfast" },
+      { type: "Dinner", label: "Dinner" }
+    ],
+    3: [
+      { type: "Breakfast", label: "Breakfast" },
+      { type: "Lunch", label: "Lunch" },
+      { type: "Dinner", label: "Dinner" }
+    ],
+    4: [
+      { type: "Breakfast", label: "Breakfast" },
+      { type: "Lunch", label: "Lunch" },
+      { type: "Dinner", label: "Dinner" },
+      { type: "Lunch", label: "Extra Meal" }
+    ],
+    5: [
+      { type: "Breakfast", label: "Breakfast" },
+      { type: "Lunch", label: "Lunch" },
+      { type: "Dinner", label: "Dinner" },
+      { type: "Lunch", label: "Extra Meal 1" },
+      { type: "Dinner", label: "Extra Meal 2" }
+    ]
+  };
+  const mainMeals = mainMealPatterns[mealsPerDay] || mainMealPatterns[3];
+  const snacks = Array.from({ length: snacksPerDay }, (_, index) => ({
+    type: "Snack",
+    label: snacksPerDay === 1 ? "Snack" : `Snack ${index + 1}`
+  }));
+  return [...mainMeals, ...snacks];
 }
 
 function pickNutritionDemoMeal(mealType, options, day, counters, usedIds = new Set(), usedKeys = new Set()) {
