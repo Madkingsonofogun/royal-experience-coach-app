@@ -6900,11 +6900,6 @@ function printNutritionShoppingList() {
     alert("No shopping list is ready to print yet. Generate or assign a meal plan first.");
     return;
   }
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
-  if (!printWindow) {
-    window.print();
-    return;
-  }
   const title = shoppingList.querySelector("h3")?.textContent || "Shopping List";
   const shoppingGroups = Array.from(shoppingList.querySelectorAll(".shopping-columns > div"))
     .map((group) => {
@@ -6913,25 +6908,25 @@ function printNutritionShoppingList() {
       return { heading, items };
     })
     .filter((group) => group.items.length);
-  printWindow.document.open();
-  printWindow.document.write(`
+  const printMarkup = `
     <!doctype html>
     <html>
       <head>
         <title>${escapeHtml(title)}</title>
         <style>
-          @page { margin: 10mm; }
+          @page { margin: 8mm; size: auto; }
           * { box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; color: #111; margin: 0; font-size: 12px; }
-          h1 { margin: 0 0 8px; font-size: 18px; line-height: 1.1; }
-          .shopping-list-print { columns: 2; column-gap: 22px; }
-          .shopping-group { break-inside: avoid; page-break-inside: avoid; margin: 0 0 8px; }
-          h4 { margin: 0 0 3px; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid #999; }
-          ul { margin: 0; padding-left: 16px; }
-          li { margin: 0 0 2px; line-height: 1.15; }
+          html, body { background: #fff !important; color: #111 !important; margin: 0; padding: 0; min-height: 0; }
+          body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.12; }
+          h1 { margin: 0 0 6px; font-size: 16px; line-height: 1.1; }
+          .shopping-list-print { columns: 3; column-gap: 18px; }
+          .shopping-group { break-inside: avoid; page-break-inside: avoid; margin: 0 0 6px; }
+          h4 { margin: 0 0 2px; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #999; }
+          ul { margin: 0; padding-left: 14px; }
+          li { margin: 0 0 1px; line-height: 1.12; }
           @media print {
             body { margin: 0; }
-            .shopping-list-print { columns: 2; }
+            .shopping-list-print { columns: 3; }
           }
         </style>
       </head>
@@ -6946,16 +6941,38 @@ function printNutritionShoppingList() {
           `).join("")}
         </div>
         <script>
-          window.onload = function() {
-            window.focus();
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
+          window.onload = function() {};
         <\/script>
       </body>
     </html>
-  `);
-  printWindow.document.close();
+  `;
+  const oldFrame = document.querySelector("#nutritionShoppingPrintFrame");
+  oldFrame?.remove();
+  const frame = document.createElement("iframe");
+  frame.id = "nutritionShoppingPrintFrame";
+  frame.setAttribute("title", "Shopping list print");
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.style.opacity = "0";
+  document.body.appendChild(frame);
+  const frameDocument = frame.contentWindow?.document;
+  if (!frameDocument) {
+    alert("The shopping list could not open the print dialog. Please try again.");
+    frame.remove();
+    return;
+  }
+  frameDocument.open();
+  frameDocument.write(printMarkup);
+  frameDocument.close();
+  setTimeout(() => {
+    frame.contentWindow?.focus();
+    frame.contentWindow?.print();
+    setTimeout(() => frame.remove(), 1200);
+  }, 120);
 }
 
 function requestClientMealPlanAddon() {

@@ -1423,25 +1423,35 @@ dd {
 }
 
 @media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   body * {
-    visibility: hidden;
+    display: none !important;
   }
 
   .printable-shopping-list,
   .printable-shopping-list * {
-    visibility: visible;
+    display: revert !important;
   }
 
   .printable-shopping-list {
     display: block;
-    position: absolute;
-    inset: 0;
+    position: static;
     box-shadow: none;
     border: 0;
     color: #17141d;
     background: #fff;
-    padding: 10mm;
-    font-size: 12px;
+    padding: 0;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.12;
   }
 
   .printable-shopping-list button,
@@ -1452,8 +1462,8 @@ dd {
 
   .printable-shopping-list .shopping-columns {
     display: block;
-    columns: 2;
-    column-gap: 22px;
+    columns: 3;
+    column-gap: 18px;
   }
 
   .printable-shopping-list .shopping-columns > div {
@@ -1463,24 +1473,24 @@ dd {
   }
 
   .printable-shopping-list h3 {
-    margin: 0 0 8px;
-    font-size: 18px;
+    margin: 0 0 6px;
+    font-size: 16px;
   }
 
   .printable-shopping-list h4 {
-    margin: 0 0 3px;
-    font-size: 12px;
+    margin: 0 0 2px;
+    font-size: 11px;
     border-bottom: 1px solid #999;
   }
 
   .printable-shopping-list ul {
     margin: 0;
-    padding-left: 16px;
+    padding-left: 14px;
   }
 
   .printable-shopping-list li {
-    margin: 0 0 2px;
-    line-height: 1.15;
+    margin: 0 0 1px;
+    line-height: 1.12;
   }
 }
 
