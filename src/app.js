@@ -365,6 +365,7 @@ let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
 let lastShoppingListPrintAt = 0;
 
+sanitizeLegacyMealPlans();
 const app = document.querySelector("#app");
 render();
 startLoginAccountAutoRefresh();
@@ -6072,6 +6073,61 @@ function dedupeNutritionMeals(meals, options = {}) {
     seenMeals.add(mealKey);
     return true;
   });
+}
+
+function sanitizeLegacyMealPlans() {
+  const libraryById = new Map(nutritionDemoMealPool.map((meal) => [meal.id, meal]));
+  const mealsByType = nutritionDemoMealPool.reduce((groups, meal) => {
+    groups[meal.mealType] ||= [];
+    groups[meal.mealType].push(meal);
+    return groups;
+  }, {});
+  let changed = false;
+  (store.mealPlans || []).forEach((plan) => {
+    (plan.days || []).forEach((day) => {
+      day.meals = (day.meals || []).map((meal) => {
+        const currentLibraryMeal = libraryById.get(meal?.id);
+        if (currentLibraryMeal) {
+          if (currentLibraryMeal.name !== meal.name) changed = true;
+          return currentLibraryMeal;
+        }
+        const mealType = meal?.mealType || "Dinner";
+        const fallbackPool = mealsByType[mealType] || nutritionDemoMealPool;
+        const replacement = fallbackPool[Math.floor(Math.random() * fallbackPool.length)] || nutritionDemoMealPool[0];
+        changed = true;
+        return replacement;
+      });
+      day.totalCalories = day.meals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0);
+      day.totalProtein = day.meals.reduce((sum, meal) => sum + Number(meal.protein || 0), 0);
+      day.totalCarbs = day.meals.reduce((sum, meal) => sum + Number(meal.carbs || 0), 0);
+      day.totalFat = day.meals.reduce((sum, meal) => sum + Number(meal.fat || 0), 0);
+      day.totalFiber = day.meals.reduce((sum, meal) => sum + nutritionMealNutrient(meal, "fiber"), 0);
+      day.totalSugar = day.meals.reduce((sum, meal) => sum + nutritionMealNutrient(meal, "sugar"), 0);
+      day.totalSodium = day.meals.reduce((sum, meal) => sum + nutritionMealNutrient(meal, "sodium"), 0);
+    });
+    if (changed && plan.summary) {
+      const days = plan.days || [];
+      const totals = days.reduce((sum, day) => ({
+        calories: sum.calories + Number(day.totalCalories || 0),
+        protein: sum.protein + Number(day.totalProtein || 0),
+        carbs: sum.carbs + Number(day.totalCarbs || 0),
+        fat: sum.fat + Number(day.totalFat || 0)
+      }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      plan.summary.averageCalories = Math.round(totals.calories / Math.max(1, days.length));
+      plan.summary.averageProtein = Math.round(totals.protein / Math.max(1, days.length));
+      plan.summary.averageCarbs = Math.round(totals.carbs / Math.max(1, days.length));
+      plan.summary.averageFat = Math.round(totals.fat / Math.max(1, days.length));
+      plan.updatedAt = new Date().toISOString();
+      plan.cleanedLegacyMeals = true;
+    }
+  });
+  if (changed) {
+    try {
+      window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+      console.warn("Could not save cleaned meal plans.", error);
+    }
+  }
 }
 
 function shuffledNutritionMeals(meals) {
