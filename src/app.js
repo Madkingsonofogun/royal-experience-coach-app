@@ -1263,6 +1263,7 @@ function homeDashboard() {
       <div class="dashboard-grid">
         ${state.currentUser.role === "Client" ? "" : smartDecisionPanel(client, latestAssessment, lastCheckIn)}
         ${todayPreviewPanel(client)}
+        ${approvedAppointmentsPanel(client)}
         ${assessmentSchedulePanel(client)}
         ${quickLinksPanel()}
       </div>
@@ -1581,6 +1582,7 @@ function schedulePage() {
         </div>
         ${state.currentUser.role !== "Client" ? `<button class="primary" data-view="assessment">Open Assessment</button>` : ""}
       </div>
+      ${approvedAppointmentsPanel(client)}
       ${assessmentSchedulePanel(client)}
       ${state.currentUser.role === "Admin" ? `
         <article class="card">
@@ -1591,6 +1593,7 @@ function schedulePage() {
               <p class="muted">Admin can see every client/coach schedule request here and intervene when needed.</p>
             </div>
           </div>
+          ${approvedAppointmentsPanel(null, { adminView: true })}
           ${adminAssessmentScheduleBoard()}
         </article>
       ` : ""}
@@ -5597,6 +5600,61 @@ function assessmentSchedulePanel(client) {
       ` : ""}
     </article>
   `;
+}
+
+function approvedAppointmentsPanel(client = null, options = {}) {
+  const adminView = Boolean(options.adminView);
+  const appointments = approvedAssessmentAppointments(client?.id, adminView);
+  const title = adminView ? "All Approved Appointments" : "Approved Appointments";
+  if (!appointments.length) {
+    return `
+      <article class="card approved-appointments-card">
+        <p class="eyebrow">Approved schedule</p>
+        <h3>${title}</h3>
+        <p class="muted">No approved assessment appointments yet.</p>
+      </article>
+    `;
+  }
+  return `
+    <article class="card approved-appointments-card">
+      <div class="section-head compact-head">
+        <div>
+          <p class="eyebrow">Approved schedule</p>
+          <h3>${title}</h3>
+          <p class="muted">${adminView ? "Admin can see every finalized assessment and reassessment appointment." : "These are the finalized assessment and reassessment appointments."}</p>
+        </div>
+        <span class="badge green">${appointments.length} approved</span>
+      </div>
+      <div class="admin-list compact-list">
+        ${appointments.map((schedule) => {
+          const scheduleClient = store.clients.find((item) => item.id === schedule.clientId);
+          const coach = store.coaches.find((item) => item.id === schedule.coachId);
+          return `
+            <div class="admin-row">
+              <span>
+                <strong>${escapeHtml(schedule.assessmentType || "Assessment")}</strong>
+                ${adminView ? `<br><small>${escapeHtml(scheduleClient?.name || "Unknown client")} / ${escapeHtml(coach?.name || "Coach not assigned")}</small>` : `<br><small>${escapeHtml(coach?.name || "Coach not assigned")}</small>`}
+              </span>
+              <small>${formatScheduleDateTime(schedule.proposedDate || schedule.counterDate, schedule.proposedTime || schedule.counterTime)} / Approved</small>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function approvedAssessmentAppointments(clientId = null, adminView = false) {
+  return (store.assessmentSchedules || [])
+    .filter((schedule) => schedule.status === "Approved")
+    .filter((schedule) => {
+      if (clientId) return schedule.clientId === clientId;
+      if (adminView && state.currentUser.role === "Admin") return true;
+      if (state.currentUser.role === "Coach") return schedule.coachId === state.currentUser.linkedId;
+      if (state.currentUser.role === "Client") return schedule.clientId === state.currentUser.linkedId;
+      return false;
+    })
+    .sort((a, b) => String(a.proposedDate || a.counterDate || "").localeCompare(String(b.proposedDate || b.counterDate || "")) || String(a.proposedTime || a.counterTime || "").localeCompare(String(b.proposedTime || b.counterTime || "")));
 }
 
 function formatScheduleDateTime(date, time) {

@@ -109,7 +109,36 @@ export function createStore() {
       }
     ],
     assessments: [],
-    assessmentSchedules: [],
+    assessmentSchedules: [
+      {
+        id: "assessment_schedule_ada_approved",
+        clientId: "client_ada",
+        coachId: "coach_1",
+        assessmentType: "Reassessment",
+        proposedDate: "2026-06-18",
+        proposedTime: "10:30",
+        status: "Approved",
+        clientNotes: "Confirmed by client.",
+        coachNotes: "Reassessment before next month plan update.",
+        approvedAt: "2026-06-10T12:00:00.000Z",
+        createdAt: "2026-06-09T12:00:00.000Z",
+        updatedAt: "2026-06-10T12:00:00.000Z"
+      },
+      {
+        id: "assessment_schedule_marcus_approved",
+        clientId: "client_marcus",
+        coachId: "coach_1",
+        assessmentType: "Initial Assessment",
+        proposedDate: "2026-06-20",
+        proposedTime: "15:00",
+        status: "Approved",
+        clientNotes: "Client approved afternoon time.",
+        coachNotes: "Focus on conditioning baseline and movement screen.",
+        approvedAt: "2026-06-11T12:00:00.000Z",
+        createdAt: "2026-06-10T12:00:00.000Z",
+        updatedAt: "2026-06-11T12:00:00.000Z"
+      }
+    ],
     weeklyCheckIns: [],
     dailyCheckIns: [],
     painCheckIns: [],
