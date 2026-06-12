@@ -5739,7 +5739,7 @@ function nutritionDemoResults(plan) {
 }
 
 function buildExpandedNutritionDemoMealPool(sourceMeals) {
-  if (sourceMeals.length > 1000) return sourceMeals;
+  if (sourceMeals.length > 1000) return dedupeNutritionMeals(sourceMeals, { keepCuisineVariants: true });
   const flavorProfiles = [
     { label: "Cajun", cuisine: "Black American / African Diaspora", seasoning: "cajun seasoning", produce: "collard greens", budgetLevel: "Medium", calories: 24, protein: 2, carbs: 3, fat: 1 },
     { label: "Jerk", cuisine: "Black American / African Diaspora", seasoning: "jerk seasoning", produce: "cabbage slaw", budgetLevel: "Medium", calories: 18, protein: 1, carbs: 4, fat: 0 },
@@ -5778,6 +5778,63 @@ function buildExpandedNutritionDemoMealPool(sourceMeals) {
       coachOnlyNotes: "Demo-generated variety from the meal workbook sample. Review before using in a paid nutrition add-on."
     }))
   ]);
+}
+
+function normalizeNutritionText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function nutritionMealDuplicateKey(meal, options = {}) {
+  const mealType = normalizeNutritionText(meal.mealType);
+  const name = normalizeNutritionText(meal.name);
+  const cuisine = options.keepCuisineVariants ? normalizeNutritionText(meal.cuisine) : "";
+  return [mealType, name, cuisine].filter(Boolean).join("|");
+}
+
+function nutritionMealPlanRepeatKey(meal) {
+  return [normalizeNutritionText(meal.mealType), normalizeNutritionText(meal.name)].join("|");
+}
+
+function dedupeNutritionMeals(meals, options = {}) {
+  const seenIds = new Set();
+  const seenMeals = new Set();
+  return (meals || []).filter((meal) => {
+    const id = String(meal.id || "").trim();
+    const mealKey = nutritionMealDuplicateKey(meal, options);
+    if ((id && seenIds.has(id)) || seenMeals.has(mealKey)) return false;
+    if (id) seenIds.add(id);
+    seenMeals.add(mealKey);
+    return true;
+  });
+}
+
+function shuffledNutritionMeals(meals) {
+  const shuffled = [...meals];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function nutritionPlanUsedKeys(plan) {
+  return new Set((plan?.days || [])
+    .flatMap((day) => day.meals || [])
+    .map((meal) => nutritionMealPlanRepeatKey(meal)));
+}
+
+function uniqueNutritionMealOptions(meals, options = {}) {
+  const seen = new Set();
+  return (meals || []).filter((meal) => {
+    const key = options.planWide ? nutritionMealPlanRepeatKey(meal) : nutritionMealDuplicateKey(meal, { keepCuisineVariants: true });
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function nutritionMealInstructionCard(meal) {
@@ -5894,7 +5951,14 @@ function nutritionRecipeModal() {
   const canClientAdjust = state.currentUser?.role === "Client" && client?.id === plan.clientId;
   const favoriteIds = clientFavoriteMealIds(plan.clientId);
   const isFavorite = favoriteIds.includes(meal.id);
-  const alternatives = nutritionReplacementOptions(meal, { favoriteMealIds: favoriteIds, limit: 80, includeCurrent: false, broaden: true });
+  const alternatives = nutritionReplacementOptions(meal, {
+    favoriteMealIds: favoriteIds,
+    limit: 160,
+    includeCurrent: false,
+    broaden: true,
+    options: plan.options || {},
+    strictPreferences: true
+  });
   return `
     <div class="modal-backdrop" role="dialog" aria-modal="true">
       <section class="modal-card nutrition-recipe-modal">
@@ -5914,13 +5978,13 @@ function nutritionRecipeModal() {
             <div class="nutrition-swap-panel">
               <div>
                 <p class="eyebrow">Substitute this meal</p>
-                <p class="muted">Favorite meals appear first. Choose a different ${escapeHtml(meal.mealType)} and apply it to this day only.</p>
+                <p class="muted">Choose from favorites first, or pick another ${escapeHtml(meal.mealType)} that fits this plan's allergy, culture, and budget settings.</p>
               </div>
               <div class="nutrition-swap-controls">
                 <select id="clientMealSubstitute-${day.day}-${modal.mealIndex}">
-                  ${alternatives.map((option) => `<option value="${option.id}">${favoriteIds.includes(option.id) ? "Favorite - " : ""}${escapeHtml(option.name)} / ${option.calories} cal / P ${option.protein}g</option>`).join("")}
+                  ${nutritionSwapOptionGroups(alternatives, favoriteIds)}
                 </select>
-                <button class="success" data-substitute-client-meal data-plan-id="${plan.id}" data-day="${day.day}" data-meal-index="${modal.mealIndex}">Use This Meal</button>
+                <button class="success" data-substitute-client-meal data-plan-id="${plan.id}" data-day="${day.day}" data-meal-index="${modal.mealIndex}" ${alternatives.length ? "" : "disabled"}>Use This Meal</button>
               </div>
             </div>
           </div>
@@ -5943,7 +6007,7 @@ function mealInstructionsToSteps(instructions) {
 }
 
 function nutritionReplacementOptions(currentMeal, config = {}) {
-  const options = state.nutritionDemo || {};
+  const options = { ...(state.nutritionDemo || {}), ...(config.options || {}) };
   const favoriteMealIds = config.favoriteMealIds || [];
   const sameMealType = nutritionDemoMealPool.filter((meal) =>
     meal.mealType === currentMeal.mealType &&
@@ -5955,12 +6019,21 @@ function nutritionReplacementOptions(currentMeal, config = {}) {
     (config.includeCurrent !== false || meal.id !== currentMeal.id) &&
     !mealHasAllergy(meal, options.allergy)
   );
-  const pool = sameMealType.length ? sameMealType : allergySafeFallback.length ? allergySafeFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === currentMeal.mealType);
-  return [...pool]
+  const favoriteMatches = nutritionDemoMealPool.filter((meal) =>
+    favoriteMealIds.includes(meal.id) &&
+    meal.mealType === currentMeal.mealType &&
+    (config.includeCurrent !== false || meal.id !== currentMeal.id) &&
+    mealFitsNutritionPreferences(meal, options)
+  );
+  const pool = config.strictPreferences
+    ? sameMealType
+    : sameMealType.length ? sameMealType : allergySafeFallback.length ? allergySafeFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === currentMeal.mealType);
+  const favoriteFirstPool = [...favoriteMatches, ...pool.filter((meal) => !favoriteMatches.some((favorite) => favorite.id === meal.id))];
+  return uniqueNutritionMealOptions(shuffledNutritionMeals(favoriteFirstPool), { planWide: true })
     .sort((a, b) =>
       Number(favoriteMealIds.includes(b.id)) - Number(favoriteMealIds.includes(a.id)) ||
       nutritionMealSmartScore(b, options, currentMeal.mealType) - nutritionMealSmartScore(a, options, currentMeal.mealType) ||
-      String(a.name).localeCompare(String(b.name))
+      Math.random() - 0.5
     )
     .slice(0, config.limit || 120);
 }
@@ -5969,7 +6042,24 @@ function mealFitsNutritionPreferences(meal, options) {
   if (mealHasAllergy(meal, options.allergy)) return false;
   if (options.dietaryNeed && options.dietaryNeed !== "Any" && !meal.dietTags.includes(options.dietaryNeed)) return false;
   if (options.cuisine && options.cuisine !== "Any" && meal.cuisine !== options.cuisine) return false;
+  if (options.budgetLevel && options.budgetLevel !== "Any" && meal.budgetLevel !== options.budgetLevel) return false;
   return true;
+}
+
+function nutritionSwapOptionGroups(meals, favoriteIds = []) {
+  if (!meals.length) return `<option value="">No matching meals found for this plan's filters</option>`;
+  const favorites = meals.filter((meal) => favoriteIds.includes(meal.id));
+  const others = meals.filter((meal) => !favoriteIds.includes(meal.id));
+  const option = (meal) => `<option value="${meal.id}">${escapeHtml(meal.name)} / ${escapeHtml(meal.cuisine || "Any culture")} / ${escapeHtml(meal.budgetLevel || "Any budget")} / ${meal.calories} cal / P ${meal.protein}g</option>`;
+  if (!favorites.length) return others.map(option).join("");
+  return `
+    <optgroup label="Favorite meals">
+      ${favorites.map(option).join("")}
+    </optgroup>
+    <optgroup label="Other matching meals">
+      ${others.map(option).join("")}
+    </optgroup>
+  `;
 }
 
 function nutritionMealSmartScore(meal, options, mealType) {
@@ -5998,8 +6088,11 @@ function smartReplaceNutritionDemoMeal(dayNumber, mealIndex) {
   const day = plan?.days.find((item) => Number(item.day) === Number(dayNumber));
   const currentMeal = day?.meals?.[mealIndex];
   if (!plan || !day || !currentMeal) return;
-  const usedIds = new Set(day.meals.map((meal) => meal.id));
-  const replacement = pickSmartNutritionMeal(currentMeal.mealType, state.nutritionDemo, usedIds, currentMeal.id);
+  const usedIds = new Set(plan.days.flatMap((planDay) => planDay.meals || []).map((meal) => meal.id));
+  const usedKeys = nutritionPlanUsedKeys(plan);
+  usedIds.delete(currentMeal.id);
+  usedKeys.delete(nutritionMealPlanRepeatKey(currentMeal));
+  const replacement = pickSmartNutritionMeal(currentMeal.mealType, state.nutritionDemo, usedIds, currentMeal.id, usedKeys);
   if (!replacement) return;
   day.meals[mealIndex] = replacement;
   recalculateNutritionDemoPlan(plan);
@@ -6009,36 +6102,42 @@ function smartReplaceNutritionDemoDay(dayNumber) {
   const plan = state.nutritionDemo.generatedPlan;
   const day = plan?.days.find((item) => Number(item.day) === Number(dayNumber));
   if (!plan || !day) return;
-  const usedIds = new Set();
+  const usedIds = new Set(plan.days.filter((item) => Number(item.day) !== Number(dayNumber)).flatMap((planDay) => planDay.meals || []).map((meal) => meal.id));
+  const usedKeys = new Set(plan.days.filter((item) => Number(item.day) !== Number(dayNumber)).flatMap((planDay) => planDay.meals || []).map((meal) => nutritionMealPlanRepeatKey(meal)));
   day.meals = day.meals.map((meal) => {
-    const replacement = pickSmartNutritionMeal(meal.mealType, state.nutritionDemo, usedIds, meal.id);
+    const replacement = pickSmartNutritionMeal(meal.mealType, state.nutritionDemo, usedIds, meal.id, usedKeys);
     if (replacement) {
       usedIds.add(replacement.id);
+      usedKeys.add(nutritionMealPlanRepeatKey(replacement));
       return replacement;
     }
     usedIds.add(meal.id);
+    usedKeys.add(nutritionMealPlanRepeatKey(meal));
     return meal;
   });
   recalculateNutritionDemoPlan(plan);
 }
 
-function pickSmartNutritionMeal(mealType, options, usedIds = new Set(), currentMealId = "") {
+function pickSmartNutritionMeal(mealType, options, usedIds = new Set(), currentMealId = "", usedKeys = new Set()) {
   const strict = nutritionDemoMealPool.filter((meal) =>
     meal.mealType === mealType &&
     meal.id !== currentMealId &&
     !usedIds.has(meal.id) &&
+    !usedKeys.has(nutritionMealPlanRepeatKey(meal)) &&
     mealFitsNutritionPreferences(meal, options)
   );
   const fallback = nutritionDemoMealPool.filter((meal) =>
     meal.mealType === mealType &&
     meal.id !== currentMealId &&
     !usedIds.has(meal.id) &&
+    !usedKeys.has(nutritionMealPlanRepeatKey(meal)) &&
     !mealHasAllergy(meal, options.allergy)
   );
-  const pool = strict.length ? strict : fallback.length ? fallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && meal.id !== currentMealId);
-  return [...pool].sort((a, b) =>
+  const looseFallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && meal.id !== currentMealId && !usedIds.has(meal.id));
+  const pool = strict.length ? strict : fallback.length ? fallback : looseFallback.length ? looseFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && meal.id !== currentMealId);
+  return uniqueNutritionMealOptions(shuffledNutritionMeals(pool), { planWide: true }).sort((a, b) =>
     nutritionMealSmartScore(b, options, mealType) - nutritionMealSmartScore(a, options, mealType) ||
-    String(a.name).localeCompare(String(b.name))
+    Math.random() - 0.5
   )[0] || null;
 }
 
@@ -6309,8 +6408,17 @@ function generateNutritionDemoPlan(options) {
   const mealTypes = ["Breakfast", "Lunch", "Dinner", "Snack"];
   const days = [];
   const counters = {};
+  const usedIds = new Set();
+  const usedKeys = new Set();
   for (let day = 1; day <= options.planLength; day += 1) {
-    const meals = mealTypes.map((mealType) => pickNutritionDemoMeal(mealType, options, day, counters));
+    const meals = mealTypes.map((mealType) => {
+      const meal = pickNutritionDemoMeal(mealType, options, day, counters, usedIds, usedKeys);
+      if (meal) {
+        usedIds.add(meal.id);
+        usedKeys.add(nutritionMealPlanRepeatKey(meal));
+      }
+      return meal;
+    }).filter(Boolean);
     days.push({
       day,
       meals,
@@ -6340,12 +6448,19 @@ function generateNutritionDemoPlan(options) {
   };
 }
 
-function pickNutritionDemoMeal(mealType, options, day, counters) {
-  const matches = nutritionDemoMealPool.filter((meal) => nutritionMealMatches(meal, mealType, options));
-  const fallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !mealHasAllergy(meal, options.allergy));
-  const pool = matches.length ? matches : fallback.length ? fallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType);
-  const sorted = [...pool].sort((a, b) => (counters[a.id] || 0) - (counters[b.id] || 0) || String(a.name).localeCompare(String(b.name)));
-  const picked = sorted[(day - 1) % Math.max(1, sorted.length)] || pool[0] || nutritionDemoMealPool[0];
+function pickNutritionDemoMeal(mealType, options, day, counters, usedIds = new Set(), usedKeys = new Set()) {
+  const planSafe = (meal) => !usedIds.has(meal.id) && !usedKeys.has(nutritionMealPlanRepeatKey(meal));
+  const matches = nutritionDemoMealPool.filter((meal) => nutritionMealMatches(meal, mealType, options) && planSafe(meal));
+  const fallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !mealHasAllergy(meal, options.allergy) && planSafe(meal));
+  const noRepeatNameFallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !usedKeys.has(nutritionMealPlanRepeatKey(meal)) && !mealHasAllergy(meal, options.allergy));
+  const sameTypeFallback = nutritionDemoMealPool.filter((meal) => meal.mealType === mealType && !mealHasAllergy(meal, options.allergy));
+  const pool = matches.length ? matches : fallback.length ? fallback : noRepeatNameFallback.length ? noRepeatNameFallback : sameTypeFallback.length ? sameTypeFallback : nutritionDemoMealPool.filter((meal) => meal.mealType === mealType);
+  const sorted = uniqueNutritionMealOptions(shuffledNutritionMeals(pool), { planWide: true }).sort((a, b) =>
+    (counters[a.id] || 0) - (counters[b.id] || 0) ||
+    nutritionMealSmartScore(b, options, mealType) - nutritionMealSmartScore(a, options, mealType) ||
+    Math.random() - 0.5
+  );
+  const picked = sorted[0] || pool[(day - 1) % Math.max(1, pool.length)] || nutritionDemoMealPool[0];
   counters[picked.id] = (counters[picked.id] || 0) + 1;
   return picked;
 }
