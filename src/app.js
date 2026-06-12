@@ -5715,7 +5715,9 @@ function nutritionDemoPanel(options = {}) {
   const demo = state.nutritionDemo;
   const plan = demo.generatedPlan;
   const visibleClients = visibleClientsForUser(store, state.currentUser);
-  const targetSummary = calculateNutritionTargets({ ...nutritionProfileFromSelectedClient(), ...demo });
+  const clientNutritionProfile = nutritionProfileFromSelectedClient();
+  const nutritionForm = { ...demo, ...clientNutritionProfile };
+  const targetSummary = calculateNutritionTargets(nutritionForm);
   return `
     <article class="card admin-card ${standalone ? "" : adminPanelClass("nutritionDemo")}" id="admin-nutrition-demo">
       <div class="section-head compact-head">
@@ -5729,6 +5731,10 @@ function nutritionDemoPanel(options = {}) {
       <div class="result-band warning-band">
         <strong>Client assignment</strong>
         <span>Assigned meal plans are saved to the selected client profile and included in Supabase shared records. The planner is using the Royal Elixir ${Number(nutritionDemoStats.uniqueMealNames || nutritionDemoStats.totalMeals).toLocaleString()}-meal library with old recipe data cleaned out.</span>
+      </div>
+      <div class="result-band">
+        <strong>Profile fields applied</strong>
+        <span>${escapeHtml(selectedClient()?.name || "Selected client")} profile is filling matching meal-plan fields: age, sex, height, weight, goal, training schedule, allergies, medical problems, restrictions, and injury notes.</span>
       </div>
       <div class="grid-4 stat-strip">
         ${infoCard("Workbook meals", nutritionDemoStats.totalMeals.toLocaleString())}
@@ -5755,27 +5761,27 @@ function nutritionDemoPanel(options = {}) {
         </label>
         <label>Goal
           <select id="nutritionGoal" data-nutrition-profile>
-            ${["Weight loss", "Muscle gain", "Maintenance", "Athletic performance", "Fat loss with muscle retention", "Postpartum return to fitness", "General wellness"].map((goal) => `<option value="${goal}" ${demo.goal === goal ? "selected" : ""}>${goal}</option>`).join("")}
+            ${["Weight loss", "Muscle gain", "Maintenance", "Athletic performance", "Fat loss with muscle retention", "Postpartum return to fitness", "General wellness"].map((goal) => `<option value="${goal}" ${nutritionForm.goal === goal ? "selected" : ""}>${goal}</option>`).join("")}
           </select>
         </label>
         <label>Dietary need
           <select id="nutritionDietaryNeed" data-nutrition-profile>
-            ${["Balanced", "High Protein", "Low Carb", "Moderate Carb", "Diabetes Friendly", "Prediabetes Friendly", "Low Sodium", "Heart Healthy", "Gluten-Free", "Dairy-Free", "Vegan", "Vegetarian", "Pescatarian"].map((tag) => `<option value="${tag}" ${demo.dietaryNeed === tag ? "selected" : ""}>${tag}</option>`).join("")}
+            ${["Balanced", "High Protein", "Low Carb", "Moderate Carb", "Diabetes Friendly", "Prediabetes Friendly", "Low Sodium", "Heart Healthy", "Gluten-Free", "Dairy-Free", "Vegan", "Vegetarian", "Pescatarian"].map((tag) => `<option value="${tag}" ${nutritionForm.dietaryNeed === tag ? "selected" : ""}>${tag}</option>`).join("")}
           </select>
         </label>
         <label>Allergy to avoid
           <select id="nutritionAllergy" data-nutrition-profile>
-            ${["None", "Nuts", "Dairy", "Eggs", "Shellfish", "Gluten", "Soy", "Fish", "Other"].map((allergy) => `<option value="${allergy}" ${demo.allergy === allergy ? "selected" : ""}>${allergy}</option>`).join("")}
+            ${["None", "Nuts", "Dairy", "Eggs", "Shellfish", "Gluten", "Soy", "Fish", "Other"].map((allergy) => `<option value="${allergy}" ${nutritionForm.allergy === allergy ? "selected" : ""}>${allergy}</option>`).join("")}
           </select>
         </label>
         <label>Cuisine
           <select id="nutritionCuisine" data-nutrition-profile>
-            ${nutritionCuisineOptions().map((cuisine) => `<option value="${cuisine}" ${demo.cuisine === cuisine ? "selected" : ""}>${cuisine}</option>`).join("")}
+            ${nutritionCuisineOptions().map((cuisine) => `<option value="${cuisine}" ${nutritionForm.cuisine === cuisine ? "selected" : ""}>${cuisine}</option>`).join("")}
           </select>
         </label>
         <label>Budget
           <select id="nutritionBudget" data-nutrition-profile>
-            ${["Any", "Low", "Medium", "High"].map((budget) => `<option value="${budget}" ${demo.budgetLevel === budget ? "selected" : ""}>${budget}</option>`).join("")}
+            ${["Any", "Low", "Medium", "High"].map((budget) => `<option value="${budget}" ${nutritionForm.budgetLevel === budget ? "selected" : ""}>${budget}</option>`).join("")}
           </select>
         </label>
       </div>
@@ -5810,9 +5816,9 @@ function nutritionDemoPanel(options = {}) {
         </label>
       </div>
       <div class="form-grid">
-        <label>Food dislikes <input id="nutritionFoodDislikes" data-nutrition-profile value="${escapeHtml(demo.foodDislikes || "")}" placeholder="Foods to avoid, comma separated" /></label>
-        <label>Favorite foods <input id="nutritionFavoriteFoods" data-nutrition-profile value="${escapeHtml(demo.favoriteFoods || "")}" placeholder="Foods to prefer, comma separated" /></label>
-        <label>Medical / safety flags <input id="nutritionMedicalFlags" data-nutrition-profile value="${escapeHtml(demo.medicalFlags || "")}" placeholder="diabetes, kidney disease, pregnancy, heart disease..." /></label>
+        <label>Food dislikes <input id="nutritionFoodDislikes" data-nutrition-profile value="${escapeHtml(nutritionForm.foodDislikes || "")}" placeholder="Foods to avoid, comma separated" /></label>
+        <label>Favorite foods <input id="nutritionFavoriteFoods" data-nutrition-profile value="${escapeHtml(nutritionForm.favoriteFoods || "")}" placeholder="Foods to prefer, comma separated" /></label>
+        <label>Medical / safety flags <input id="nutritionMedicalFlags" data-nutrition-profile value="${escapeHtml(nutritionForm.medicalFlags || "")}" placeholder="diabetes, kidney disease, pregnancy, heart disease..." /></label>
         ${state.currentUser?.role === "Admin" ? `
           <label>Calorie override <input id="nutritionCalorieOverride" data-nutrition-profile type="number" value="${escapeHtml(demo.calorieOverride || "")}" placeholder="${targetSummary.targetCalories}" /></label>
           <label>Protein override <input id="nutritionProteinOverride" data-nutrition-profile type="number" value="${escapeHtml(demo.proteinOverride || "")}" placeholder="${targetSummary.proteinGrams}" /></label>
@@ -5909,20 +5915,83 @@ function nutritionCuisineOptions() {
 
 function nutritionProfileFromSelectedClient() {
   const client = selectedClient() || {};
+  const text = (...values) => values.filter(Boolean).join(", ");
   return {
     age: Number(client.age || state.nutritionDemo.age || 35),
     sex: client.sex || state.nutritionDemo.sex || "Female",
     heightInches: Number(client.heightInches || state.nutritionDemo.heightInches || 66),
     currentWeightLb: Number(client.currentWeightLb || client.weight || state.nutritionDemo.currentWeightLb || 180),
     goalWeightLb: Number(client.goalWeightLb || state.nutritionDemo.goalWeightLb || client.weight || 160),
+    goal: client.goal ? nutritionGoalFromClient(client.goal) : state.nutritionDemo.goal || "Weight loss",
+    dietaryNeed: nutritionDietaryNeedFromClient(client),
+    allergy: nutritionAllergyFromClient(client),
+    cuisine: client.culturalFoodPreference || client.cuisinePreference || state.nutritionDemo.cuisine || "Any",
+    budgetLevel: client.budgetLevel || client.foodBudgetLevel || state.nutritionDemo.budgetLevel || "Any",
     activityLevel: state.nutritionDemo.activityLevel || "Moderately active",
     workoutDaysPerWeek: Number(client.trainingDaysPerWeek || state.nutritionDemo.workoutDaysPerWeek || 3),
     averageWorkoutLength: Number(client.sessionLength || state.nutritionDemo.averageWorkoutLength || 45),
-    trainingType: state.nutritionDemo.trainingType || client.sportFocus || "General fitness",
+    trainingType: nutritionTrainingTypeFromClient(client),
     mealsPerDay: Number(state.nutritionDemo.mealsPerDay || 3),
     snacksPerDay: Number(state.nutritionDemo.snacksPerDay || 1),
-    prepTimePreference: state.nutritionDemo.prepTimePreference || "Any"
+    prepTimePreference: state.nutritionDemo.prepTimePreference || "Any",
+    foodDislikes: text(client.foodDislikes, client.dislikedFoods, state.nutritionDemo.foodDislikes),
+    favoriteFoods: text(client.favoriteFoods, state.nutritionDemo.favoriteFoods),
+    medicalFlags: text(client.medicalProblems, client.medicalConditions, client.medicalRestrictions, client.medications, client.injuryNotes, client.currentRestrictions?.join?.(", "), state.nutritionDemo.medicalFlags)
   };
+}
+
+function nutritionGoalFromClient(goal = "") {
+  const text = String(goal).toLowerCase();
+  if (/muscle|strength|gain/.test(text)) return "Muscle gain";
+  if (/fat loss|lean|retain/.test(text)) return "Fat loss with muscle retention";
+  if (/weight loss|lose|slim/.test(text)) return "Weight loss";
+  if (/performance|fighter|fight|athlete|conditioning|endurance/.test(text)) return "Athletic performance";
+  if (/maintain/.test(text)) return "Maintenance";
+  if (/postpartum/.test(text)) return "Postpartum return to fitness";
+  return "General wellness";
+}
+
+function nutritionTrainingTypeFromClient(client = {}) {
+  const text = `${client.sportFocus || ""} ${client.goal || ""}`.toLowerCase();
+  if (/kickboxing/.test(text)) return "Kickboxing";
+  if (/boxing/.test(text)) return "Boxing";
+  if (/mma/.test(text)) return "MMA";
+  if (/running/.test(text)) return "Running";
+  if (/muscle|strength/.test(text)) return "Strength training";
+  if (/recovery/.test(text)) return "Recovery";
+  if (/mobility/.test(text)) return "Mobility";
+  if (/conditioning|endurance|fight/.test(text)) return "Conditioning";
+  if (/weight loss/.test(text)) return "Weight loss training";
+  return "General fitness";
+}
+
+function nutritionDietaryNeedFromClient(client = {}) {
+  const text = `${client.dietaryNeeds || ""} ${client.medicalProblems || ""} ${client.medicalConditions || ""} ${client.medicalRestrictions || ""} ${client.goal || ""}`.toLowerCase();
+  if (/prediabetes/.test(text)) return "Prediabetes Friendly";
+  if (/diabetes/.test(text)) return "Diabetes Friendly";
+  if (/heart|blood pressure|hypertension/.test(text)) return "Heart Healthy";
+  if (/sodium/.test(text)) return "Low Sodium";
+  if (/gluten/.test(text)) return "Gluten-Free";
+  if (/dairy/.test(text)) return "Dairy-Free";
+  if (/vegan/.test(text)) return "Vegan";
+  if (/vegetarian/.test(text)) return "Vegetarian";
+  if (/pescatarian/.test(text)) return "Pescatarian";
+  if (/low carb/.test(text)) return "Low Carb";
+  if (/protein|muscle|strength/.test(text)) return "High Protein";
+  return state.nutritionDemo.dietaryNeed || "Balanced";
+}
+
+function nutritionAllergyFromClient(client = {}) {
+  const text = String(client.allergies || "").toLowerCase();
+  if (/nut|peanut|almond|cashew|walnut/.test(text)) return "Nuts";
+  if (/dairy|milk|cheese|yogurt/.test(text)) return "Dairy";
+  if (/egg/.test(text)) return "Eggs";
+  if (/shellfish|shrimp|crab|lobster/.test(text)) return "Shellfish";
+  if (/gluten|wheat/.test(text)) return "Gluten";
+  if (/soy|tofu/.test(text)) return "Soy";
+  if (/fish|salmon|tuna|cod/.test(text)) return "Fish";
+  if (text.trim()) return "Other";
+  return state.nutritionDemo.allergy || "None";
 }
 
 function calculateNutritionTargets(input = {}) {
@@ -6979,28 +7048,29 @@ function nutritionMealTrackingLine(plan, day) {
 }
 
 function collectNutritionDemoOptions() {
+  const clientProfile = nutritionProfileFromSelectedClient();
   return {
     planLength: Number(document.querySelector("#nutritionPlanLength")?.value || state.nutritionDemo.planLength || 7),
-    goal: document.querySelector("#nutritionGoal")?.value || state.nutritionDemo.goal,
-    dietaryNeed: document.querySelector("#nutritionDietaryNeed")?.value || state.nutritionDemo.dietaryNeed,
-    allergy: document.querySelector("#nutritionAllergy")?.value || state.nutritionDemo.allergy,
-    cuisine: document.querySelector("#nutritionCuisine")?.value || state.nutritionDemo.cuisine,
-    budgetLevel: document.querySelector("#nutritionBudget")?.value || state.nutritionDemo.budgetLevel,
-    age: Number(document.querySelector("#nutritionAge")?.value || state.nutritionDemo.age || nutritionProfileFromSelectedClient().age),
-    sex: document.querySelector("#nutritionSex")?.value || state.nutritionDemo.sex,
-    heightInches: Number(document.querySelector("#nutritionHeightInches")?.value || state.nutritionDemo.heightInches || 66),
-    currentWeightLb: Number(document.querySelector("#nutritionCurrentWeight")?.value || state.nutritionDemo.currentWeightLb || 180),
-    goalWeightLb: Number(document.querySelector("#nutritionGoalWeight")?.value || state.nutritionDemo.goalWeightLb || 160),
-    activityLevel: document.querySelector("#nutritionActivityLevel")?.value || state.nutritionDemo.activityLevel,
-    workoutDaysPerWeek: Number(document.querySelector("#nutritionWorkoutDays")?.value || state.nutritionDemo.workoutDaysPerWeek || 3),
-    averageWorkoutLength: Number(document.querySelector("#nutritionWorkoutLength")?.value || state.nutritionDemo.averageWorkoutLength || 45),
-    trainingType: document.querySelector("#nutritionTrainingType")?.value || state.nutritionDemo.trainingType,
-    mealsPerDay: Number(document.querySelector("#nutritionMealsPerDay")?.value || state.nutritionDemo.mealsPerDay || 3),
-    snacksPerDay: Number(document.querySelector("#nutritionSnacksPerDay")?.value || state.nutritionDemo.snacksPerDay || 1),
-    prepTimePreference: document.querySelector("#nutritionPrepTime")?.value || state.nutritionDemo.prepTimePreference,
-    foodDislikes: document.querySelector("#nutritionFoodDislikes")?.value || state.nutritionDemo.foodDislikes || "",
-    favoriteFoods: document.querySelector("#nutritionFavoriteFoods")?.value || state.nutritionDemo.favoriteFoods || "",
-    medicalFlags: document.querySelector("#nutritionMedicalFlags")?.value || state.nutritionDemo.medicalFlags || "",
+    goal: document.querySelector("#nutritionGoal")?.value || clientProfile.goal || state.nutritionDemo.goal,
+    dietaryNeed: document.querySelector("#nutritionDietaryNeed")?.value || clientProfile.dietaryNeed || state.nutritionDemo.dietaryNeed,
+    allergy: document.querySelector("#nutritionAllergy")?.value || clientProfile.allergy || state.nutritionDemo.allergy,
+    cuisine: document.querySelector("#nutritionCuisine")?.value || clientProfile.cuisine || state.nutritionDemo.cuisine,
+    budgetLevel: document.querySelector("#nutritionBudget")?.value || clientProfile.budgetLevel || state.nutritionDemo.budgetLevel,
+    age: Number(document.querySelector("#nutritionAge")?.value || clientProfile.age || state.nutritionDemo.age || 35),
+    sex: document.querySelector("#nutritionSex")?.value || clientProfile.sex || state.nutritionDemo.sex,
+    heightInches: Number(document.querySelector("#nutritionHeightInches")?.value || clientProfile.heightInches || state.nutritionDemo.heightInches || 66),
+    currentWeightLb: Number(document.querySelector("#nutritionCurrentWeight")?.value || clientProfile.currentWeightLb || state.nutritionDemo.currentWeightLb || 180),
+    goalWeightLb: Number(document.querySelector("#nutritionGoalWeight")?.value || clientProfile.goalWeightLb || state.nutritionDemo.goalWeightLb || 160),
+    activityLevel: document.querySelector("#nutritionActivityLevel")?.value || clientProfile.activityLevel || state.nutritionDemo.activityLevel,
+    workoutDaysPerWeek: Number(document.querySelector("#nutritionWorkoutDays")?.value || clientProfile.workoutDaysPerWeek || state.nutritionDemo.workoutDaysPerWeek || 3),
+    averageWorkoutLength: Number(document.querySelector("#nutritionWorkoutLength")?.value || clientProfile.averageWorkoutLength || state.nutritionDemo.averageWorkoutLength || 45),
+    trainingType: document.querySelector("#nutritionTrainingType")?.value || clientProfile.trainingType || state.nutritionDemo.trainingType,
+    mealsPerDay: Number(document.querySelector("#nutritionMealsPerDay")?.value || clientProfile.mealsPerDay || state.nutritionDemo.mealsPerDay || 3),
+    snacksPerDay: Number(document.querySelector("#nutritionSnacksPerDay")?.value || clientProfile.snacksPerDay || state.nutritionDemo.snacksPerDay || 1),
+    prepTimePreference: document.querySelector("#nutritionPrepTime")?.value || clientProfile.prepTimePreference || state.nutritionDemo.prepTimePreference,
+    foodDislikes: document.querySelector("#nutritionFoodDislikes")?.value || clientProfile.foodDislikes || state.nutritionDemo.foodDislikes || "",
+    favoriteFoods: document.querySelector("#nutritionFavoriteFoods")?.value || clientProfile.favoriteFoods || state.nutritionDemo.favoriteFoods || "",
+    medicalFlags: document.querySelector("#nutritionMedicalFlags")?.value || clientProfile.medicalFlags || state.nutritionDemo.medicalFlags || "",
     calorieOverride: document.querySelector("#nutritionCalorieOverride")?.value || state.nutritionDemo.calorieOverride || "",
     proteinOverride: document.querySelector("#nutritionProteinOverride")?.value || state.nutritionDemo.proteinOverride || "",
     carbsOverride: document.querySelector("#nutritionCarbsOverride")?.value || state.nutritionDemo.carbsOverride || "",
