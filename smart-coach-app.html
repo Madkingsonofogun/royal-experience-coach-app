@@ -399102,6 +399102,53 @@ async function pushLiveChatMessage(message) {
   }
 }
 
+async function pushLiveChatReset(clientId, resetAt = new Date().toISOString()) {
+  if (!clientId) return false;
+  try {
+    await upsertLiveSupabaseRecord("chat_resets", clientId, {
+      id: `chat_reset_${clientId}`,
+      clientId,
+      resetAt,
+      clearedByUserId: state.currentUser?.id || "",
+      createdAt: resetAt
+    });
+    return true;
+  } catch (error) {
+    console.warn("Could not save live chat reset.", error);
+    state.syncStatus = `Live chat reset save failed: ${error.message}`;
+    return false;
+  }
+}
+
+async function deleteLiveChatRowsForClient(clientId) {
+  if (!canUseSupabaseBackup() || !clientId) return false;
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  const params = new URLSearchParams({
+    backup_id: "eq.live",
+    collection_name: "eq.chat_messages"
+  });
+  params.append("data->>clientId", `eq.${clientId}`);
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?${params.toString()}`;
+  const response = await supabaseFetchWithTimeout(endpoint, {
+    method: "DELETE",
+    headers: {
+      ...supabaseHeaders(key),
+      Prefer: "return=minimal"
+    }
+  }, 6000);
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  return true;
+}
+
+function chatResetTimeForClient(resets, clientId) {
+  const reset = (resets || [])
+    .filter((item) => item?.clientId === clientId && item.resetAt)
+    .sort((a, b) => String(b.resetAt).localeCompare(String(a.resetAt)))[0];
+  return reset?.resetAt || "";
+}
+
 function liveIdentityCollections() {
   return [
     { storeKey: "users", collectionName: "users" },
@@ -399223,14 +399270,35 @@ async function syncLiveChatRecords() {
   const key = String(store.settings.supabaseAnonKey || "").trim();
   const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
   try {
+    const resetEndpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.chat_resets&select=record_id,data&order=id.asc`;
+    const resetResponse = await supabaseFetchWithTimeout(resetEndpoint, { headers: supabaseHeaders(key) }, 6000);
+    if (!resetResponse.ok) throw new Error(await resetResponse.text() || `Supabase returned ${resetResponse.status}`);
+    const resetRows = await resetResponse.json();
+    const resets = resetRows.map((row) => row.data).filter(Boolean);
+    let changed = false;
+    if (resets.length) {
+      const beforeMessages = (store.chatMessages || []).length;
+      const beforeNotifications = (store.notifications || []).length;
+      store.chatMessages = (store.chatMessages || []).filter((message) => {
+        const resetAt = chatResetTimeForClient(resets, message.clientId);
+        return !resetAt || String(message.createdAt || "") > String(resetAt);
+      });
+      store.notifications = (store.notifications || []).filter((notification) => {
+        if (notification.type !== "Chat Message") return true;
+        const resetAt = chatResetTimeForClient(resets, notification.clientId);
+        return !resetAt || String(notification.createdAt || "") > String(resetAt);
+      });
+      changed = beforeMessages !== store.chatMessages.length || beforeNotifications !== store.notifications.length;
+    }
     const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.chat_messages&select=record_id,data&order=id.asc`;
     const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 7000);
     if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
     const rows = await response.json();
-    let changed = false;
     rows.forEach((row) => {
       const message = row.data;
       if (!message?.id || !message.clientId) return;
+      const resetAt = chatResetTimeForClient(resets, message.clientId);
+      if (resetAt && String(message.createdAt || "") <= String(resetAt)) return;
       if (state.currentUser && !canUserAccessClient(store, state.currentUser, message.clientId)) return;
       const existingIndex = (store.chatMessages || []).findIndex((item) => item.id === message.id);
       if (existingIndex >= 0) {
@@ -400852,6 +400920,7 @@ function chatPage() {
         <div class="actions">
           <button class="ghost" id="refreshChatButton">Refresh Messages</button>
           <button class="ghost" id="markReadButton">Mark Messages Read</button>
+          <button class="danger" id="clearChatButton">Clear This Chat</button>
         </div>
       </div>
       <div class="chat-layout">
@@ -402891,6 +402960,8 @@ function bindGlobal() {
   });
   document.querySelector("#sendChatButton")?.addEventListener("click", async () => {
     let client = currentChatClient();
+    let pendingMessage = null;
+    let liveSaved = false;
     try {
       const body = state.chatDraft;
       let partner = chatPartnerFor(client);
@@ -402899,19 +402970,24 @@ function bindGlobal() {
       if (!client) throw new Error("No client chat is selected.");
       if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
       state.clientId = client.id;
-      const message = sendChatMessage(store, {
+      pendingMessage = sendChatMessage(store, {
         fromUserId: state.currentUser.id,
         toUserId: partner.id,
         clientId: client.id,
         body
       });
       state.chatDraft = "";
-      saveStoreLocalOnly();
-      const liveSaved = await pushLiveChatMessage(message);
+      liveSaved = await pushLiveChatMessage(pendingMessage);
       if (!liveSaved) throw new Error("Supabase live chat save failed. Check Admin Data Sync and the Supabase table permissions.");
+      saveStoreLocalOnly();
       markCurrentStoreAsCloudFresh();
       state.syncStatus = `Message sent to ${partner.name} and saved to live Supabase chat.`;
     } catch (error) {
+      if (pendingMessage && !liveSaved) {
+        store.chatMessages = (store.chatMessages || []).filter((message) => message.id !== pendingMessage.id);
+        store.notifications = (store.notifications || []).filter((notification) => !(notification.createdAt === pendingMessage.createdAt && notification.body === pendingMessage.body));
+        saveStoreLocalOnly();
+      }
       state.syncStatus = `Message could not be sent: ${error.message}`;
       window.alert(state.syncStatus);
     } finally {
@@ -402936,6 +403012,30 @@ function bindGlobal() {
       state.syncStatus = changed ? "Messages refreshed from Supabase." : "No new Supabase messages found.";
     } catch (error) {
       state.syncStatus = `Could not refresh messages: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
+    render();
+  });
+  document.querySelector("#clearChatButton")?.addEventListener("click", async () => {
+    const client = currentChatClient();
+    if (!client) return;
+    if (!window.confirm(`Clear chat history for ${client.name}? This starts a fresh conversation on every device.`)) return;
+    const resetAt = new Date().toISOString();
+    store.chatMessages = (store.chatMessages || []).filter((message) => message.clientId !== client.id);
+    store.notifications = (store.notifications || []).filter((notification) => !(notification.clientId === client.id && notification.type === "Chat Message"));
+    saveStoreLocalOnly();
+    try {
+      const resetSaved = await pushLiveChatReset(client.id, resetAt);
+      try {
+        await deleteLiveChatRowsForClient(client.id);
+      } catch (deleteError) {
+        console.warn("Live chat rows were not deleted, reset marker will hide them.", deleteError);
+      }
+      if (!resetSaved) throw new Error(state.syncStatus || "Supabase reset marker was not saved.");
+      markCurrentStoreAsCloudFresh();
+      state.syncStatus = "Chat history cleared in this browser and reset in Supabase. Other devices can press Refresh Messages.";
+    } catch (error) {
+      state.syncStatus = `Chat cleared in this browser, but Supabase reset failed: ${error.message}`;
       window.alert(state.syncStatus);
     }
     render();
