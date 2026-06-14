@@ -399001,12 +399001,27 @@ async function runAutomaticCloudBackup(expectedFingerprint) {
 }
 
 async function backupPublicChangeToCloud() {
-  if (!canUseSupabaseBackup() || state.supabaseBackupBusy || state.supabaseRestoreBusy) return;
+  if (!canUseSupabaseBackup() || state.supabaseBackupBusy || state.supabaseRestoreBusy) return false;
   try {
     await runAutomaticCloudBackup(cloudBackupFingerprint());
+    return true;
   } catch (error) {
     console.warn("Could not save public change to Supabase.", error);
+    return false;
   }
+}
+
+async function forceBackupStoreToSupabase(reason = "shared data") {
+  if (!canUseSupabaseBackup()) throw new Error("Supabase is not connected on this device.");
+  const result = await backupStoreToSupabase({
+    url: store.settings.supabaseUrl,
+    anonKey: store.settings.supabaseAnonKey,
+    table: store.settings.supabaseBackupTable
+  });
+  lastCloudBackupFingerprint = cloudBackupFingerprint();
+  lastCloudBackupId = result.backupId;
+  state.syncStatus = `Saved ${reason} to Supabase at ${new Date().toLocaleTimeString()}.`;
+  return result;
 }
 
 async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
@@ -400777,6 +400792,8 @@ function chatPage() {
           <p class="eyebrow">Secure Coach / Client Chat</p>
           <h2>${client.name}</h2>
           <p class="muted">Messages save to Supabase and refresh across devices while both users are logged in. Admins can audit and intervene when needed.</p>
+          ${!partner ? `<p class="alert orange">This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.</p>` : ""}
+          ${state.syncStatus ? `<p class="muted">${escapeHtml(state.syncStatus)}</p>` : ""}
         </div>
         <button class="ghost" id="markReadButton">Mark Messages Read</button>
       </div>
@@ -402821,14 +402838,16 @@ function bindGlobal() {
     try {
       const body = state.chatDraft;
       let partner = chatPartnerFor(client);
-      if (!partner || !client) return;
+      if (!client) throw new Error("No client chat is selected.");
+      if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
       if (canUseSupabaseBackup()) {
         await syncLatestCloudData(false);
         await syncLiveChatRecords();
         client = currentChatClient();
         partner = chatPartnerFor(client);
       }
-      if (!partner || !client) return;
+      if (!client) throw new Error("No client chat is selected.");
+      if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
       state.clientId = client.id;
       const message = sendChatMessage(store, {
         fromUserId: state.currentUser.id,
@@ -402838,9 +402857,12 @@ function bindGlobal() {
       });
       state.chatDraft = "";
       saveStore();
-      await pushLiveChatMessage(message);
-      backupPublicChangeToCloud();
-      state.syncStatus = `Message sent to ${partner.name}.`;
+      const liveSaved = await pushLiveChatMessage(message);
+      if (!liveSaved) await forceBackupStoreToSupabase("chat message");
+      else backupPublicChangeToCloud();
+      state.syncStatus = liveSaved
+        ? `Message sent to ${partner.name} and saved to live Supabase chat.`
+        : `Message sent to ${partner.name} and saved through Supabase backup.`;
     } catch (error) {
       state.syncStatus = `Message could not be sent: ${error.message}`;
       window.alert(state.syncStatus);
