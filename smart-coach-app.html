@@ -398771,10 +398771,9 @@ function startLoggedInCloudDataMonitor() {
 
 async function refreshLoginAccountsAutomatically(showResult) {
   if (state.currentUser || state.supabaseRestoreBusy) return;
-  const restored = await syncLatestCloudData(false);
   const liveIdentityRestored = await syncLiveIdentityRecords().catch(() => false);
   if (showResult) {
-    state.syncStatus = restored || liveIdentityRestored
+    state.syncStatus = liveIdentityRestored
       ? "Accounts automatically updated from Supabase."
       : "Automatic account updates are on. Log in when your account has been approved.";
     render();
@@ -398854,13 +398853,14 @@ function markCurrentStoreAsCloudFresh() {
   lastLiveChatFingerprint = liveChatFingerprint();
 }
 
-function saveAndSyncIdentity({ userIds = [], clientIds = [], coachIds = [], includeAll = false } = {}) {
-  saveStore();
+function saveAndSyncIdentity({ userIds = [], clientIds = [], coachIds = [], includeAll = false, skipBackup = false } = {}) {
+  if (skipBackup) saveStoreLocalOnly();
+  else saveStore();
   pushLiveIdentityRecordsFor({ userIds, clientIds, coachIds, includeAll })
     .catch((error) => {
       state.syncStatus = `Supabase account/profile save failed: ${error.message}`;
     });
-  backupPublicChangeToCloud();
+  if (!skipBackup) backupPublicChangeToCloud();
 }
 
 function replaceStoreWith(nextStore) {
@@ -401290,7 +401290,13 @@ function adminView() {
           ${store.coaches.filter((coach) => coach.role !== "Admin").map((coach) => `<div class="admin-row"><span>${coach.name} / Emergency: ${coach.emergencyContact || "Not saved"}</span><input data-coach-emergency="${coach.id}" value="${coach.emergencyContact || ""}" placeholder="Emergency contact" /><button data-save-coach-emergency="${coach.id}">Save Emergency</button><button data-delete-coach="${coach.id}">Delete Coach</button></div>`).join("")}
         </article>
         <article class="card ${adminPanelClass("accountRequests")}">
-          <h3>Pending Account Requests</h3>
+          <div class="section-head compact-head">
+            <div>
+              <h3>Pending Account Requests</h3>
+              <p class="muted">New account requests sync through live Supabase records and do not need the full backup button.</p>
+            </div>
+            <button class="ghost" id="refreshAccountRequests">Refresh Requests</button>
+          </div>
           <label>Filter
             <select id="accountRequestFilter">${["Pending", "Active", "Locked", "Rejected", "Suspended", "Archived", "Client", "Coach", "All"].map((filter) => `<option value="${filter}" ${state.accountRequestFilter === filter ? "selected" : ""}>${filter}</option>`).join("")}</select>
           </label>
@@ -402549,7 +402555,6 @@ function bindLogin() {
       loginButton.disabled = true;
       loginButton.textContent = "Log In";
     }
-    await syncLatestCloudData(false);
     await syncLiveIdentityRecords().catch((error) => {
       state.syncStatus = `Could not load live account records: ${error.message}`;
     });
@@ -402618,24 +402623,32 @@ function bindLogin() {
   document.querySelectorAll("[data-signup-check]").forEach((input) => input.addEventListener("change", () => {
     state.signup[input.dataset.signupCheck] = input.checked;
   }));
-  document.querySelector("#createLoginButton")?.addEventListener("click", () => {
+  document.querySelector("#createLoginButton")?.addEventListener("click", async () => {
+    let user = null;
     try {
-      requestLockedAccount(store, state.signup);
-      const user = [...(store.users || [])].reverse().find((item) =>
+      user = requestLockedAccount(store, state.signup);
+      user = [...(store.users || [])].reverse().find((item) =>
         item.email === state.signup.email ||
         (item.phone && item.phone === state.signup.phone)
-      );
+      ) || user;
+      const liveSaved = await pushLiveIdentityRecord("users", user);
+      if (!liveSaved) throw new Error("Supabase did not save the account request. Check Admin Data Sync setup and table permissions.");
       saveAndSyncIdentity({
         userIds: user ? [user.id] : [],
         clientIds: user?.role === "Client" && user.linkedId ? [user.linkedId] : [],
-        coachIds: ["Coach", "Admin"].includes(user?.role) && user.linkedId ? [user.linkedId] : []
+        coachIds: ["Coach", "Admin"].includes(user?.role) && user.linkedId ? [user.linkedId] : [],
+        skipBackup: true
       });
-      backupPublicChangeToCloud();
       state.signupOpen = false;
-      state.signupSuccess = "Account request submitted. Admin must approve and unlock your account before you can log in.";
+      state.signupSuccess = "Account request submitted to Supabase. Admin should see it in Pending Account Requests.";
       state.signupError = "";
       render();
     } catch (error) {
+      if (user?.id) {
+        store.users = (store.users || []).filter((item) => item.id !== user.id);
+        store.adminAuditLog = (store.adminAuditLog || []).filter((item) => !String(item.action || "").includes(user.name));
+        saveStoreLocalOnly();
+      }
       state.signupError = error.message;
       render();
     }
@@ -403622,6 +403635,16 @@ function bindGlobal() {
   }));
   document.querySelector("#accountRequestFilter")?.addEventListener("change", (event) => {
     state.accountRequestFilter = event.target.value;
+    render();
+  });
+  document.querySelector("#refreshAccountRequests")?.addEventListener("click", async () => {
+    try {
+      const changed = await syncLiveIdentityRecords();
+      state.syncStatus = changed ? "Account requests refreshed from Supabase." : "No new account requests found.";
+    } catch (error) {
+      state.syncStatus = `Could not refresh account requests: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
     render();
   });
   document.querySelectorAll("#closeEditModal, #closeEditModalSecondary").forEach((button) => button.addEventListener("click", () => {
