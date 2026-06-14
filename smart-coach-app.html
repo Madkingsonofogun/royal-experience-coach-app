@@ -399061,20 +399061,31 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
   const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?on_conflict=backup_id,collection_name,record_id`;
-  const response = await supabaseFetchWithTimeout(endpoint, {
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
+  const row = {
+    backup_id: "live",
+    collection_name: collectionName,
+    record_id: backupRecordId(data, recordId),
+    data: cleanBackupValue(data)
+  };
+  let response = await supabaseFetchWithTimeout(`${endpoint}?on_conflict=backup_id,collection_name,record_id`, {
     method: "POST",
     headers: {
       ...supabaseHeaders(key),
       Prefer: "resolution=merge-duplicates,return=minimal"
     },
-    body: JSON.stringify([{
-      backup_id: "live",
-      collection_name: collectionName,
-      record_id: backupRecordId(data, recordId),
-      data: cleanBackupValue(data)
-    }])
+    body: JSON.stringify([row])
   }, 6000);
+  if (!response.ok && /on_conflict|unique|constraint|schema cache/i.test(await response.clone().text())) {
+    response = await supabaseFetchWithTimeout(endpoint, {
+      method: "POST",
+      headers: {
+        ...supabaseHeaders(key),
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify([row])
+    }, 6000);
+  }
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   return true;
 }
@@ -399086,6 +399097,7 @@ async function pushLiveChatMessage(message) {
     return true;
   } catch (error) {
     console.warn("Could not save live chat message.", error);
+    state.syncStatus = `Live chat Supabase save failed: ${error.message}`;
     return false;
   }
 }
@@ -400837,7 +400849,10 @@ function chatPage() {
           ${!partner ? `<p class="alert orange">This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.</p>` : ""}
           ${state.syncStatus ? `<p class="muted">${escapeHtml(state.syncStatus)}</p>` : ""}
         </div>
-        <button class="ghost" id="markReadButton">Mark Messages Read</button>
+        <div class="actions">
+          <button class="ghost" id="refreshChatButton">Refresh Messages</button>
+          <button class="ghost" id="markReadButton">Mark Messages Read</button>
+        </div>
       </div>
       <div class="chat-layout">
         <article class="card chat-thread">
@@ -402912,6 +402927,17 @@ function bindGlobal() {
     saveStoreLocalOnly();
     pushLiveChatMessagesForClient(client.id);
     markCurrentStoreAsCloudFresh();
+    render();
+  });
+  document.querySelector("#refreshChatButton")?.addEventListener("click", async () => {
+    try {
+      const changed = await syncLiveChatRecords();
+      if (changed) markCurrentStoreAsCloudFresh();
+      state.syncStatus = changed ? "Messages refreshed from Supabase." : "No new Supabase messages found.";
+    } catch (error) {
+      state.syncStatus = `Could not refresh messages: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
     render();
   });
   markVisibleChatReadIfNeeded();
