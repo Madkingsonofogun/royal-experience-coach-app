@@ -374,6 +374,8 @@ let lastLiveChatFingerprint = "";
 let cloudDataMonitorTimer = null;
 let cloudDataMonitorRunning = false;
 let liveChatSyncRunning = false;
+let liveIdentityMonitorTimer = null;
+let liveIdentityMonitorRunning = false;
 let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
 let lastShoppingListPrintAt = 0;
@@ -383,6 +385,7 @@ const app = document.querySelector("#app");
 render();
 startLoginAccountAutoRefresh();
 startLoggedInCloudDataMonitor();
+startLiveIdentityMonitor();
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || !state.currentUser) return;
   if (!hasOpenPopup()) return;
@@ -476,6 +479,11 @@ function startLoginAccountAutoRefresh() {
 function startLoggedInCloudDataMonitor() {
   if (cloudDataMonitorTimer) return;
   cloudDataMonitorTimer = setInterval(() => checkCloudDataUpdates(), 3000);
+}
+
+function startLiveIdentityMonitor() {
+  if (liveIdentityMonitorTimer) return;
+  liveIdentityMonitorTimer = setInterval(() => checkLiveIdentityUpdates(), 3500);
 }
 
 async function refreshLoginAccountsAutomatically(showResult) {
@@ -1093,6 +1101,29 @@ async function checkCloudDataUpdates() {
       : `Supabase sync check failed: ${error.message}`;
   } finally {
     cloudDataMonitorRunning = false;
+  }
+}
+
+async function checkLiveIdentityUpdates() {
+  if (
+    !state.currentUser ||
+    liveIdentityMonitorRunning ||
+    state.supabaseRestoreBusy ||
+    !canUseSupabaseBackup()
+  ) return;
+  liveIdentityMonitorRunning = true;
+  try {
+    const changed = await syncLiveIdentityRecords();
+    if (changed) {
+      state.syncStatus = `Account/profile updates loaded from Supabase at ${new Date().toLocaleTimeString()}.`;
+      if (state.currentUser.role === "Admin" || ["profile", "admin"].includes(state.view)) render();
+    }
+  } catch (error) {
+    if (state.currentUser?.role === "Admin" && state.view === "admin") {
+      state.syncStatus = `Could not pull account requests: ${error.message}`;
+    }
+  } finally {
+    liveIdentityMonitorRunning = false;
   }
 }
 
@@ -4954,6 +4985,17 @@ function bindGlobal() {
   });
   document.querySelectorAll("[data-admin-panel]").forEach((button) => button.addEventListener("click", () => {
     state.adminPanel = button.dataset.adminPanel;
+    if (state.adminPanel === "accountRequests") {
+      syncLiveIdentityRecords()
+        .then((changed) => {
+          state.syncStatus = changed ? "Account requests refreshed from Supabase." : "Account requests checked. No new requests found.";
+          render();
+        })
+        .catch((error) => {
+          state.syncStatus = `Could not refresh account requests: ${error.message}`;
+          render();
+        });
+    }
     render();
   }));
   document.querySelector("#nutritionDemoMode")?.addEventListener("change", (event) => {
