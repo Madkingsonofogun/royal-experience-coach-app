@@ -368,7 +368,9 @@ let autoCloudBackupTimer = null;
 let autoCloudBackupRunning = false;
 let suppressAutomaticCloudBackup = false;
 let lastCloudBackupFingerprint = "";
+let lastNonChatCloudBackupFingerprint = "";
 let lastCloudBackupId = "";
+let lastLiveChatFingerprint = "";
 let cloudDataMonitorTimer = null;
 let cloudDataMonitorRunning = false;
 let liveChatSyncRunning = false;
@@ -547,6 +549,20 @@ function saveStore() {
   scheduleAutomaticCloudBackup();
 }
 
+function saveStoreLocalOnly() {
+  try {
+    window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+  } catch (error) {
+    console.warn("Could not save app data locally.", error);
+  }
+}
+
+function markCurrentStoreAsCloudFresh() {
+  lastCloudBackupFingerprint = cloudBackupFingerprint();
+  lastNonChatCloudBackupFingerprint = cloudBackupFingerprintWithoutChat();
+  lastLiveChatFingerprint = liveChatFingerprint();
+}
+
 function saveAndSyncIdentity({ userIds = [], clientIds = [], coachIds = [], includeAll = false } = {}) {
   saveStore();
   pushLiveIdentityRecordsFor({ userIds, clientIds, coachIds, includeAll })
@@ -659,6 +675,20 @@ function cloudBackupFingerprint() {
   return JSON.stringify(backupPayload());
 }
 
+function cloudBackupFingerprintWithoutChat() {
+  const payload = backupPayload();
+  delete payload.chatMessages;
+  payload.notifications = (payload.notifications || []).filter((item) => item.type !== "Chat Message");
+  return JSON.stringify(payload);
+}
+
+function liveChatFingerprint() {
+  return JSON.stringify({
+    chatMessages: store.chatMessages || [],
+    notifications: (store.notifications || []).filter((item) => item.type === "Chat Message")
+  });
+}
+
 function scheduleAutomaticCloudBackup() {
   if (
     suppressAutomaticCloudBackup ||
@@ -696,6 +726,7 @@ async function runAutomaticCloudBackup(expectedFingerprint) {
       table: store.settings.supabaseBackupTable
     });
     lastCloudBackupFingerprint = currentFingerprint === expectedFingerprint ? expectedFingerprint : currentFingerprint;
+    lastNonChatCloudBackupFingerprint = cloudBackupFingerprintWithoutChat();
     lastCloudBackupId = result.backupId;
     saved = true;
     state.syncStatus = `Automatically saved to Supabase at ${new Date().toLocaleTimeString()}. Backup ${result.backupId}.`;
@@ -728,6 +759,7 @@ async function forceBackupStoreToSupabase(reason = "shared data") {
     table: store.settings.supabaseBackupTable
   });
   lastCloudBackupFingerprint = cloudBackupFingerprint();
+  lastNonChatCloudBackupFingerprint = cloudBackupFingerprintWithoutChat();
   lastCloudBackupId = result.backupId;
   state.syncStatus = `Saved ${reason} to Supabase at ${new Date().toLocaleTimeString()}.`;
   return result;
@@ -739,7 +771,7 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
   const key = String(store.settings.supabaseAnonKey || "").trim();
   const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?on_conflict=backup_id,collection_name,record_id`;
-  const response = await fetch(endpoint, {
+  const response = await supabaseFetchWithTimeout(endpoint, {
     method: "POST",
     headers: {
       ...supabaseHeaders(key),
@@ -751,7 +783,7 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
       record_id: backupRecordId(data, recordId),
       data: cleanBackupValue(data)
     }])
-  });
+  }, 6000);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   return true;
 }
@@ -859,7 +891,8 @@ async function syncLiveIdentityRecords() {
 
 async function pushLiveChatMessagesForClient(clientId) {
   const messages = (store.chatMessages || []).filter((message) => message.clientId === clientId);
-  await Promise.all(messages.map((message) => pushLiveChatMessage(message)));
+  const results = await Promise.all(messages.map((message) => pushLiveChatMessage(message)));
+  if (results.some(Boolean)) markCurrentStoreAsCloudFresh();
 }
 
 function ensureLiveChatNotification(message) {
@@ -950,6 +983,13 @@ async function checkCloudDataUpdates() {
     if (liveIdentityChanged && ["profile", "admin"].includes(state.view)) render();
     const currentFingerprint = cloudBackupFingerprint();
     if (currentFingerprint !== lastCloudBackupFingerprint) {
+      const currentNonChatFingerprint = cloudBackupFingerprintWithoutChat();
+      if (currentNonChatFingerprint === lastNonChatCloudBackupFingerprint && liveChatFingerprint() !== lastLiveChatFingerprint) {
+        lastCloudBackupFingerprint = currentFingerprint;
+        lastNonChatCloudBackupFingerprint = currentNonChatFingerprint;
+        lastLiveChatFingerprint = liveChatFingerprint();
+        return;
+      }
       await runAutomaticCloudBackup(currentFingerprint);
       return;
     }
@@ -1081,6 +1121,7 @@ async function resetSupabaseBackupTable({ url, anonKey, table }) {
   }, 12000);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   lastCloudBackupFingerprint = "";
+  lastNonChatCloudBackupFingerprint = "";
   lastCloudBackupId = "";
   return true;
 }
@@ -1218,6 +1259,7 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
     suppressAutomaticCloudBackup = false;
   }
   lastCloudBackupFingerprint = duplicateRowsRemoved ? "" : cloudBackupFingerprint();
+  lastNonChatCloudBackupFingerprint = duplicateRowsRemoved ? "" : cloudBackupFingerprintWithoutChat();
   lastCloudBackupId = backupId;
   if (duplicateRowsRemoved) scheduleAutomaticCloudBackup();
   return {
@@ -2555,9 +2597,8 @@ function markVisibleChatReadIfNeeded() {
   if (state.view !== "chat" || !state.currentUser || !client?.id) return;
   if (!hasUnreadChatActivity(state.currentUser.id, client.id)) return;
   markNotificationsRead(store, state.currentUser.id, client.id);
-  saveStore();
+  saveStoreLocalOnly();
   pushLiveChatMessagesForClient(client.id);
-  backupPublicChangeToCloud();
   setTimeout(() => {
     if (state.view === "chat") render();
   }, 0);
@@ -4549,12 +4590,6 @@ function bindGlobal() {
       let partner = chatPartnerFor(client);
       if (!client) throw new Error("No client chat is selected.");
       if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
-      if (canUseSupabaseBackup()) {
-        await syncLatestCloudData(false);
-        await syncLiveChatRecords();
-        client = currentChatClient();
-        partner = chatPartnerFor(client);
-      }
       if (!client) throw new Error("No client chat is selected.");
       if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
       state.clientId = client.id;
@@ -4565,13 +4600,11 @@ function bindGlobal() {
         body
       });
       state.chatDraft = "";
-      saveStore();
+      saveStoreLocalOnly();
       const liveSaved = await pushLiveChatMessage(message);
-      if (!liveSaved) await forceBackupStoreToSupabase("chat message");
-      else backupPublicChangeToCloud();
-      state.syncStatus = liveSaved
-        ? `Message sent to ${partner.name} and saved to live Supabase chat.`
-        : `Message sent to ${partner.name} and saved through Supabase backup.`;
+      if (!liveSaved) throw new Error("Supabase live chat save failed. Check Admin Data Sync and the Supabase table permissions.");
+      markCurrentStoreAsCloudFresh();
+      state.syncStatus = `Message sent to ${partner.name} and saved to live Supabase chat.`;
     } catch (error) {
       state.syncStatus = `Message could not be sent: ${error.message}`;
       window.alert(state.syncStatus);
@@ -4585,15 +4618,16 @@ function bindGlobal() {
     const client = currentChatClient();
     if (!client) return;
     markNotificationsRead(store, state.currentUser.id, client.id);
-    saveStore();
+    saveStoreLocalOnly();
     pushLiveChatMessagesForClient(client.id);
-    backupPublicChangeToCloud();
+    markCurrentStoreAsCloudFresh();
     render();
   });
   markVisibleChatReadIfNeeded();
   if (state.view === "chat" && canUseSupabaseBackup()) {
     syncLiveChatRecords()
       .then((changed) => {
+        if (changed) markCurrentStoreAsCloudFresh();
         if (changed && state.view === "chat") render();
       })
       .catch((error) => {
@@ -5786,9 +5820,10 @@ function bindGlobal() {
   document.querySelector("#adminInterveneButton")?.addEventListener("click", () => {
     const body = document.querySelector("#adminIntervention").value;
     const message = adminInterveneInChat(store, state.currentUser, state.clientId, body);
-    saveStore();
-    pushLiveChatMessage(message);
-    backupPublicChangeToCloud();
+    saveStoreLocalOnly();
+    pushLiveChatMessage(message).then((saved) => {
+      if (saved) markCurrentStoreAsCloudFresh();
+    });
     render();
   });
 }
