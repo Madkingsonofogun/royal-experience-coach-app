@@ -1562,7 +1562,13 @@ on public.smart_coach_live_records (backup_id, collection_name, record_id);
 alter table public.smart_coach_live_records disable row level security;
 
 grant select, insert, update, delete on table public.smart_coach_live_records to anon, authenticated;
-grant usage, select on sequence public.smart_coach_live_records_id_seq to anon, authenticated;`;
+grant usage, select on sequence public.smart_coach_live_records_id_seq to anon, authenticated;
+
+-- Tell Supabase's REST API to notice the new live table immediately.
+notify pgrst, 'reload schema';
+
+-- Quick check: this should return smart_coach_live_records.
+select to_regclass('public.smart_coach_live_records') as live_table_check;`;
 }
 
 function supabaseEraseSql(tableName = "smart_coach_backups") {
