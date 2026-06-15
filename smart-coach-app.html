@@ -399346,8 +399346,10 @@ async function syncLiveIdentityRecords() {
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
   let changed = false;
+  const counts = {};
   for (const { storeKey, collectionName } of liveIdentityCollections()) {
     const rows = await fetchLiveSupabaseRows(projectUrl, key, collectionName);
+    counts[storeKey] = rows.length;
     rows.forEach((row) => {
       changed = mergeLiveRecordIntoStore(storeKey, row.data) || changed;
     });
@@ -399362,6 +399364,7 @@ async function syncLiveIdentityRecords() {
       console.warn("Could not save live identity records locally.", error);
     }
   }
+  state.lastLiveIdentityCounts = counts;
   return changed;
 }
 
@@ -403767,9 +403770,8 @@ function bindGlobal() {
     try {
       const identityChanged = await syncLiveIdentityRecords();
       const chatChanged = await syncLiveChatRecords();
-      state.syncStatus = identityChanged || chatChanged
-        ? "Loaded live Supabase account/profile/chat updates on this device."
-        : "Live Supabase records checked. No new account, profile, or chat updates found.";
+      const counts = state.lastLiveIdentityCounts || {};
+      state.syncStatus = `Loaded live Supabase records: ${counts.users || 0} users, ${counts.clients || 0} clients, ${counts.coaches || 0} coach/admin profiles.${identityChanged || chatChanged ? " This device was updated." : " No local changes were needed."}`;
     } catch (error) {
       state.syncStatus = `Could not load live Supabase records: ${error.message}`;
       window.alert(state.syncStatus);
