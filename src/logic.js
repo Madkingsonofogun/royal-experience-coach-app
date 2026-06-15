@@ -956,7 +956,7 @@ export function ensureMonthlyPlanHasWorkouts(store, planId, assessment = null) {
   const plan = findById(store.monthlyPlans, planId, "Monthly plan");
   const existing = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id);
   const client = findById(store.clients, plan.clientId, "Client");
-  const targetCount = Math.max(1, Math.min(5, Number(client.trainingDaysPerWeek || 3))) * 4;
+  const targetCount = Math.max(1, Math.min(7, Number(client.trainingDaysPerWeek || 3))) * 4;
   if (existing.length >= targetCount) return existing;
   const sourceAssessment = assessment || store.assessments.filter((item) => item.clientId === plan.clientId).at(-1) || {
     assessmentId: plan.generatedFromAssessmentId,
@@ -971,7 +971,7 @@ export function ensureMonthlyPlanHasWorkouts(store, planId, assessment = null) {
 
 function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment, startAtIndex = 0) {
   const client = findById(store.clients, plan.clientId, "Client");
-  const trainingDays = Math.max(1, Math.min(5, Number(client.trainingDaysPerWeek || 3)));
+  const trainingDays = Math.max(1, Math.min(7, Number(client.trainingDaysPerWeek || 3)));
   const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery" || toArray(assessment.restrictions).includes("Pain high");
   const sections = recoveryMode
     ? ["Warm-Up", "Recovery", "Skill / Technique", "Core", "Cooldown"]
@@ -1812,7 +1812,7 @@ export function adminUpdateClient(store, adminUser, clientId, patch) {
   requireAdmin(adminUser);
   const client = findById(store.clients, clientId, "Client");
   if (patch.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(patch.email))) throw new Error("Enter a valid email address.");
-  if (patch.trainingDaysPerWeek !== undefined && ![2, 3, 4, 5].includes(Number(patch.trainingDaysPerWeek))) throw new Error("Training days must be 2, 3, 4, or 5.");
+  if (patch.trainingDaysPerWeek !== undefined && ![1, 2, 3, 4, 5, 6, 7].includes(Number(patch.trainingDaysPerWeek))) throw new Error("Training days must be 1 through 7.");
   if (patch.sessionLength !== undefined && ![30, 45, 60, 120].includes(Number(patch.sessionLength))) throw new Error("Session length must be 30, 45, 60, or 120.");
   if (patch.currentTrainingLevel !== undefined && !["Beginner", "Intermediate", "Advanced", "Pro"].includes(patch.currentTrainingLevel)) throw new Error("Choose a valid training level.");
   if (patch.planOfferingId) findById(store.planOfferings, patch.planOfferingId, "Plan offering");
@@ -2681,7 +2681,7 @@ export function uploadProfileImage(store, actorUser, targetUserId, file) {
   if (!canManageProfileImage(store, actorUser, targetUser)) throw new Error("You do not have permission to edit this profile image.");
   validateImageUpload(file, store.settings);
   const storageKey = imageStorageKey("profile", targetUser.id, file.name);
-  const imageUrl = `/uploads/${storageKey}`;
+  const imageUrl = file.dataUrl || file.imageUrl || `/uploads/${storageKey}`;
   Object.assign(targetUser, { profileImageUrl: imageUrl, profileImageStorageKey: storageKey, profileImageUploadedAt: nowIso() });
   syncLinkedProfileImage(store, targetUser);
   auditImageAction(store, actorUser, `${actorUser.role} uploaded profile image for ${targetUser.name}`);
@@ -2705,7 +2705,7 @@ export function uploadProgressImage(store, actorUser, clientId, input) {
     id: input.id || makeId("progress-image"),
     clientId,
     uploadedByUserId: actorUser.id,
-    imageUrl: `/uploads/${storageKey}`,
+    imageUrl: input.file.dataUrl || input.file.imageUrl || `/uploads/${storageKey}`,
     imageStorageKey: storageKey,
     imageCategory: input.imageCategory || "Other",
     imageDate: input.imageDate || todayIso(),

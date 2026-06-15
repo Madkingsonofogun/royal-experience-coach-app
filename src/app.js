@@ -636,6 +636,15 @@ function importAppDataFile(file) {
   reader.readAsText(file);
 }
 
+function readImageFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, dataUrl: reader.result });
+    reader.onerror = () => reject(new Error("Image could not be loaded. Try a smaller jpg, png, or webp file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function backupPayload() {
   const backupSettings = {
     ...store.settings,
@@ -3830,7 +3839,7 @@ function clientEditModal(clientId) {
             ${editSelect("client", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], client.sportFocus)}
             ${editInput("client", "goal", "Goal", client.goal || "")}
             ${editSelect("client", "currentTrainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], client.currentTrainingLevel || "Beginner")}
-            ${editSelect("client", "trainingDaysPerWeek", "Training days per week", [2, 3, 4, 5], client.trainingDaysPerWeek)}
+            ${editSelect("client", "trainingDaysPerWeek", "Training days per week", [1, 2, 3, 4, 5, 6, 7], client.trainingDaysPerWeek)}
             ${editSelect("client", "sessionLength", "Session length", [30, 45, 60, 120], client.sessionLength)}
             ${editInput("client", "startDate", "Start date", client.startDate || "", "date")}
           </div>
@@ -5172,12 +5181,18 @@ function bindGlobal() {
       event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
     });
   });
-  document.querySelector("#uploadProfileImageButton")?.addEventListener("click", () => {
+  document.querySelector("#uploadProfileImageButton")?.addEventListener("click", async () => {
     const file = document.querySelector("#profileImageInput")?.files?.[0];
     const targetUser = ["Coach", "Admin"].includes(state.currentUser.role) && state.view === "profile" ? state.currentUser : userForProfile(selectedClient());
     if (!file || !targetUser) return window.alert("Choose an image first.");
     try {
-      uploadProfileImage(store, state.currentUser, targetUser.id, file);
+      const imageFile = await readImageFileAsDataUrl(file);
+      uploadProfileImage(store, state.currentUser, targetUser.id, imageFile);
+      saveAndSyncIdentity({
+        userIds: [targetUser.id],
+        clientIds: targetUser.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
+        coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : []
+      });
       render();
     } catch (error) {
       window.alert(error.message);
@@ -5188,20 +5203,27 @@ function bindGlobal() {
     if (!targetUser) return;
     try {
       removeProfileImage(store, state.currentUser, targetUser.id);
+      saveAndSyncIdentity({
+        userIds: [targetUser.id],
+        clientIds: targetUser.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
+        coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : []
+      });
       render();
     } catch (error) {
       window.alert(error.message);
     }
   });
-  document.querySelector("#uploadProgressImageButton")?.addEventListener("click", () => {
+  document.querySelector("#uploadProgressImageButton")?.addEventListener("click", async () => {
     const file = document.querySelector("#progressImageInput")?.files?.[0];
     if (!file) return window.alert("Choose an image first.");
     state.progressDraft.imageDate = document.querySelector("#progressImageDate")?.value || today;
     state.progressDraft.imageCategory = document.querySelector("#progressImageCategory")?.value || "Other";
     state.progressDraft.clientNotes = document.querySelector("#progressImageNotes")?.value || "";
     try {
-      uploadProgressImage(store, state.currentUser, state.clientId, { ...state.progressDraft, file });
+      const imageFile = await readImageFileAsDataUrl(file);
+      uploadProgressImage(store, state.currentUser, state.clientId, { ...state.progressDraft, file: imageFile });
       state.progressDraft.clientNotes = "";
+      saveStore();
       render();
     } catch (error) {
       window.alert(error.message);
@@ -5210,17 +5232,26 @@ function bindGlobal() {
   document.querySelectorAll("[data-save-progress-note]").forEach((button) => button.addEventListener("click", () => {
     const note = document.querySelector(`[data-progress-note="${button.dataset.saveProgressNote}"]`)?.value || "";
     addProgressImageCoachNote(store, state.currentUser, button.dataset.saveProgressNote, note, true);
+    saveStore();
     render();
   }));
   document.querySelectorAll("[data-archive-progress-image]").forEach((button) => button.addEventListener("click", () => {
     archiveProgressImage(store, state.currentUser, button.dataset.archiveProgressImage);
+    saveStore();
     render();
   }));
-  document.querySelectorAll("[data-admin-upload-profile]").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll("[data-admin-upload-profile]").forEach((button) => button.addEventListener("click", async () => {
     const file = document.querySelector(`[data-profile-file="${button.dataset.adminUploadProfile}"]`)?.files?.[0];
     if (!file) return window.alert("Choose an image first.");
     try {
-      uploadProfileImage(store, state.currentUser, button.dataset.adminUploadProfile, file);
+      const targetUser = store.users.find((user) => user.id === button.dataset.adminUploadProfile);
+      const imageFile = await readImageFileAsDataUrl(file);
+      uploadProfileImage(store, state.currentUser, button.dataset.adminUploadProfile, imageFile);
+      saveAndSyncIdentity({
+        userIds: [button.dataset.adminUploadProfile],
+        clientIds: targetUser?.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
+        coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : []
+      });
       render();
     } catch (error) {
       window.alert(error.message);
@@ -5228,7 +5259,13 @@ function bindGlobal() {
   }));
   document.querySelectorAll("[data-admin-remove-profile]").forEach((button) => button.addEventListener("click", () => {
     try {
+      const targetUser = store.users.find((user) => user.id === button.dataset.adminRemoveProfile);
       removeProfileImage(store, state.currentUser, button.dataset.adminRemoveProfile);
+      saveAndSyncIdentity({
+        userIds: [button.dataset.adminRemoveProfile],
+        clientIds: targetUser?.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
+        coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : []
+      });
       render();
     } catch (error) {
       window.alert(error.message);
