@@ -1164,18 +1164,6 @@ async function checkCloudDataUpdates() {
       await runAutomaticCloudBackup(currentFingerprint);
       return;
     }
-    const latestBackupId = await getLatestSupabaseBackupId({
-      url: store.settings.supabaseUrl,
-      anonKey: store.settings.supabaseAnonKey,
-      table: store.settings.supabaseBackupTable
-    });
-    if (latestBackupId && latestBackupId !== lastCloudBackupId) {
-      const restored = await syncLatestCloudData(false);
-      if (restored) {
-        state.syncStatus = `Loaded newer Supabase data at ${new Date().toLocaleTimeString()}.`;
-        render();
-      }
-    }
   } catch (error) {
     state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
       ? "Supabase sync is blocked by Row Level Security. Run the Setup SQL in Admin Data Sync."
@@ -1468,29 +1456,26 @@ async function syncLatestCloudData(showStatus = true) {
   if (state.supabaseRestoreBusy) return false;
   state.supabaseRestoreBusy = true;
   if (showStatus) {
-    state.syncStatus = "Checking Supabase for the newest app data...";
+    state.syncStatus = "Checking Supabase for live account, profile, and chat records...";
     render();
   }
   try {
-    const result = await restoreLatestFromSupabase({
-      url: store.settings.supabaseUrl,
-      anonKey: store.settings.supabaseAnonKey,
-      table: store.settings.supabaseBackupTable
-    });
+    state.supabaseRestoreBusy = false;
+    const identityChanged = await syncLiveIdentityRecords();
+    const chatChanged = await syncLiveChatRecords();
+    state.supabaseRestoreBusy = true;
     state.cloudSyncAttempted = true;
     if (showStatus) {
-      state.syncStatus = result.restored
-        ? `Loaded latest Supabase coaching backup ${result.backupId}.${result.duplicateRowsRemoved ? ` Removed ${result.duplicateRowsRemoved} duplicate cloud records and queued a clean backup.` : " Profiles, chats, assessments, check-ins, and client plan records are now available on this device."}`
-        : result.reason;
+      state.syncStatus = identityChanged || chatChanged
+        ? "Loaded live Supabase account/profile/chat updates on this device."
+        : "Live Supabase records checked. No new account, profile, or chat updates found.";
       render();
     }
-    return result.restored;
+    return identityChanged || chatChanged;
   } catch (error) {
     state.cloudSyncAttempted = true;
     if (showStatus) {
-      state.syncStatus = String(error.message || "").includes("57014")
-        ? "Could not load Supabase data because the backup table timed out. Run the updated Setup SQL in Admin Data Sync, then click Backup to Supabase once."
-        : `Could not load Supabase data: ${error.message}`;
+      state.syncStatus = `Could not load live Supabase records: ${error.message}`;
     }
     return false;
   } finally {
@@ -2978,7 +2963,7 @@ function adminView() {
           <button type="button" id="saveSupabaseConfig">Save Supabase Settings</button>
           <button type="button" id="testSupabaseConnection">Test Supabase Connection</button>
           <button type="button" class="success" id="publishLiveProfiles">Publish Accounts / Profiles</button>
-          <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
+          <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Live Supabase Records"}</button>
           <button type="button" class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
           <button type="button" class="danger" id="resetSupabaseTable" ${state.supabaseResetBusy ? "disabled" : ""}>${state.supabaseResetBusy ? "Resetting..." : "Reset Supabase Table"}</button>
         </div>
