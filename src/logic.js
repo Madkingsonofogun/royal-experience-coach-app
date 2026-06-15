@@ -2501,6 +2501,10 @@ export function generateMonthlyPlanFromPlanOffering(store, adminUser, clientId, 
   requireAdmin(adminUser);
   const client = findById(store.clients, clientId, "Client");
   const offering = findById(store.planOfferings, planOfferingId, "Plan offering");
+  const requestedTemplateIds = [...new Set([
+    ...(Array.isArray(options.workoutTemplateIds) ? options.workoutTemplateIds : []),
+    options.workoutTemplateId
+  ].filter(Boolean))];
   const plan = {
     id: makeId("plan"),
     clientId,
@@ -2515,10 +2519,18 @@ export function generateMonthlyPlanFromPlanOffering(store, adminUser, clientId, 
     restrictions: latestRestrictions(store, clientId),
     workoutPermission: "Train with Modifications",
     sourcePlanOfferingId: offering.id,
+    sourceWorkoutTemplateIds: requestedTemplateIds,
+    sourceWorkoutTemplateId: requestedTemplateIds[0] || null,
     createdAt: nowIso()
   };
   store.monthlyPlans.push(plan);
-  const templates = store.workoutTemplates.filter((template) => offering.workoutTemplateIds?.includes(template.id) && !template.archived);
+  const templateIds = requestedTemplateIds.length ? requestedTemplateIds : offering.workoutTemplateIds || [];
+  const templates = store.workoutTemplates.filter((template) => templateIds.includes(template.id) && !template.archived);
+  addWorkoutTemplateItemsToMonthlyPlan(store, client, offering, plan, templates, options);
+  return plan;
+}
+
+function addWorkoutTemplateItemsToMonthlyPlan(store, client, offering, plan, templates, options = {}) {
   let day = 1;
   templates.forEach((template) => {
     const templateItems = store.workoutTemplateItems
@@ -2551,6 +2563,33 @@ export function generateMonthlyPlanFromPlanOffering(store, adminUser, clientId, 
     });
     day += 1;
   });
+}
+
+export function adminAssignWorkoutTemplateToClientPlan(store, adminUser, clientId, workoutTemplateId, options = {}) {
+  requireAdmin(adminUser);
+  const client = findById(store.clients, clientId, "Client");
+  const template = findById(store.workoutTemplates, workoutTemplateId, "Workout template");
+  const offering = store.planOfferings.find((item) => item.id === (options.planOfferingId || client.planOfferingId)) || store.planOfferings[0];
+  if (!offering) throw new Error("Choose a plan offering before assigning a workout template.");
+  client.assignedWorkoutTemplateId = template.id;
+  client.assignedWorkoutTemplateName = template.workoutName;
+  client.planOfferingId = offering.id;
+  let plan = store.monthlyPlans
+    .filter((item) => item.clientId === clientId && ["Draft", "Active"].includes(item.status || item.planStatus))
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
+  if (!plan) {
+    plan = generateMonthlyPlanFromPlanOffering(store, adminUser, clientId, offering.id, { workoutTemplateId: template.id });
+  } else {
+    store.monthlyPlanItems = store.monthlyPlanItems.filter((item) => item.monthlyPlanId !== plan.id);
+    plan.sourcePlanOfferingId = offering.id;
+    plan.sourceWorkoutTemplateId = template.id;
+    plan.sourceWorkoutTemplateIds = [template.id];
+    plan.trainingLevel = template.trainingLevel || plan.trainingLevel || offering.trainingLevel || "Beginner";
+    plan.planLevel = plan.trainingLevel;
+    plan.updatedAt = nowIso();
+    addWorkoutTemplateItemsToMonthlyPlan(store, client, offering, plan, [template], options);
+  }
+  logAdminAction(store, adminUser, `Assigned workout template ${template.workoutName} to ${client.name}`);
   return plan;
 }
 

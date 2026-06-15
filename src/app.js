@@ -28,6 +28,7 @@ import {
   adminDeletePlanOffering,
   adminDeleteWorkoutTemplate,
   adminUpdateCoach,
+  adminAssignWorkoutTemplateToClientPlan,
   addProgressImageCoachNote,
   adminRemoveWorkoutTemplateItem,
   adminReorderWorkoutTemplateItems,
@@ -3763,6 +3764,10 @@ function clientEditModal(clientId) {
   if (!client) return "";
   const user = store.users.find((item) => item.role === "Client" && item.linkedId === clientId);
   const activePlan = store.monthlyPlans.find((plan) => plan.clientId === clientId && plan.status === "Active" && plan.approved);
+  const latestPlan = store.monthlyPlans
+    .filter((plan) => plan.clientId === clientId)
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
+  const selectedWorkoutTemplateId = client.assignedWorkoutTemplateId || latestPlan?.sourceWorkoutTemplateId || latestPlan?.sourceWorkoutTemplateIds?.[0] || store.planOfferings.find((offering) => offering.id === client.planOfferingId)?.workoutTemplateIds?.[0] || store.workoutTemplates[0]?.id || "";
   const latestAssessment = store.assessments.filter((item) => item.clientId === clientId).at(-1);
   const latestReassessment = store.assessments.filter((item) => item.clientId === clientId && item.assessmentType === "Reassessment").at(-1);
   const tabs = ["Profile", "Coach & Access", "Program", "Package", "Workouts", "Assessments", "Notes"];
@@ -3853,7 +3858,7 @@ function clientEditModal(clientId) {
           </div>
           <div class="form-grid">
             ${modalSelect("clientModalPlanOfferingForDraft", "Plan offering for new Draft", store.planOfferings.map((offering) => ({ value: offering.id, label: offering.planName })), client.planOfferingId || store.planOfferings[0]?.id)}
-            ${modalSelect("clientModalWorkoutTemplate", "Assign workout template", store.workoutTemplates.map((template) => ({ value: template.id, label: template.workoutName })), "")}
+            ${modalSelect("clientModalWorkoutTemplate", "Assign workout template", store.workoutTemplates.map((template) => ({ value: template.id, label: template.workoutName })), selectedWorkoutTemplateId)}
           </div>
           <div class="modal-actions left-actions">
             <button id="clientModalGenerateDraft" data-client-id="${client.id}">Generate New Draft Plan</button>
@@ -5970,6 +5975,12 @@ function bindGlobal() {
         const pkg = store.packages.find((item) => item.id === patch.packageId);
         patch.packageType = pkg?.packageName || patch.packageType;
       }
+      const selectedTemplateId = document.querySelector("#clientModalWorkoutTemplate")?.value || "";
+      if (selectedTemplateId) {
+        const selectedTemplate = store.workoutTemplates.find((template) => template.id === selectedTemplateId);
+        patch.assignedWorkoutTemplateId = selectedTemplateId;
+        patch.assignedWorkoutTemplateName = selectedTemplate?.workoutName || "";
+      }
       adminUpdateClient(store, state.currentUser, clientId, patch);
       saveAndSyncIdentity({ clientIds: [clientId] });
       changeSelectedClient(clientId, false);
@@ -6114,8 +6125,18 @@ function bindGlobal() {
   });
   document.querySelector("#clientModalGenerateDraft")?.addEventListener("click", (event) => {
     const planOfferingId = document.querySelector("#clientModalPlanOfferingForDraft")?.value;
+    const workoutTemplateId = document.querySelector("#clientModalWorkoutTemplate")?.value;
     if (!planOfferingId) return window.alert("Choose a plan offering first.");
-    const draft = generateMonthlyPlanFromPlanOffering(store, state.currentUser, event.currentTarget.dataset.clientId, planOfferingId);
+    const draft = generateMonthlyPlanFromPlanOffering(store, state.currentUser, event.currentTarget.dataset.clientId, planOfferingId, { workoutTemplateId });
+    if (workoutTemplateId) {
+      const template = store.workoutTemplates.find((item) => item.id === workoutTemplateId);
+      adminUpdateClient(store, state.currentUser, event.currentTarget.dataset.clientId, {
+        planOfferingId,
+        assignedWorkoutTemplateId: workoutTemplateId,
+        assignedWorkoutTemplateName: template?.workoutName || ""
+      });
+    }
+    saveAndSyncIdentity({ clientIds: [event.currentTarget.dataset.clientId] });
     store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Generated new Draft monthly plan ${draft.id} from Edit Client popup`, createdAt: new Date().toISOString() });
     window.alert("New Draft monthly plan created.");
     render();
@@ -6126,7 +6147,18 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#clientModalWorkoutWarning")?.addEventListener("click", () => {
-    window.alert("Future workout changes are noted. Past workout history will not be deleted.");
+    try {
+      const clientId = document.querySelector("#saveClientModal")?.dataset.clientId;
+      const workoutTemplateId = document.querySelector("#clientModalWorkoutTemplate")?.value;
+      const planOfferingId = document.querySelector("#clientModalPlanOfferingForDraft")?.value;
+      if (!clientId || !workoutTemplateId) return window.alert("Choose a workout template first.");
+      adminAssignWorkoutTemplateToClientPlan(store, state.currentUser, clientId, workoutTemplateId, { planOfferingId });
+      saveAndSyncIdentity({ clientIds: [clientId] });
+      window.alert("Future workouts updated from the selected template. Past workout history was kept.");
+      render();
+    } catch (error) {
+      window.alert(error.message);
+    }
   });
   document.querySelector("#clientModalScheduleAssessment")?.addEventListener("click", () => window.alert("Assessment scheduling note saved for Admin follow-up."));
   document.querySelector("#clientModalScheduleReassessment")?.addEventListener("click", () => window.alert("Reassessment scheduling note saved for Admin follow-up."));
