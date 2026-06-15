@@ -399392,6 +399392,26 @@ async function syncLiveIdentityRecords() {
   return changed;
 }
 
+async function forceReplaceIdentityFromSupabase() {
+  if (!canUseSupabaseBackup()) throw new Error("Supabase settings are missing on this device.");
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const users = (await fetchLiveSupabaseRows(projectUrl, key, "users")).map((row) => row.data).filter(Boolean);
+  const clients = (await fetchLiveSupabaseRows(projectUrl, key, "clients")).map((row) => row.data).filter(Boolean);
+  const coaches = (await fetchLiveSupabaseRows(projectUrl, key, "coaches")).map((row) => row.data).filter(Boolean);
+  if (!users.length && !clients.length && !coaches.length) throw new Error("No profile snapshot rows were found in Supabase.");
+  if (users.length) store.users = deduplicateRecords(users);
+  if (clients.length) store.clients = deduplicateRecords(clients);
+  if (coaches.length) store.coaches = deduplicateRecords(coaches);
+  if (state.currentUser) state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
+  if (!store.clients.some((client) => client.id === state.clientId)) {
+    state.clientId = visibleClientsForUser(store, state.currentUser || store.users[0])[0]?.id || store.clients[0]?.id || "";
+  }
+  state.lastLiveIdentityCounts = { users: users.length, clients: clients.length, coaches: coaches.length };
+  saveStoreLocalOnly();
+  return state.lastLiveIdentityCounts;
+}
+
 async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
   try {
     return await fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName);
@@ -401353,6 +401373,7 @@ function adminView() {
           <button type="button" id="testSupabaseConnection">Test Supabase Connection</button>
           <button type="button" class="success" id="publishLiveProfiles">Publish Accounts / Profiles</button>
           <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Live Supabase Records"}</button>
+          <button type="button" class="danger" id="forcePullLiveProfiles">Force Pull Profiles From Supabase</button>
           <button type="button" class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
           <button type="button" class="danger" id="resetSupabaseTable" ${state.supabaseResetBusy ? "disabled" : ""}>${state.supabaseResetBusy ? "Resetting..." : "Reset Supabase Table"}</button>
         </div>
@@ -403803,6 +403824,22 @@ function bindGlobal() {
       state.supabaseRestoreBusy = false;
       render();
     }
+  });
+  document.querySelector("#forcePullLiveProfiles")?.addEventListener("click", async () => {
+    if (!window.confirm("Replace this device's local users, clients, and coach/admin profiles with the Supabase profile snapshot? Use this on a stale device that is missing profiles.")) return;
+    store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
+    store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || store.settings.supabaseAnonKey || "";
+    store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || store.settings.supabaseBackupTable || "smart_coach_backups";
+    state.syncStatus = "Force pulling profile snapshots from Supabase...";
+    render();
+    try {
+      const counts = await forceReplaceIdentityFromSupabase();
+      state.syncStatus = `Force pulled profiles from Supabase: ${counts.users || 0} users, ${counts.clients || 0} clients, ${counts.coaches || 0} coach/admin profiles.`;
+    } catch (error) {
+      state.syncStatus = `Could not force pull profiles: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
+    render();
   });
   document.querySelector("#backupSupabaseData")?.addEventListener("click", async () => {
     store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
