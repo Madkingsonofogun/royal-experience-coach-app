@@ -399458,7 +399458,7 @@ async function checkCloudDataUpdates() {
     state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
       ? "Supabase sync is blocked by Row Level Security. Run the Setup SQL in Admin Data Sync."
       : String(error.message || "").includes("57014")
-        ? "Supabase sync timed out because the backup table needs cleanup. Run the updated Setup SQL in Admin Data Sync, then click Backup to Supabase once."
+        ? "Supabase live sync timed out. Accounts, profiles, and chat use the live table; check smart_coach_live_records and try Load Live Supabase Records again."
       : `Supabase sync check failed: ${error.message}`;
   } finally {
     cloudDataMonitorRunning = false;
@@ -403688,7 +403688,23 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#restoreSupabaseData")?.addEventListener("click", async () => {
-    await syncLatestCloudData(true);
+    if (state.supabaseRestoreBusy) return;
+    state.supabaseRestoreBusy = true;
+    state.syncStatus = "Loading live Supabase accounts, profiles, and chat...";
+    render();
+    try {
+      const identityChanged = await syncLiveIdentityRecords();
+      const chatChanged = await syncLiveChatRecords();
+      state.syncStatus = identityChanged || chatChanged
+        ? "Loaded live Supabase account/profile/chat updates on this device."
+        : "Live Supabase records checked. No new account, profile, or chat updates found.";
+    } catch (error) {
+      state.syncStatus = `Could not load live Supabase records: ${error.message}`;
+      window.alert(state.syncStatus);
+    } finally {
+      state.supabaseRestoreBusy = false;
+      render();
+    }
   });
   document.querySelector("#backupSupabaseData")?.addEventListener("click", async () => {
     store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
