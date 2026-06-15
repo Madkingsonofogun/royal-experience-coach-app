@@ -488,9 +488,12 @@ function startLiveIdentityMonitor() {
 
 async function refreshLoginAccountsAutomatically(showResult) {
   if (state.currentUser || state.supabaseRestoreBusy) return;
+  const publishedPending = await publishLocalPendingAccountRequestsToSupabase().catch((error) => ({ error }));
   const liveIdentityRestored = await syncLiveIdentityRecords().catch(() => false);
   if (showResult) {
-    state.syncStatus = liveIdentityRestored
+    state.syncStatus = publishedPending?.saved
+      ? `Published ${publishedPending.saved} pending account request${publishedPending.saved === 1 ? "" : "s"} to Supabase. Admin can pull it now.`
+      : liveIdentityRestored
       ? "Accounts automatically updated from Supabase."
       : "Automatic account updates are on. Log in when your account has been approved.";
     render();
@@ -912,6 +915,48 @@ async function pushLiveIdentityRecordsFor({ userIds = [], clientIds = [], coachI
   }
   await Promise.all(jobs);
   return Boolean(jobs.length);
+}
+
+function localPendingAccountRequests() {
+  return (store.users || []).filter((user) =>
+    ["Client", "Coach"].includes(user.requestedRole || user.role)
+    && (user.accountStatus || "Active") === "Pending"
+    && user.accountLocked
+  );
+}
+
+function accountRequestIds(filter = "Pending") {
+  if (!state.currentUser || state.currentUser.role !== "Admin") return new Set();
+  try {
+    return new Set(getAccountRequests(store, state.currentUser, filter).map((user) => user.id));
+  } catch (error) {
+    return new Set();
+  }
+}
+
+async function publishLocalPendingAccountRequestsToSupabase() {
+  if (!canUseSupabaseBackup()) return { attempted: 0, saved: 0 };
+  const requests = localPendingAccountRequests();
+  let saved = 0;
+  for (const user of requests) {
+    if (await pushLiveIdentityRecord("users", user)) saved += 1;
+    if (user.linkedId && (user.requestedRole || user.role) === "Client") {
+      const client = store.clients.find((item) => item.id === user.linkedId);
+      if (client) await pushLiveIdentityRecord("clients", client);
+    }
+    if (user.linkedId && (user.requestedRole || user.role) === "Coach") {
+      const coach = store.coaches.find((item) => item.id === user.linkedId);
+      if (coach) await pushLiveIdentityRecord("coaches", coach);
+    }
+  }
+  if (saved) {
+    try {
+      window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
+    } catch (error) {
+      console.warn("Could not mark pending account requests locally after Supabase publish.", error);
+    }
+  }
+  return { attempted: requests.length, saved };
 }
 
 function mergeLiveRecordIntoStore(storeKey, record) {
@@ -3035,7 +3080,7 @@ function adminView() {
               <h3>Pending Account Requests</h3>
               <p class="muted">New account requests sync through live Supabase records and do not need the full backup button.</p>
             </div>
-            <button class="ghost" id="refreshAccountRequests">Refresh Requests</button>
+            <button class="ghost" id="refreshAccountRequests">Pull Requests From Supabase</button>
           </div>
           <label>Filter
             <select id="accountRequestFilter">${["Pending", "Active", "Locked", "Rejected", "Suspended", "Archived", "Client", "Coach", "All"].map((filter) => `<option value="${filter}" ${state.accountRequestFilter === filter ? "selected" : ""}>${filter}</option>`).join("")}</select>
@@ -4986,9 +5031,16 @@ function bindGlobal() {
   document.querySelectorAll("[data-admin-panel]").forEach((button) => button.addEventListener("click", () => {
     state.adminPanel = button.dataset.adminPanel;
     if (state.adminPanel === "accountRequests") {
+      const beforeIds = accountRequestIds("All");
       syncLiveIdentityRecords()
         .then((changed) => {
-          state.syncStatus = changed ? "Account requests refreshed from Supabase." : "Account requests checked. No new requests found.";
+          const afterIds = accountRequestIds("All");
+          const newCount = [...afterIds].filter((id) => !beforeIds.has(id)).length;
+          state.syncStatus = newCount
+            ? `Pulled ${newCount} account request${newCount === 1 ? "" : "s"} from Supabase.`
+            : changed
+              ? "Account requests updated from Supabase."
+              : "Account requests checked. No new requests found.";
           render();
         })
         .catch((error) => {
@@ -5390,8 +5442,15 @@ function bindGlobal() {
   });
   document.querySelector("#refreshAccountRequests")?.addEventListener("click", async () => {
     try {
+      const beforeIds = accountRequestIds("All");
       const changed = await syncLiveIdentityRecords();
-      state.syncStatus = changed ? "Account requests refreshed from Supabase." : "No new account requests found.";
+      const afterIds = accountRequestIds("All");
+      const newCount = [...afterIds].filter((id) => !beforeIds.has(id)).length;
+      state.syncStatus = newCount
+        ? `Pulled ${newCount} account request${newCount === 1 ? "" : "s"} from Supabase.`
+        : changed
+          ? "Account requests updated from Supabase."
+          : "No new account requests found in Supabase.";
     } catch (error) {
       state.syncStatus = `Could not refresh account requests: ${error.message}`;
       window.alert(state.syncStatus);
