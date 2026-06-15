@@ -94,6 +94,7 @@ import { blankAssessment, createStore } from "./data.js";
 import { mealDemoLibrary, nutritionDemoStats } from "./meal-demo-data.js";
 
 const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
+const LIVE_BACKUP_ID = "identity_live_v2";
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
 const nutritionDemoMealPool = buildExpandedNutritionDemoMealPool(mealDemoLibrary);
@@ -786,7 +787,12 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
     record_id: backupRecordId(data, recordId),
     data: cleanBackupValue(data)
   };
-  return upsertLiveSupabaseRow(projectUrl, key, "smart_coach_live_records", row, true);
+  try {
+    return await upsertLiveSupabaseRow(projectUrl, key, "smart_coach_live_records", row, false);
+  } catch (error) {
+    if (!shouldFallbackToBackupTable(error.message || "")) throw error;
+    return upsertLiveBackupTableRecord(projectUrl, key, row);
+  }
 }
 
 function shouldFallbackToBackupTable(errorText = "") {
@@ -821,6 +827,34 @@ async function upsertLiveSupabaseRow(projectUrl, key, tableName, row, allowFallb
     }
     throw new Error(errorText || `Supabase returned ${response.status}`);
   }
+  return true;
+}
+
+async function upsertLiveBackupTableRecord(projectUrl, key, row) {
+  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
+  const liveRow = {
+    ...row,
+    backup_id: LIVE_BACKUP_ID,
+    created_at: new Date().toISOString()
+  };
+  const deleteEndpoint = `${endpoint}?backup_id=eq.${encodeURIComponent(LIVE_BACKUP_ID)}&collection_name=eq.${encodeURIComponent(row.collection_name)}&record_id=eq.${encodeURIComponent(row.record_id)}`;
+  await supabaseFetchWithTimeout(deleteEndpoint, {
+    method: "DELETE",
+    headers: {
+      ...supabaseHeaders(key),
+      Prefer: "return=minimal"
+    }
+  }, 4500).catch((error) => console.warn("Could not clear previous live fallback row.", error));
+  const response = await supabaseFetchWithTimeout(endpoint, {
+    method: "POST",
+    headers: {
+      ...supabaseHeaders(key),
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify([liveRow])
+  }, 4500);
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   return true;
 }
 
@@ -1022,7 +1056,12 @@ async function syncLiveIdentityRecords() {
 }
 
 async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
-  return fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName);
+  try {
+    return await fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName);
+  } catch (error) {
+    if (!shouldFallbackToBackupTable(error.message || "")) throw error;
+    return fetchFallbackLiveBackupRows(projectUrl, key, collectionName);
+  }
 }
 
 async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collectionName) {
@@ -1035,6 +1074,14 @@ async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collec
     }
     throw new Error(errorText || `Supabase returned ${response.status}`);
   }
+  return response.json();
+}
+
+async function fetchFallbackLiveBackupRows(projectUrl, key, collectionName) {
+  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.${encodeURIComponent(LIVE_BACKUP_ID)}&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data,created_at&order=created_at.asc`;
+  const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 4500);
+  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   return response.json();
 }
 
