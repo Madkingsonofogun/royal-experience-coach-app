@@ -398385,6 +398385,13 @@ function exercise(id, name, planLevel, equipmentText, contraindications, replace
 
 const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
 const LIVE_BACKUP_ID = "identity_live_v2";
+const LIVE_SNAPSHOT_IDS = {
+  users: 900000001,
+  clients: 900000002,
+  coaches: 900000003,
+  chat_messages: 900000004,
+  chat_resets: 900000005
+};
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
 const nutritionDemoMealPool = buildExpandedNutritionDemoMealPool(mealDemoLibrary);
@@ -398821,7 +398828,7 @@ function ensureStoreListShape(targetStore = store) {
   [
     "users", "clients", "coaches", "assessments", "assessmentSchedules", "weeklyCheckIns",
     "dailyCheckIns", "painCheckIns", "pinResetRequests", "progressImages", "coachAlerts",
-    "mealPlans", "todayWorkoutAdjustments", "workoutCompletions", "chatMessages",
+    "mealPlans", "todayWorkoutAdjustments", "workoutCompletions", "chatMessages", "chatResets",
     "notifications", "inviteCodes", "adminAuditLog", "planOfferings", "packages",
     "workoutTemplates", "workoutTemplateItems", "monthlyPlans", "monthlyPlanItems",
     "exercises", "assessmentTemplates"
@@ -399121,31 +399128,42 @@ async function upsertLiveSupabaseRow(projectUrl, key, tableName, row, allowFallb
 }
 
 async function upsertLiveBackupTableRecord(projectUrl, key, row) {
+  const snapshotId = LIVE_SNAPSHOT_IDS[row.collection_name];
+  if (!snapshotId) throw new Error(`No live fallback snapshot id is configured for ${row.collection_name}.`);
   const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?on_conflict=id`;
+  const snapshotData = liveSnapshotDataFor(row.collection_name, row.data);
   const liveRow = {
-    ...row,
+    id: snapshotId,
     backup_id: LIVE_BACKUP_ID,
-    created_at: new Date().toISOString()
+    collection_name: row.collection_name,
+    record_id: `${row.collection_name}_snapshot`,
+    data: cleanBackupValue(snapshotData)
   };
-  const deleteEndpoint = `${endpoint}?backup_id=eq.${encodeURIComponent(LIVE_BACKUP_ID)}&collection_name=eq.${encodeURIComponent(row.collection_name)}&record_id=eq.${encodeURIComponent(row.record_id)}`;
-  await supabaseFetchWithTimeout(deleteEndpoint, {
-    method: "DELETE",
-    headers: {
-      ...supabaseHeaders(key),
-      Prefer: "return=minimal"
-    }
-  }, 4500).catch((error) => console.warn("Could not clear previous live fallback row.", error));
   const response = await supabaseFetchWithTimeout(endpoint, {
     method: "POST",
     headers: {
       ...supabaseHeaders(key),
-      Prefer: "return=minimal"
+      Prefer: "resolution=merge-duplicates,return=minimal"
     },
     body: JSON.stringify([liveRow])
   }, 4500);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
   return true;
+}
+
+function liveSnapshotDataFor(collectionName, latestRecord = null) {
+  const map = {
+    users: "users",
+    clients: "clients",
+    coaches: "coaches",
+    chat_messages: "chatMessages",
+    chat_resets: "chatResets"
+  };
+  const storeKey = map[collectionName];
+  const records = Array.isArray(store[storeKey]) ? [...store[storeKey]] : [];
+  if (latestRecord?.id && !records.some((item) => item.id === latestRecord.id)) records.push(latestRecord);
+  return deduplicateRecords(records);
 }
 
 async function pushLiveChatMessage(message) {
@@ -399163,13 +399181,15 @@ async function pushLiveChatMessage(message) {
 async function pushLiveChatReset(clientId, resetAt = new Date().toISOString()) {
   if (!clientId) return false;
   try {
-    await upsertLiveSupabaseRecord("chat_resets", clientId, {
+    const resetRecord = {
       id: `chat_reset_${clientId}`,
       clientId,
       resetAt,
       clearedByUserId: state.currentUser?.id || "",
       createdAt: resetAt
-    });
+    };
+    store.chatResets = deduplicateRecords([...(store.chatResets || []).filter((item) => item.clientId !== clientId), resetRecord]);
+    await upsertLiveSupabaseRecord("chat_resets", clientId, resetRecord);
     return true;
   } catch (error) {
     console.warn("Could not save live chat reset.", error);
@@ -399368,11 +399388,16 @@ async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collec
 }
 
 async function fetchFallbackLiveBackupRows(projectUrl, key, collectionName) {
+  const snapshotId = LIVE_SNAPSHOT_IDS[collectionName];
+  if (!snapshotId) return [];
   const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.${encodeURIComponent(LIVE_BACKUP_ID)}&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data,created_at&order=created_at.asc`;
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?id=eq.${snapshotId}&select=record_id,data,created_at&limit=1`;
   const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 4500);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
-  return response.json();
+  const rows = await response.json();
+  const snapshot = rows[0]?.data;
+  if (!Array.isArray(snapshot)) return [];
+  return snapshot.map((record) => ({ record_id: record.id, data: record, created_at: rows[0]?.created_at }));
 }
 
 async function pushLiveChatMessagesForClient(clientId) {
