@@ -1319,8 +1319,7 @@ export function canUserAccessClient(store, user, clientId) {
 
 export function getChatMessages(store, user, clientId) {
   if (!canUserAccessClient(store, user, clientId)) return [];
-  if (user.role === "Admin") return store.chatMessages.filter((message) => message.clientId === clientId);
-  return store.chatMessages.filter((message) => message.clientId === clientId && (message.fromUserId === user.id || message.toUserId === user.id));
+  return store.chatMessages.filter((message) => message.clientId === clientId);
 }
 
 export function sendChatMessage(store, { fromUserId, toUserId, clientId, body }) {
@@ -1363,7 +1362,7 @@ export function markNotificationsRead(store, userId, clientId = null) {
   });
   store.chatMessages.forEach((message) => {
     const matchesClient = !clientId || message.clientId === clientId;
-    if (matchesClient && (message.toUserId === userId || message.fromUserId === userId) && !message.readBy.includes(userId)) {
+    if (matchesClient && !message.readBy.includes(userId)) {
       message.readBy.push(userId);
     }
   });

@@ -1023,19 +1023,12 @@ async function syncLiveIdentityRecords() {
 
 async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
   const primaryRows = await fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName, true);
-  if (primaryRows?.length) return primaryRows;
+  if (primaryRows) return primaryRows;
   const fallbackTable = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
   try {
     const fallbackRows = await fetchLiveSupabaseRowsFromTable(projectUrl, key, fallbackTable, collectionName, false) || [];
-    if (primaryRows && fallbackRows.length) {
-      fallbackRows.forEach((row) => upsertLiveSupabaseRecord(collectionName, row.record_id, row.data));
-    }
-    return fallbackRows.length ? fallbackRows : (primaryRows || []);
+    return fallbackRows;
   } catch (error) {
-    if (primaryRows) {
-      console.warn(`Old Supabase backup table could not provide ${collectionName}; using live table only.`, error);
-      return primaryRows;
-    }
     throw error;
   }
 }
@@ -1058,7 +1051,12 @@ async function pushLiveChatMessagesForClient(clientId) {
 }
 
 function ensureLiveChatNotification(message) {
-  if (!state.currentUser || message.toUserId !== state.currentUser.id || (message.readBy || []).includes(state.currentUser.id)) return false;
+  if (
+    !state.currentUser ||
+    message.fromUserId === state.currentUser.id ||
+    (message.readBy || []).includes(state.currentUser.id) ||
+    !canUserAccessClient(store, state.currentUser, message.clientId)
+  ) return false;
   const notificationId = `notification_live_${message.id}_${state.currentUser.id}`;
   if ((store.notifications || []).some((item) => item.id === notificationId || (item.userId === state.currentUser.id && item.body === message.body && item.createdAt === message.createdAt))) return false;
   const sender = store.users.find((user) => user.id === message.fromUserId);
@@ -1081,6 +1079,9 @@ async function syncLiveChatRecords() {
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
   try {
+    await syncLiveIdentityRecords().catch((error) => {
+      console.warn("Could not refresh live identity records before chat sync.", error);
+    });
     const resetRows = await fetchLiveSupabaseRows(projectUrl, key, "chat_resets");
     const resets = resetRows.map((row) => row.data).filter(Boolean);
     let changed = false;
@@ -1153,8 +1154,8 @@ async function checkCloudDataUpdates() {
   if (!state.currentUser || cloudDataMonitorRunning || autoCloudBackupRunning || state.supabaseBackupBusy || state.supabaseRestoreBusy || !canUseSupabaseBackup()) return;
   cloudDataMonitorRunning = true;
   try {
-    const liveChatChanged = await syncLiveChatRecords();
     const liveIdentityChanged = await syncLiveIdentityRecords();
+    const liveChatChanged = await syncLiveChatRecords();
     if (liveChatChanged && state.view === "chat") render();
     if (liveIdentityChanged && ["profile", "admin"].includes(state.view)) render();
     const currentFingerprint = cloudBackupFingerprint();
@@ -2823,7 +2824,7 @@ function hasUnreadChatActivity(userId, clientId) {
   return (store.notifications || []).some((item) => item.userId === userId && item.clientId === clientId && !item.read)
     || (store.chatMessages || []).some((message) =>
       message.clientId === clientId &&
-      (message.toUserId === userId || message.fromUserId === userId) &&
+      message.fromUserId !== userId &&
       !(message.readBy || []).includes(userId)
     );
 }
@@ -4838,9 +4839,11 @@ function bindGlobal() {
     let liveSaved = false;
     try {
       const body = state.chatDraft;
+      await syncLiveIdentityRecords().catch((error) => {
+        console.warn("Could not refresh accounts before sending chat.", error);
+      });
+      client = currentChatClient();
       let partner = chatPartnerFor(client);
-      if (!client) throw new Error("No client chat is selected.");
-      if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
       if (!client) throw new Error("No client chat is selected.");
       if (!partner) throw new Error("This chat needs both a coach login and a client login. Admin may need to create or unlock the missing account.");
       state.clientId = client.id;
@@ -6147,13 +6150,25 @@ function bindGlobal() {
     adminUpdateWorkout(store, state.currentUser, workoutId, { title });
     render();
   }));
-  document.querySelector("#adminInterveneButton")?.addEventListener("click", () => {
-    const body = document.querySelector("#adminIntervention").value;
-    const message = adminInterveneInChat(store, state.currentUser, state.clientId, body);
-    saveStoreLocalOnly();
-    pushLiveChatMessage(message).then((saved) => {
-      if (saved) markCurrentStoreAsCloudFresh();
-    });
+  document.querySelector("#adminInterveneButton")?.addEventListener("click", async () => {
+    let message = null;
+    try {
+      const body = document.querySelector("#adminIntervention").value;
+      message = adminInterveneInChat(store, state.currentUser, state.clientId, body);
+      const saved = await pushLiveChatMessage(message);
+      if (!saved) throw new Error(state.syncStatus || "Supabase live chat save failed.");
+      saveStoreLocalOnly();
+      markCurrentStoreAsCloudFresh();
+      state.syncStatus = "Admin message saved to live Supabase chat.";
+    } catch (error) {
+      if (message) {
+        store.chatMessages = (store.chatMessages || []).filter((item) => item.id !== message.id);
+        store.notifications = (store.notifications || []).filter((notification) => !(notification.createdAt === message.createdAt && notification.body === message.body));
+        saveStoreLocalOnly();
+      }
+      state.syncStatus = `Admin chat message could not be sent: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
     render();
   });
 }
