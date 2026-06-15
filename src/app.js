@@ -968,31 +968,55 @@ async function pushLiveIdentityRecord(collectionName, record) {
 
 async function pushLiveIdentityRecordsFor({ userIds = [], clientIds = [], coachIds = [], includeAll = false } = {}) {
   if (!canUseSupabaseBackup()) return false;
+  if (includeAll) return pushLiveIdentitySnapshots();
   const jobs = [];
-  if (includeAll) {
-    jobs.push(...(store.users || []).map((record) => pushLiveIdentityRecord("users", record)));
-    jobs.push(...(store.clients || []).map((record) => pushLiveIdentityRecord("clients", record)));
-    jobs.push(...(store.coaches || []).map((record) => pushLiveIdentityRecord("coaches", record)));
-  } else {
-    userIds.forEach((id) => {
-      const record = store.users.find((item) => item.id === id);
-      if (record) jobs.push(pushLiveIdentityRecord("users", record));
-    });
-    clientIds.forEach((id) => {
-      const record = store.clients.find((item) => item.id === id);
-      if (record) jobs.push(pushLiveIdentityRecord("clients", record));
-      const user = store.users.find((item) => item.role === "Client" && item.linkedId === id);
-      if (user) jobs.push(pushLiveIdentityRecord("users", user));
-    });
-    coachIds.forEach((id) => {
-      const record = store.coaches.find((item) => item.id === id);
-      if (record) jobs.push(pushLiveIdentityRecord("coaches", record));
-      const user = store.users.find((item) => ["Coach", "Admin"].includes(item.role) && item.linkedId === id);
-      if (user) jobs.push(pushLiveIdentityRecord("users", user));
-    });
-  }
+  userIds.forEach((id) => {
+    const record = store.users.find((item) => item.id === id);
+    if (record) jobs.push(pushLiveIdentityRecord("users", record));
+  });
+  clientIds.forEach((id) => {
+    const record = store.clients.find((item) => item.id === id);
+    if (record) jobs.push(pushLiveIdentityRecord("clients", record));
+    const user = store.users.find((item) => item.role === "Client" && item.linkedId === id);
+    if (user) jobs.push(pushLiveIdentityRecord("users", user));
+  });
+  coachIds.forEach((id) => {
+    const record = store.coaches.find((item) => item.id === id);
+    if (record) jobs.push(pushLiveIdentityRecord("coaches", record));
+    const user = store.users.find((item) => ["Coach", "Admin"].includes(item.role) && item.linkedId === id);
+    if (user) jobs.push(pushLiveIdentityRecord("users", user));
+  });
   await Promise.all(jobs);
   return Boolean(jobs.length);
+}
+
+async function pushLiveIdentitySnapshots() {
+  await Promise.all([
+    pushLiveSnapshotCollection("users"),
+    pushLiveSnapshotCollection("clients"),
+    pushLiveSnapshotCollection("coaches")
+  ]);
+  return true;
+}
+
+async function pushLiveSnapshotCollection(collectionName) {
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const snapshot = liveSnapshotDataFor(collectionName);
+  const row = {
+    backup_id: "live",
+    collection_name: collectionName,
+    record_id: `${collectionName}_snapshot`,
+    data: cleanBackupValue(snapshot)
+  };
+  try {
+    await upsertLiveSupabaseRow(projectUrl, key, "smart_coach_live_records", row, false);
+    return true;
+  } catch (error) {
+    if (!shouldFallbackToBackupTable(error.message || "")) throw error;
+    await upsertLiveBackupTableRecord(projectUrl, key, row);
+    return true;
+  }
 }
 
 function localPendingAccountRequests() {
@@ -5510,7 +5534,7 @@ function bindGlobal() {
       lastNonChatCloudBackupFingerprint = cloudBackupFingerprintWithoutChat();
       lastLiveChatFingerprint = liveChatFingerprint();
       lastCloudBackupId = result.backupId;
-      state.syncStatus = `Supabase coaching backup complete: ${result.backupId}. Live accounts/profiles were published for every device. Saved ${result.summary.users || 0} users, ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coach/admin profiles, ${result.summary.chatMessages || 0} chat messages, ${result.summary.assessments || 0} assessments, ${result.summary.dailyCheckIns || 0} daily check-ins, ${result.summary.weeklyCheckIns || 0} weekly check-ins, and ${result.summary.monthlyPlans || 0} client monthly plans. Built-in workouts, exercise library, templates, offerings, and packages stay inside the app files.`;
+      state.syncStatus = `Supabase coaching backup complete: ${result.backupId}. Live profile snapshots published ${store.users.length} users, ${store.clients.length} clients, and ${store.coaches.length} coach/admin profiles for every device. Saved ${result.summary.chatMessages || 0} chat messages, ${result.summary.assessments || 0} assessments, ${result.summary.dailyCheckIns || 0} daily check-ins, ${result.summary.weeklyCheckIns || 0} weekly check-ins, and ${result.summary.monthlyPlans || 0} client monthly plans. Built-in workouts, exercise library, templates, offerings, and packages stay inside the app files.`;
     } catch (error) {
       state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
         ? "Supabase is connected, but Row Level Security is blocking backups. In Supabase, open SQL Editor and run the Setup SQL shown in this app's Data Sync section, then click Backup to Supabase again."
