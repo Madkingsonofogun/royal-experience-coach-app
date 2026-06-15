@@ -1646,6 +1646,7 @@ function navTabs() {
 }
 
 function loginPage() {
+  const pendingRequests = localPendingAccountRequests();
   return `
     <main class="login-shell">
       <section class="login-card">
@@ -1669,6 +1670,13 @@ function loginPage() {
             <button class="ghost" id="forgotPinButton">Forgot PIN</button>
             <button class="success" id="openSignupButton">Create Account</button>
           </div>
+          ${pendingRequests.length ? `
+            <div class="alert orange">
+              <strong>${pendingRequests.length} pending account request${pendingRequests.length === 1 ? "" : "s"} saved on this device.</strong>
+              <p>Send it to Supabase so Admin can see it on another device.</p>
+              <button class="primary full" id="publishPendingAccountRequests">Send Pending Request To Supabase</button>
+            </div>
+          ` : ""}
           <p class="login-error" id="loginError"></p>
           <p class="login-success">${state.syncStatus}</p>
           <p class="login-success">${state.signupSuccess}</p>
@@ -2969,6 +2977,7 @@ function adminView() {
           <button type="button" class="danger" id="copySupabaseEraseSql">Copy Erase Supabase SQL</button>
           <button type="button" id="saveSupabaseConfig">Save Supabase Settings</button>
           <button type="button" id="testSupabaseConnection">Test Supabase Connection</button>
+          <button type="button" class="success" id="publishLiveProfiles">Publish Accounts / Profiles</button>
           <button type="button" class="success" id="restoreSupabaseData" ${state.supabaseRestoreBusy ? "disabled" : ""}>${state.supabaseRestoreBusy ? "Loading..." : "Load Latest Supabase Data"}</button>
           <button type="button" class="primary" id="backupSupabaseData" ${state.supabaseBackupBusy ? "disabled" : ""}>${state.supabaseBackupBusy ? "Backing Up..." : "Backup to Supabase"}</button>
           <button type="button" class="danger" id="resetSupabaseTable" ${state.supabaseResetBusy ? "disabled" : ""}>${state.supabaseResetBusy ? "Resetting..." : "Reset Supabase Table"}</button>
@@ -4434,6 +4443,21 @@ function bindLogin() {
     state.loginPin = "";
     render();
   });
+  document.querySelector("#publishPendingAccountRequests")?.addEventListener("click", async () => {
+    try {
+      state.syncStatus = "Sending pending account request to Supabase...";
+      render();
+      const result = await publishLocalPendingAccountRequestsToSupabase();
+      await syncLiveIdentityRecords();
+      state.syncStatus = result.saved
+        ? `Sent ${result.saved} pending account request${result.saved === 1 ? "" : "s"} to Supabase. Admin can pull it now.`
+        : "No pending account request was sent. It may already be in Supabase or Supabase settings are missing.";
+    } catch (error) {
+      state.syncStatus = `Pending account request could not be sent: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
+    render();
+  });
   document.querySelector("#forgotPinButton")?.addEventListener("click", () => {
     state.forgotPinOpen = true;
     state.forgotPinError = "";
@@ -5368,6 +5392,24 @@ function bindGlobal() {
       state.syncStatus = `Supabase connection test failed: ${error.message}`;
     }
     window.alert(state.syncStatus);
+    render();
+  });
+  document.querySelector("#publishLiveProfiles")?.addEventListener("click", async () => {
+    store.settings.supabaseUrl = normalizeSupabaseUrl(document.querySelector("#supabaseUrl")?.value || store.settings.supabaseUrl || "");
+    store.settings.supabaseAnonKey = document.querySelector("#supabaseAnonKey")?.value.trim() || store.settings.supabaseAnonKey || "";
+    store.settings.supabaseBackupTable = document.querySelector("#supabaseBackupTable")?.value.trim() || store.settings.supabaseBackupTable || "smart_coach_backups";
+    saveStoreLocalOnly();
+    state.syncStatus = "Publishing accounts and profiles to Supabase...";
+    render();
+    try {
+      await pushLiveIdentityRecordsFor({ includeAll: true });
+      await publishLocalPendingAccountRequestsToSupabase();
+      const changed = await syncLiveIdentityRecords();
+      state.syncStatus = `Published ${store.users.length} users, ${store.clients.length} clients, and ${store.coaches.length} coach/admin profiles to Supabase.${changed ? " Pulled live updates back into this device." : ""}`;
+    } catch (error) {
+      state.syncStatus = `Could not publish accounts/profiles: ${error.message}`;
+      window.alert(state.syncStatus);
+    }
     render();
   });
   document.querySelector("#restoreSupabaseData")?.addEventListener("click", async () => {
