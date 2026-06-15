@@ -399374,6 +399374,15 @@ async function syncLiveIdentityRecords() {
   for (const { storeKey, collectionName } of liveIdentityCollections()) {
     const rows = await fetchLiveSupabaseRows(projectUrl, key, collectionName);
     counts[storeKey] = rows.length;
+    if (rows.some((row) => row.snapshotSource)) {
+      const incoming = deduplicateRecords(rows.map((row) => row.data).filter(Boolean));
+      if (JSON.stringify(store[storeKey] || []) !== JSON.stringify(incoming)) {
+        store[storeKey] = incoming;
+        changed = true;
+      }
+      counts[storeKey] = incoming.length;
+      continue;
+    }
     rows.forEach((row) => {
       changed = mergeLiveRecordIntoStore(storeKey, row.data) || changed;
     });
@@ -399382,6 +399391,10 @@ async function syncLiveIdentityRecords() {
     store.users = deduplicateRecords(store.users);
     store.clients = deduplicateRecords(store.clients);
     store.coaches = deduplicateRecords(store.coaches);
+    if (state.currentUser) state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
+    if (!store.clients.some((client) => client.id === state.clientId)) {
+      state.clientId = visibleClientsForUser(store, state.currentUser || store.users[0])[0]?.id || store.clients[0]?.id || "";
+    }
     try {
       window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
     } catch (error) {
@@ -399444,7 +399457,7 @@ async function fetchFallbackLiveBackupRows(projectUrl, key, collectionName) {
   const rows = await response.json();
   const snapshot = rows[0]?.data;
   if (!Array.isArray(snapshot)) return [];
-  return snapshot.map((record) => ({ record_id: record.id, data: record, created_at: rows[0]?.created_at }));
+  return snapshot.map((record) => ({ record_id: record.id, data: record, created_at: rows[0]?.created_at, snapshotSource: true }));
 }
 
 async function pushLiveChatMessagesForClient(clientId) {
@@ -404418,10 +404431,15 @@ function bindGlobal() {
     saveAndSyncIdentity({ clientIds: [button.dataset.archiveClient] });
     render();
   }));
-  document.querySelectorAll("[data-delete-client]").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll("[data-delete-client]").forEach((button) => button.addEventListener("click", async () => {
     if (!window.confirm("Delete this client and their linked app records?")) return;
     adminDeleteClient(store, state.currentUser, button.dataset.deleteClient);
     state.clientId = store.clients[0]?.id || state.clientId;
+    await pushLiveIdentityRecordsFor({ includeAll: true }).catch((error) => {
+      console.warn("Could not publish deleted client snapshot.", error);
+      window.alert("Client was deleted on this device, but Supabase did not update. Open Admin Data Sync and back up once so other devices erase it too.");
+    });
+    saveStoreLocalOnly();
     render();
   }));
   document.querySelectorAll("[data-reset-client-pin]").forEach((button) => button.addEventListener("click", () => {
@@ -404588,9 +404606,14 @@ function bindGlobal() {
     });
     render();
   }));
-  document.querySelectorAll("[data-delete-coach]").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll("[data-delete-coach]").forEach((button) => button.addEventListener("click", async () => {
     if (!window.confirm("Delete this coach login/profile and reassign their clients?")) return;
     adminDeleteCoach(store, state.currentUser, button.dataset.deleteCoach);
+    await pushLiveIdentityRecordsFor({ includeAll: true }).catch((error) => {
+      console.warn("Could not publish deleted coach snapshot.", error);
+      window.alert("Coach was deleted on this device, but Supabase did not update. Open Admin Data Sync and back up once so other devices erase it too.");
+    });
+    saveStoreLocalOnly();
     render();
   }));
   document.querySelectorAll("[data-save-coach-emergency]").forEach((button) => button.addEventListener("click", () => {
