@@ -1022,23 +1022,17 @@ async function syncLiveIdentityRecords() {
 }
 
 async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
-  const primaryRows = await fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName, true);
-  if (primaryRows) return primaryRows;
-  const fallbackTable = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
-  try {
-    const fallbackRows = await fetchLiveSupabaseRowsFromTable(projectUrl, key, fallbackTable, collectionName, false) || [];
-    return fallbackRows;
-  } catch (error) {
-    throw error;
-  }
+  return fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName);
 }
 
-async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collectionName, allowFallback = false) {
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data&order=id.asc`;
+async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collectionName) {
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data&order=created_at.asc`;
   const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 4500);
   if (!response.ok) {
     const errorText = await response.text();
-    if (allowFallback && shouldFallbackToBackupTable(errorText)) return null;
+    if (shouldFallbackToBackupTable(errorText)) {
+      throw new Error("The live Supabase table is missing. Open Admin Data Sync, copy the updated Setup SQL, run it in Supabase SQL Editor, then try again.");
+    }
     throw new Error(errorText || `Supabase returned ${response.status}`);
   }
   return response.json();
@@ -1346,7 +1340,7 @@ async function supabaseFetchWithTimeout(url, options = {}, timeoutMs = 10000) {
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error("Supabase request timed out. Run the updated Setup SQL, then click Backup to Supabase once from the device that has the newest data.");
+      throw new Error("Supabase live-sync request timed out. Run the updated Setup SQL so smart_coach_live_records exists, then try again.");
     }
     throw error;
   } finally {
@@ -5526,6 +5520,7 @@ function bindGlobal() {
   document.querySelector("#refreshAccountRequests")?.addEventListener("click", async () => {
     try {
       const beforeIds = accountRequestIds("All");
+      await publishLocalPendingAccountRequestsToSupabase();
       const changed = await syncLiveIdentityRecords();
       const afterIds = accountRequestIds("All");
       const newCount = [...afterIds].filter((id) => !beforeIds.has(id)).length;
