@@ -803,7 +803,7 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
 }
 
 function shouldFallbackToBackupTable(errorText = "") {
-  return /42P01|PGRST205|schema cache|could not find|does not exist|smart_coach_live_records/i.test(errorText);
+  return /42P01|PGRST205|schema cache|could not find|does not exist|smart_coach_live_records|live Supabase table is missing/i.test(errorText);
 }
 
 async function upsertLiveSupabaseRow(projectUrl, key, tableName, row, allowFallback = false) {
@@ -1106,9 +1106,9 @@ async function forceReplaceIdentityFromSupabase() {
   if (!canUseSupabaseBackup()) throw new Error("Supabase settings are missing on this device.");
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
-  const users = (await fetchLiveSupabaseRows(projectUrl, key, "users")).map((row) => row.data).filter(Boolean);
-  const clients = (await fetchLiveSupabaseRows(projectUrl, key, "clients")).map((row) => row.data).filter(Boolean);
-  const coaches = (await fetchLiveSupabaseRows(projectUrl, key, "coaches")).map((row) => row.data).filter(Boolean);
+  const users = (await fetchFallbackLiveBackupRows(projectUrl, key, "users")).map((row) => row.data).filter(Boolean);
+  const clients = (await fetchFallbackLiveBackupRows(projectUrl, key, "clients")).map((row) => row.data).filter(Boolean);
+  const coaches = (await fetchFallbackLiveBackupRows(projectUrl, key, "coaches")).map((row) => row.data).filter(Boolean);
   if (!users.length && !clients.length && !coaches.length) throw new Error("No profile snapshot rows were found in Supabase.");
   if (users.length) store.users = deduplicateRecords(users);
   if (clients.length) store.clients = deduplicateRecords(clients);
