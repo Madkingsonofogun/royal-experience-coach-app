@@ -780,14 +780,21 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
   if (!canUseSupabaseBackup()) return false;
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
-  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
   const row = {
     backup_id: "live",
     collection_name: collectionName,
     record_id: backupRecordId(data, recordId),
     data: cleanBackupValue(data)
   };
+  return upsertLiveSupabaseRow(projectUrl, key, "smart_coach_live_records", row, true);
+}
+
+function shouldFallbackToBackupTable(errorText = "") {
+  return /42P01|PGRST205|schema cache|could not find|does not exist|smart_coach_live_records/i.test(errorText);
+}
+
+async function upsertLiveSupabaseRow(projectUrl, key, tableName, row, allowFallback = false) {
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
   let response = await supabaseFetchWithTimeout(`${endpoint}?on_conflict=backup_id,collection_name,record_id`, {
     method: "POST",
     headers: {
@@ -806,7 +813,14 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
       body: JSON.stringify([row])
     }, 6000);
   }
-  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    if (allowFallback && shouldFallbackToBackupTable(errorText)) {
+      const fallbackTable = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+      return upsertLiveSupabaseRow(projectUrl, key, fallbackTable, row, false);
+    }
+    throw new Error(errorText || `Supabase returned ${response.status}`);
+  }
   return true;
 }
 
@@ -844,7 +858,13 @@ async function deleteLiveChatRowsForClient(clientId) {
   if (!canUseSupabaseBackup() || !clientId) return false;
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
-  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  const deletedPrimary = await deleteLiveChatRowsForClientFromTable(projectUrl, key, "smart_coach_live_records", clientId, true);
+  if (deletedPrimary) return true;
+  const fallbackTable = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  return deleteLiveChatRowsForClientFromTable(projectUrl, key, fallbackTable, clientId, false);
+}
+
+async function deleteLiveChatRowsForClientFromTable(projectUrl, key, tableName, clientId, allowFallback = false) {
   const params = new URLSearchParams({
     backup_id: "eq.live",
     collection_name: "eq.chat_messages"
@@ -858,7 +878,11 @@ async function deleteLiveChatRowsForClient(clientId) {
       Prefer: "return=minimal"
     }
   }, 6000);
-  if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    if (allowFallback && shouldFallbackToBackupTable(errorText)) return false;
+    throw new Error(errorText || `Supabase returned ${response.status}`);
+  }
   return true;
 }
 
@@ -977,13 +1001,9 @@ async function syncLiveIdentityRecords() {
   if (!canUseSupabaseBackup() || state.supabaseRestoreBusy) return false;
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
-  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
   let changed = false;
   for (const { storeKey, collectionName } of liveIdentityCollections()) {
-    const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data&order=id.asc`;
-    const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 7000);
-    if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
-    const rows = await response.json();
+    const rows = await fetchLiveSupabaseRows(projectUrl, key, collectionName);
     rows.forEach((row) => {
       changed = mergeLiveRecordIntoStore(storeKey, row.data) || changed;
     });
@@ -999,6 +1019,36 @@ async function syncLiveIdentityRecords() {
     }
   }
   return changed;
+}
+
+async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
+  const primaryRows = await fetchLiveSupabaseRowsFromTable(projectUrl, key, "smart_coach_live_records", collectionName, true);
+  if (primaryRows?.length) return primaryRows;
+  const fallbackTable = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
+  try {
+    const fallbackRows = await fetchLiveSupabaseRowsFromTable(projectUrl, key, fallbackTable, collectionName, false) || [];
+    if (primaryRows && fallbackRows.length) {
+      fallbackRows.forEach((row) => upsertLiveSupabaseRecord(collectionName, row.record_id, row.data));
+    }
+    return fallbackRows.length ? fallbackRows : (primaryRows || []);
+  } catch (error) {
+    if (primaryRows) {
+      console.warn(`Old Supabase backup table could not provide ${collectionName}; using live table only.`, error);
+      return primaryRows;
+    }
+    throw error;
+  }
+}
+
+async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collectionName, allowFallback = false) {
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data&order=id.asc`;
+  const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 4500);
+  if (!response.ok) {
+    const errorText = await response.text();
+    if (allowFallback && shouldFallbackToBackupTable(errorText)) return null;
+    throw new Error(errorText || `Supabase returned ${response.status}`);
+  }
+  return response.json();
 }
 
 async function pushLiveChatMessagesForClient(clientId) {
@@ -1030,12 +1080,8 @@ async function syncLiveChatRecords() {
   liveChatSyncRunning = true;
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
-  const tableName = (store.settings.supabaseBackupTable || "smart_coach_backups").trim();
   try {
-    const resetEndpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.chat_resets&select=record_id,data&order=id.asc`;
-    const resetResponse = await supabaseFetchWithTimeout(resetEndpoint, { headers: supabaseHeaders(key) }, 6000);
-    if (!resetResponse.ok) throw new Error(await resetResponse.text() || `Supabase returned ${resetResponse.status}`);
-    const resetRows = await resetResponse.json();
+    const resetRows = await fetchLiveSupabaseRows(projectUrl, key, "chat_resets");
     const resets = resetRows.map((row) => row.data).filter(Boolean);
     let changed = false;
     if (resets.length) {
@@ -1052,10 +1098,7 @@ async function syncLiveChatRecords() {
       });
       changed = beforeMessages !== store.chatMessages.length || beforeNotifications !== store.notifications.length;
     }
-    const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.chat_messages&select=record_id,data&order=id.asc`;
-    const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 7000);
-    if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
-    const rows = await response.json();
+    const rows = await fetchLiveSupabaseRows(projectUrl, key, "chat_messages");
     rows.forEach((row) => {
       const message = row.data;
       if (!message?.id || !message.clientId) return;
@@ -1492,14 +1535,47 @@ on public.${safeTable} (backup_id, collection_name, record_id);
 alter table public.${safeTable} disable row level security;
 
 grant select, insert, update, delete on table public.${safeTable} to anon, authenticated;
-grant usage, select on sequence public.${safeTable}_id_seq to anon, authenticated;`;
+grant usage, select on sequence public.${safeTable}_id_seq to anon, authenticated;
+
+-- Small live-sync table for accounts, profiles, chats, requests, and records that must appear on every device right away.
+-- This prevents account requests from timing out when the larger backup table has many rows.
+create table if not exists public.smart_coach_live_records (
+  id bigint generated by default as identity primary key,
+  backup_id text not null default 'live',
+  collection_name text not null,
+  record_id text not null,
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists smart_coach_live_records_backup_id_idx on public.smart_coach_live_records (backup_id);
+create index if not exists smart_coach_live_records_collection_idx on public.smart_coach_live_records (collection_name);
+create index if not exists smart_coach_live_records_lookup_idx on public.smart_coach_live_records (backup_id, collection_name, record_id);
+
+delete from public.smart_coach_live_records a
+using public.smart_coach_live_records b
+where a.backup_id = b.backup_id
+  and a.collection_name = b.collection_name
+  and a.record_id = b.record_id
+  and a.id < b.id;
+
+create unique index if not exists smart_coach_live_records_record_unique_idx
+on public.smart_coach_live_records (backup_id, collection_name, record_id);
+
+-- Setup mode only. Tighten this before using real client data.
+alter table public.smart_coach_live_records disable row level security;
+
+grant select, insert, update, delete on table public.smart_coach_live_records to anon, authenticated;
+grant usage, select on sequence public.smart_coach_live_records_id_seq to anon, authenticated;`;
 }
 
 function supabaseEraseSql(tableName = "smart_coach_backups") {
   const safeTable = String(tableName || "smart_coach_backups").replace(/[^a-zA-Z0-9_]/g, "") || "smart_coach_backups";
   return `-- This erases the old Supabase backup rows so you can start fresh.
 -- Run this once, then return to the app and click Backup to Supabase.
-truncate table public.${safeTable} restart identity;`;
+truncate table public.${safeTable} restart identity;
+truncate table public.smart_coach_live_records restart identity;`;
 }
 
 async function copyTextToClipboard(text) {
@@ -5308,9 +5384,13 @@ function bindGlobal() {
         anonKey: store.settings.supabaseAnonKey,
         table: store.settings.supabaseBackupTable
       });
+      await pushLiveIdentityRecordsFor({ includeAll: true });
+      await Promise.all((store.chatMessages || []).map((message) => pushLiveChatMessage(message)));
       lastCloudBackupFingerprint = cloudBackupFingerprint();
+      lastNonChatCloudBackupFingerprint = cloudBackupFingerprintWithoutChat();
+      lastLiveChatFingerprint = liveChatFingerprint();
       lastCloudBackupId = result.backupId;
-      state.syncStatus = `Supabase coaching backup complete: ${result.backupId}. Saved ${result.summary.users || 0} users, ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coach/admin profiles, ${result.summary.chatMessages || 0} chat messages, ${result.summary.assessments || 0} assessments, ${result.summary.dailyCheckIns || 0} daily check-ins, ${result.summary.weeklyCheckIns || 0} weekly check-ins, and ${result.summary.monthlyPlans || 0} client monthly plans. Built-in workouts, exercise library, templates, offerings, and packages stay inside the app files.`;
+      state.syncStatus = `Supabase coaching backup complete: ${result.backupId}. Live accounts/profiles were published for every device. Saved ${result.summary.users || 0} users, ${result.summary.clients || 0} clients, ${result.summary.coaches || 0} coach/admin profiles, ${result.summary.chatMessages || 0} chat messages, ${result.summary.assessments || 0} assessments, ${result.summary.dailyCheckIns || 0} daily check-ins, ${result.summary.weeklyCheckIns || 0} weekly check-ins, and ${result.summary.monthlyPlans || 0} client monthly plans. Built-in workouts, exercise library, templates, offerings, and packages stay inside the app files.`;
     } catch (error) {
       state.syncStatus = String(error.message || "").includes("42501") || String(error.message || "").toLowerCase().includes("row-level security")
         ? "Supabase is connected, but Row Level Security is blocking backups. In Supabase, open SQL Editor and run the Setup SQL shown in this app's Data Sync section, then click Backup to Supabase again."
