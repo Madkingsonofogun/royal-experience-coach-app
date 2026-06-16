@@ -400687,7 +400687,7 @@ function progressImageCard(image) {
         <p class="muted">Uploaded by ${uploader?.name || "Unknown"} / saved ${new Date(image.createdAt || image.imageDate).toLocaleDateString()}</p>
         ${state.currentUser.role !== "Client" ? `<textarea data-progress-note="${image.id}" placeholder="Coach note">${image.coachNotes}</textarea><button data-save-progress-note="${image.id}">Save Coach Note</button>` : ""}
         ${canArchive ? `<button class="ghost" data-archive-progress-image="${image.id}">Archive Image</button>` : ""}
-        ${state.currentUser.role === "Admin" ? `<button class="danger" data-delete-progress-image="${image.id}">Delete Image</button>` : ""}
+        ${state.currentUser.role === "Admin" ? `<button class="danger" data-delete-progress-image="${image.id}">Delete Progress Image</button>` : ""}
       </div>
     </article>
   `;
@@ -403746,6 +403746,7 @@ function bindGlobal() {
       deleteProgressImage(store, state.currentUser, button.dataset.deleteProgressImage);
       await deleteLiveSupabaseRecord("progress_images", button.dataset.deleteProgressImage);
       await saveAndSyncIdentity({ includeAll: true });
+      window.alert("Progress image deleted from the app and Supabase shared records.");
     } catch (error) {
       window.alert(error.message);
     }
