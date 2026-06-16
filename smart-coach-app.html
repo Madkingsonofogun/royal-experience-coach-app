@@ -395578,7 +395578,8 @@ function getAdminAlerts(store) {
 }
 
 function coachCanSeeClient(store, coachId, clientId) {
-  return store.clients.some((client) => client.id === clientId && client.coachId === coachId);
+  const coachIds = matchingCoachIdsFor(store, coachId);
+  return store.clients.some((client) => client.id === clientId && coachIds.includes(client.coachId || client.assignedCoach));
 }
 
 function clientOwnsRecord(record, clientId) {
@@ -395976,8 +395977,26 @@ function approveRequestedUserProfile(store, adminUser, user, options) {
 function visibleClientsForUser(store, user) {
   if (!user) return [];
   if (user.role === "Admin") return store.clients;
-  if (user.role === "Coach") return store.clients.filter((client) => client.coachId === user.linkedId);
+  if (user.role === "Coach") {
+    const coachIds = matchingCoachIdsFor(store, user.linkedId || user.id);
+    return store.clients.filter((client) => coachIds.includes(client.coachId || client.assignedCoach));
+  }
   return store.clients.filter((client) => client.id === user.linkedId);
+}
+
+function matchingCoachIdsFor(store, coachIdOrUserId) {
+  const ids = new Set([coachIdOrUserId].filter(Boolean));
+  const user = store.users.find((item) => item.id === coachIdOrUserId || item.linkedId === coachIdOrUserId);
+  if (user?.linkedId) ids.add(user.linkedId);
+  const coach = store.coaches.find((item) =>
+    item.id === coachIdOrUserId
+    || item.id === user?.linkedId
+    || (user?.email && item.email && String(item.email).toLowerCase() === String(user.email).toLowerCase())
+    || (user?.phone && item.phone && String(item.phone).replace(/\D/g, "") === String(user.phone).replace(/\D/g, ""))
+    || (user?.name && item.name && String(item.name).trim().toLowerCase() === String(user.name).trim().toLowerCase())
+  );
+  if (coach?.id) ids.add(coach.id);
+  return [...ids];
 }
 
 function canUserAccessClient(store, user, clientId) {
@@ -396485,7 +396504,11 @@ function adminUpdateClient(store, adminUser, clientId, patch) {
   if (patch.planOfferingId) findById(store.planOfferings, patch.planOfferingId, "Plan offering");
   if (patch.packageId) findById(store.packages, patch.packageId, "Package");
   Object.assign(client, patch, { updatedAt: nowIso() });
-  if (patch.assignedCoach || patch.coachId) client.coachId = patch.assignedCoach || patch.coachId;
+  if (patch.assignedCoach || patch.coachId) {
+    const assignedCoachId = patch.coachId || patch.assignedCoach;
+    client.coachId = assignedCoachId;
+    client.assignedCoach = assignedCoachId;
+  }
   if (patch.package || patch.packageType) client.packageType = patch.package || patch.packageType;
   if (patch.trainingDaysPerWeek !== undefined) client.trainingDaysPerWeek = Number(patch.trainingDaysPerWeek);
   if (patch.sessionLength !== undefined) client.sessionLength = Number(patch.sessionLength);
