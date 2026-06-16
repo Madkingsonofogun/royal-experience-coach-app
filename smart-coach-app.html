@@ -398882,7 +398882,20 @@ function mergeStore(defaultStore, savedStore) {
   Object.keys(merged).forEach((key) => {
     if (Array.isArray(merged[key])) merged[key] = deduplicateRecords(merged[key]);
   });
+  reconcileLinkedProfileImagesForStore(merged);
   return merged;
+}
+
+function reconcileLinkedProfileImagesForStore(targetStore) {
+  (targetStore.users || []).forEach((user) => {
+    const linkedList = user.role === "Client" ? targetStore.clients : ["Coach", "Admin"].includes(user.role) ? targetStore.coaches : null;
+    const profile = linkedList?.find((item) => item.id === user.linkedId);
+    if (!profile) return;
+    const best = newerProfileImageFields(user, profile);
+    if (!best?.profileImageUrl) return;
+    copyProfileImageFields(user, best);
+    copyProfileImageFields(profile, best);
+  });
 }
 
 function ensureStoreListShape(targetStore = store) {
@@ -398907,6 +398920,55 @@ function deduplicateRecords(records) {
     unique.set(String(id || fallback), record);
   });
   return [...unique.values()];
+}
+
+function profileImageTimestamp(record) {
+  const value = record?.profileImageUploadedAt;
+  const time = value ? Date.parse(value) : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function newerProfileImageFields(primary, secondary) {
+  const primaryHasImage = Boolean(primary?.profileImageUrl);
+  const secondaryHasImage = Boolean(secondary?.profileImageUrl);
+  if (!primaryHasImage && secondaryHasImage) return secondary;
+  if (primaryHasImage && !secondaryHasImage) return primary;
+  if (!primaryHasImage && !secondaryHasImage) return primary || secondary || {};
+  return profileImageTimestamp(secondary) > profileImageTimestamp(primary) ? secondary : primary;
+}
+
+function copyProfileImageFields(target, source) {
+  if (!target || !source) return;
+  target.profileImageUrl = source.profileImageUrl || "";
+  target.profileImageStorageKey = source.profileImageStorageKey || "";
+  target.profileImageUploadedAt = source.profileImageUploadedAt || null;
+}
+
+function preserveLocalProfileImages(storeKey, incoming) {
+  if (!["users", "clients", "coaches"].includes(storeKey)) return incoming;
+  return incoming.map((record) => {
+    const local = (store[storeKey] || []).find((item) => item.id === record.id);
+    const best = newerProfileImageFields(record, local);
+    if (!best?.profileImageUrl || best === record) return record;
+    return {
+      ...record,
+      profileImageUrl: best.profileImageUrl,
+      profileImageStorageKey: best.profileImageStorageKey || record.profileImageStorageKey || "",
+      profileImageUploadedAt: best.profileImageUploadedAt || record.profileImageUploadedAt || null
+    };
+  });
+}
+
+function reconcileLinkedProfileImages() {
+  (store.users || []).forEach((user) => {
+    const linkedList = user.role === "Client" ? store.clients : ["Coach", "Admin"].includes(user.role) ? store.coaches : null;
+    const profile = linkedList?.find((item) => item.id === user.linkedId);
+    if (!profile) return;
+    const best = newerProfileImageFields(user, profile);
+    if (!best?.profileImageUrl) return;
+    copyProfileImageFields(user, best);
+    copyProfileImageFields(profile, best);
+  });
 }
 
 function saveStore() {
@@ -398935,11 +398997,12 @@ function markCurrentStoreAsCloudFresh() {
 function saveAndSyncIdentity({ userIds = [], clientIds = [], coachIds = [], includeAll = false, skipBackup = false } = {}) {
   if (skipBackup) saveStoreLocalOnly();
   else saveStore();
-  pushLiveIdentityRecordsFor({ userIds, clientIds, coachIds, includeAll })
+  const liveSave = pushLiveIdentityRecordsFor({ userIds, clientIds, coachIds, includeAll })
     .catch((error) => {
       state.syncStatus = `Supabase account/profile save failed: ${error.message}`;
     });
   if (!skipBackup) backupPublicChangeToCloud();
+  return liveSave;
 }
 
 function replaceStoreWith(nextStore) {
@@ -399472,7 +399535,7 @@ async function syncLiveIdentityRecords() {
     const rows = await fetchLiveSupabaseRows(projectUrl, key, collectionName);
     counts[storeKey] = rows.length;
     if (rows.some((row) => row.snapshotSource)) {
-      const incoming = deduplicateRecords(rows.map((row) => row.data).filter(Boolean));
+      const incoming = preserveLocalProfileImages(storeKey, deduplicateRecords(rows.map((row) => row.data).filter(Boolean)));
       if (JSON.stringify(store[storeKey] || []) !== JSON.stringify(incoming)) {
         store[storeKey] = incoming;
         changed = true;
@@ -399488,6 +399551,7 @@ async function syncLiveIdentityRecords() {
     store.users = deduplicateRecords(store.users);
     store.clients = deduplicateRecords(store.clients);
     store.coaches = deduplicateRecords(store.coaches);
+    reconcileLinkedProfileImages();
     if (state.currentUser) state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
     if (!store.clients.some((client) => client.id === state.clientId)) {
       state.clientId = visibleClientsForUser(store, state.currentUser || store.users[0])[0]?.id || store.clients[0]?.id || "";
@@ -399510,9 +399574,10 @@ async function forceReplaceIdentityFromSupabase() {
   const clients = (await fetchFallbackLiveBackupRows(projectUrl, key, "clients")).map((row) => row.data).filter(Boolean);
   const coaches = (await fetchFallbackLiveBackupRows(projectUrl, key, "coaches")).map((row) => row.data).filter(Boolean);
   if (!users.length && !clients.length && !coaches.length) throw new Error("No profile snapshot rows were found in Supabase.");
-  if (users.length) store.users = deduplicateRecords(users);
-  if (clients.length) store.clients = deduplicateRecords(clients);
-  if (coaches.length) store.coaches = deduplicateRecords(coaches);
+  if (users.length) store.users = preserveLocalProfileImages("users", deduplicateRecords(users));
+  if (clients.length) store.clients = preserveLocalProfileImages("clients", deduplicateRecords(clients));
+  if (coaches.length) store.coaches = preserveLocalProfileImages("coaches", deduplicateRecords(coaches));
+  reconcileLinkedProfileImages();
   if (state.currentUser) state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
   if (!store.clients.some((client) => client.id === state.clientId)) {
     state.clientId = visibleClientsForUser(store, state.currentUser || store.users[0])[0]?.id || store.clients[0]?.id || "";
@@ -403590,7 +403655,7 @@ function bindGlobal() {
     try {
       const imageFile = await readImageFileAsDataUrl(file);
       uploadProfileImage(store, state.currentUser, targetUser.id, imageFile);
-      saveAndSyncIdentity({
+      await saveAndSyncIdentity({
         userIds: [targetUser.id],
         clientIds: targetUser.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
         coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : [],
@@ -403601,12 +403666,12 @@ function bindGlobal() {
       window.alert(error.message);
     }
   });
-  document.querySelector("#removeProfileImageButton")?.addEventListener("click", () => {
+  document.querySelector("#removeProfileImageButton")?.addEventListener("click", async () => {
     const targetUser = ["Coach", "Admin"].includes(state.currentUser.role) && state.view === "profile" ? state.currentUser : userForProfile(selectedClient());
     if (!targetUser) return;
     try {
       removeProfileImage(store, state.currentUser, targetUser.id);
-      saveAndSyncIdentity({
+      await saveAndSyncIdentity({
         userIds: [targetUser.id],
         clientIds: targetUser.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
         coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : [],
@@ -403627,7 +403692,7 @@ function bindGlobal() {
       const imageFile = await readImageFileAsDataUrl(file);
       uploadProgressImage(store, state.currentUser, state.clientId, { ...state.progressDraft, file: imageFile });
       state.progressDraft.clientNotes = "";
-      saveAndSyncIdentity({ includeAll: true });
+      await saveAndSyncIdentity({ includeAll: true });
       render();
     } catch (error) {
       window.alert(error.message);
@@ -403651,7 +403716,7 @@ function bindGlobal() {
       const targetUser = store.users.find((user) => user.id === button.dataset.adminUploadProfile);
       const imageFile = await readImageFileAsDataUrl(file);
       uploadProfileImage(store, state.currentUser, button.dataset.adminUploadProfile, imageFile);
-      saveAndSyncIdentity({
+      await saveAndSyncIdentity({
         userIds: [button.dataset.adminUploadProfile],
         clientIds: targetUser?.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
         coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : [],
@@ -403662,11 +403727,11 @@ function bindGlobal() {
       window.alert(error.message);
     }
   }));
-  document.querySelectorAll("[data-admin-remove-profile]").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll("[data-admin-remove-profile]").forEach((button) => button.addEventListener("click", async () => {
     try {
       const targetUser = store.users.find((user) => user.id === button.dataset.adminRemoveProfile);
       removeProfileImage(store, state.currentUser, button.dataset.adminRemoveProfile);
-      saveAndSyncIdentity({
+      await saveAndSyncIdentity({
         userIds: [button.dataset.adminRemoveProfile],
         clientIds: targetUser?.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
         coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : [],
