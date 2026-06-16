@@ -101,7 +101,8 @@ const LIVE_SNAPSHOT_IDS = {
   clients: 900000002,
   coaches: 900000003,
   chat_messages: 900000004,
-  chat_resets: 900000005
+  chat_resets: 900000005,
+  progress_images: 900000006
 };
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
@@ -639,7 +640,31 @@ function importAppDataFile(file) {
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, dataUrl: reader.result });
+    reader.onload = () => {
+      const originalDataUrl = reader.result;
+      if (typeof Image === "undefined" || typeof document === "undefined") {
+        resolve({ name: file.name, type: file.type, size: file.size, dataUrl: originalDataUrl });
+        return;
+      }
+      const image = new Image();
+      image.onload = () => {
+        const maxSide = 900;
+        const scale = Math.min(1, maxSide / Math.max(image.width || maxSide, image.height || maxSide));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((image.width || maxSide) * scale));
+        canvas.height = Math.max(1, Math.round((image.height || maxSide) * scale));
+        const context = canvas.getContext("2d");
+        if (!context) {
+          resolve({ name: file.name, type: file.type, size: file.size, dataUrl: originalDataUrl });
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        resolve({ name: file.name.replace(/\.[^.]+$/, ".jpg"), type: "image/jpeg", size: dataUrl.length, dataUrl });
+      };
+      image.onerror = () => resolve({ name: file.name, type: file.type, size: file.size, dataUrl: originalDataUrl });
+      image.src = String(originalDataUrl);
+    };
     reader.onerror = () => reject(new Error("Image could not be loaded. Try a smaller jpg, png, or webp file."));
     reader.readAsDataURL(file);
   });
@@ -878,7 +903,8 @@ function liveSnapshotDataFor(collectionName, latestRecord = null) {
     clients: "clients",
     coaches: "coaches",
     chat_messages: "chatMessages",
-    chat_resets: "chatResets"
+    chat_resets: "chatResets",
+    progress_images: "progressImages"
   };
   const storeKey = map[collectionName];
   const records = Array.isArray(store[storeKey]) ? [...store[storeKey]] : [];
@@ -961,7 +987,8 @@ function liveIdentityCollections() {
   return [
     { storeKey: "users", collectionName: "users" },
     { storeKey: "clients", collectionName: "clients" },
-    { storeKey: "coaches", collectionName: "coaches" }
+    { storeKey: "coaches", collectionName: "coaches" },
+    { storeKey: "progressImages", collectionName: "progress_images" }
   ];
 }
 
@@ -1004,7 +1031,8 @@ async function pushLiveIdentitySnapshots() {
   await Promise.all([
     pushLiveSnapshotCollection("users"),
     pushLiveSnapshotCollection("clients"),
-    pushLiveSnapshotCollection("coaches")
+    pushLiveSnapshotCollection("coaches"),
+    pushLiveSnapshotCollection("progress_images")
   ]);
   return true;
 }
@@ -5191,7 +5219,8 @@ function bindGlobal() {
       saveAndSyncIdentity({
         userIds: [targetUser.id],
         clientIds: targetUser.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
-        coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : []
+        coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : [],
+        includeAll: true
       });
       render();
     } catch (error) {
@@ -5206,7 +5235,8 @@ function bindGlobal() {
       saveAndSyncIdentity({
         userIds: [targetUser.id],
         clientIds: targetUser.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
-        coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : []
+        coachIds: ["Coach", "Admin"].includes(targetUser.role) && targetUser.linkedId ? [targetUser.linkedId] : [],
+        includeAll: true
       });
       render();
     } catch (error) {
@@ -5223,7 +5253,7 @@ function bindGlobal() {
       const imageFile = await readImageFileAsDataUrl(file);
       uploadProgressImage(store, state.currentUser, state.clientId, { ...state.progressDraft, file: imageFile });
       state.progressDraft.clientNotes = "";
-      saveStore();
+      saveAndSyncIdentity({ includeAll: true });
       render();
     } catch (error) {
       window.alert(error.message);
@@ -5250,7 +5280,8 @@ function bindGlobal() {
       saveAndSyncIdentity({
         userIds: [button.dataset.adminUploadProfile],
         clientIds: targetUser?.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
-        coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : []
+        coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : [],
+        includeAll: true
       });
       render();
     } catch (error) {
@@ -5264,7 +5295,8 @@ function bindGlobal() {
       saveAndSyncIdentity({
         userIds: [button.dataset.adminRemoveProfile],
         clientIds: targetUser?.role === "Client" && targetUser.linkedId ? [targetUser.linkedId] : [],
-        coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : []
+        coachIds: ["Coach", "Admin"].includes(targetUser?.role) && targetUser?.linkedId ? [targetUser.linkedId] : [],
+        includeAll: true
       });
       render();
     } catch (error) {
