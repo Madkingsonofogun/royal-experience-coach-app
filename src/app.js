@@ -27,6 +27,7 @@ import {
   adminDeletePackage,
   adminDeletePlanOffering,
   adminDeleteWorkoutTemplate,
+  deleteProgressImage,
   adminUpdateCoach,
   adminAssignWorkoutTemplateToClientPlan,
   addProgressImageCoachNote,
@@ -1037,6 +1038,27 @@ async function deleteLiveChatRowsForClientFromTable(projectUrl, key, tableName, 
     throw new Error(errorText || `Supabase returned ${response.status}`);
   }
   return true;
+}
+
+async function deleteLiveSupabaseRecord(collectionName, recordId) {
+  if (!canUseSupabaseBackup() || !recordId) return false;
+  const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
+  const key = String(store.settings.supabaseAnonKey || "").trim();
+  const cleanRecordId = String(recordId).replace(/[^A-Za-z0-9_-]/g, "_");
+  const endpoint = `${projectUrl}/rest/v1/smart_coach_live_records?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&record_id=eq.${encodeURIComponent(cleanRecordId)}`;
+  try {
+    const response = await supabaseFetchWithTimeout(endpoint, {
+      method: "DELETE",
+      headers: {
+        ...supabaseHeaders(key),
+        Prefer: "return=minimal"
+      }
+    }, 4500);
+    return response.ok;
+  } catch (error) {
+    console.warn(`Could not delete live ${collectionName} record.`, error);
+    return false;
+  }
 }
 
 function chatResetTimeForClient(resets, clientId) {
@@ -2309,6 +2331,7 @@ function progressImageCard(image) {
         <p class="muted">Uploaded by ${uploader?.name || "Unknown"} / saved ${new Date(image.createdAt || image.imageDate).toLocaleDateString()}</p>
         ${state.currentUser.role !== "Client" ? `<textarea data-progress-note="${image.id}" placeholder="Coach note">${image.coachNotes}</textarea><button data-save-progress-note="${image.id}">Save Coach Note</button>` : ""}
         ${canArchive ? `<button class="ghost" data-archive-progress-image="${image.id}">Archive Image</button>` : ""}
+        ${state.currentUser.role === "Admin" ? `<button class="danger" data-delete-progress-image="${image.id}">Delete Image</button>` : ""}
       </div>
     </article>
   `;
@@ -5355,9 +5378,21 @@ function bindGlobal() {
     saveStore();
     render();
   }));
-  document.querySelectorAll("[data-archive-progress-image]").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll("[data-archive-progress-image]").forEach((button) => button.addEventListener("click", async () => {
     archiveProgressImage(store, state.currentUser, button.dataset.archiveProgressImage);
-    saveStore();
+    await deleteLiveSupabaseRecord("progress_images", button.dataset.archiveProgressImage);
+    await saveAndSyncIdentity({ includeAll: true });
+    render();
+  }));
+  document.querySelectorAll("[data-delete-progress-image]").forEach((button) => button.addEventListener("click", async () => {
+    if (!window.confirm("Permanently delete this progress image from this client and Supabase?")) return;
+    try {
+      deleteProgressImage(store, state.currentUser, button.dataset.deleteProgressImage);
+      await deleteLiveSupabaseRecord("progress_images", button.dataset.deleteProgressImage);
+      await saveAndSyncIdentity({ includeAll: true });
+    } catch (error) {
+      window.alert(error.message);
+    }
     render();
   }));
   document.querySelectorAll("[data-admin-upload-profile]").forEach((button) => button.addEventListener("click", async () => {

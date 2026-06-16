@@ -2756,6 +2756,14 @@ export function archiveProgressImage(store, actorUser, imageId) {
   return image;
 }
 
+export function deleteProgressImage(store, actorUser, imageId) {
+  const image = findById(store.progressImages, imageId, "Progress image");
+  if (actorUser.role !== "Admin") throw new Error("Only Admin can permanently delete progress images.");
+  store.progressImages = store.progressImages.filter((item) => item.id !== imageId);
+  auditImageAction(store, actorUser, `Admin deleted progress image for ${image.clientId}`);
+  return image;
+}
+
 function canManageProfileImage(store, actorUser, targetUser) {
   if (!actorUser || !targetUser) return false;
   if (actorUser.role === "Admin") return true;
