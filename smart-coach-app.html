@@ -395108,7 +395108,9 @@ function filterExerciseLibrary(exercises, filters = {}) {
 
 function saveAssessment(store, input) {
   const summary = summarizeAssessment(input);
-  store.assessments.push(summary);
+  const existingIndex = store.assessments.findIndex((assessment) => assessment.assessmentId === summary.assessmentId);
+  if (existingIndex >= 0) store.assessments[existingIndex] = summary;
+  else store.assessments.push(summary);
   const client = store.clients.find((item) => item.id === summary.clientId);
   if (client) {
     client.currentTrainingLevel = summary.trainingLevel;
@@ -400579,6 +400581,7 @@ function profilePage() {
       </div>
       <div class="split">
         ${clientProgramSummaryPanel(client)}
+        ${clientAssessmentHistoryPanel(client)}
         ${clientSafetyInfoPanel(client)}
         ${state.currentUser.role !== "Client" ? `<article class="card"><h3>Assigned coach emergency contact</h3><p>${assignedCoach?.emergencyContact || "No coach emergency contact saved."}</p></article>` : ""}
         <article class="card"><h3>Equipment available</h3>${chipSection("Available", client.equipmentAvailable)}</article>
@@ -400587,6 +400590,49 @@ function profilePage() {
       </div>
       ${progressImagePanel(client, progressImages)}
     </section>
+  `;
+}
+
+function clientAssessmentHistoryPanel(client) {
+  const assessments = store.assessments
+    .filter((assessment) => assessment.clientId === client.id)
+    .sort((a, b) => String(b.assessmentDate || "").localeCompare(String(a.assessmentDate || "")));
+  const latest = assessments[0];
+  return `
+    <article class="card">
+      <div class="section-head">
+        <div>
+          <h3>Assessment History</h3>
+          <p class="muted">${latest ? "Latest saved assessment is used for workout suggestions." : "No saved assessment yet."}</p>
+        </div>
+        ${latest ? `<span class="badge ${latest.riskLevel === "High" ? "red" : latest.riskLevel === "Medium" ? "orange" : "green"}">${escapeHtml(latest.riskLevel || "Risk")}</span>` : ""}
+      </div>
+      ${latest ? `
+        <div class="detail-grid">
+          <p><strong>Date:</strong> ${escapeHtml(latest.assessmentDate || "Not saved")}</p>
+          <p><strong>Type:</strong> ${escapeHtml(latest.assessmentType || "Assessment")}</p>
+          <p><strong>Average score:</strong> ${escapeHtml(latest.averageCapabilityScore ?? "Not scored")}</p>
+          <p><strong>Lowest score:</strong> ${escapeHtml(latest.lowestCapabilityScore ?? "Not scored")}</p>
+          <p><strong>Training level:</strong> ${escapeHtml(latest.trainingLevel || latest.recommendedTrainingLevel || "Not set")}</p>
+          <p><strong>Workout permission:</strong> ${escapeHtml(latest.workoutPermission || "Not set")}</p>
+        </div>
+        ${chipSection("Restrictions", latest.restrictions || [])}
+        <p class="muted">${escapeHtml(latest.summaryText || latest.recommendedNextStep || "")}</p>
+      ` : `<div class="empty">When the coach saves an assessment, it will appear here on the client profile.</div>`}
+      ${assessments.length > 1 ? `
+        <details>
+          <summary>View older assessments (${assessments.length - 1})</summary>
+          <div class="card-list compact-plan-list">
+            ${assessments.slice(1).map((assessment) => `
+              <div class="admin-row">
+                <span>${escapeHtml(assessment.assessmentDate || "")} / ${escapeHtml(assessment.assessmentType || "Assessment")} / ${escapeHtml(assessment.trainingLevel || assessment.recommendedTrainingLevel || "")}</span>
+                <span class="badge ${assessment.riskLevel === "High" ? "red" : assessment.riskLevel === "Medium" ? "orange" : "green"}">${escapeHtml(assessment.riskLevel || "Risk")}</span>
+              </div>
+            `).join("")}
+          </div>
+        </details>
+      ` : ""}
+    </article>
   `;
 }
 
@@ -403398,12 +403444,18 @@ function bindGlobal() {
     state.view = "exerciseDetail";
     render();
   }));
-  document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", async () => {
-    ensureMonthlyPlanHasWorkouts(store, button.dataset.approvePlan, latestClientAssessment(state.clientId));
+  document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", () => {
+    const draftPlan = store.monthlyPlans.find((plan) => plan.id === button.dataset.approvePlan);
+    const assessment = latestClientAssessment(draftPlan?.clientId || state.clientId);
+    ensureMonthlyPlanHasWorkouts(store, button.dataset.approvePlan, assessment);
     const plan = approveMonthlyPlan(store, button.dataset.approvePlan);
-    await saveAndSyncIdentity({ clientIds: [plan.clientId], includeAll: true });
+    saveStore();
     state.planDraftNotice = `${plan.month} ${plan.trainingLevel} plan approved. The client can now open Monthly Plan and see the full month of workouts.`;
     render();
+    saveAndSyncIdentity({ clientIds: [plan.clientId], includeAll: true }).catch((error) => {
+      state.syncStatus = `Plan approved locally, but Supabase sync failed: ${error.message}`;
+      render();
+    });
   }));
   document.querySelectorAll("[data-add-suggested-exercise]").forEach((button) => button.addEventListener("click", () => {
     addSuggestedExerciseToWorkout(button.dataset.addSuggestedExercise);
@@ -403564,20 +403616,28 @@ function bindGlobal() {
     state.planDraftNotice = `Assessment saved for ${selectedClient().name}. Coach can generate a draft monthly plan from the summary suggestion.`;
     state.assessmentStep = 5;
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
-    saveAndSyncIdentity({ clientIds: [saved.clientId], includeAll: true });
+    saveStore();
+    saveAndSyncIdentity({ clientIds: [saved.clientId], includeAll: true }).catch((error) => {
+      state.syncStatus = `Assessment saved locally, but Supabase sync failed: ${error.message}`;
+      render();
+    });
     render();
   });
-  document.querySelector("#generateAssessmentPlan")?.addEventListener("click", async () => {
+  document.querySelector("#generateAssessmentPlan")?.addEventListener("click", () => {
     const saved = saveAssessment(store, state.assessment);
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
     const currentPlan = getClientVisiblePlan(store, saved.clientId);
     const result = createReassessmentDraftIfNeeded(store, saved, currentPlan, true);
-    await saveAndSyncIdentity({ clientIds: [saved.clientId], includeAll: true });
+    saveStore();
     state.planDraftNotice = result.draftPlan
       ? `Draft ${result.draftPlan.trainingLevel} monthly plan created from the assessment. Review it, then approve it before the client can see it.`
       : `The assessment did not require a new draft plan. You can still manually edit or generate a plan from Admin controls.`;
     state.view = "plan";
     render();
+    saveAndSyncIdentity({ clientIds: [saved.clientId], includeAll: true }).catch((error) => {
+      state.syncStatus = `Assessment plan saved locally, but Supabase sync failed: ${error.message}`;
+      render();
+    });
   });
   document.querySelector("#saveWeekly")?.addEventListener("click", () => {
     state.weekly.workoutCompletionPercent = Number(document.querySelector("#weeklyCompletion").value);

@@ -441,7 +441,9 @@ export function filterExerciseLibrary(exercises, filters = {}) {
 
 export function saveAssessment(store, input) {
   const summary = summarizeAssessment(input);
-  store.assessments.push(summary);
+  const existingIndex = store.assessments.findIndex((assessment) => assessment.assessmentId === summary.assessmentId);
+  if (existingIndex >= 0) store.assessments[existingIndex] = summary;
+  else store.assessments.push(summary);
   const client = store.clients.find((item) => item.id === summary.clientId);
   if (client) {
     client.currentTrainingLevel = summary.trainingLevel;
