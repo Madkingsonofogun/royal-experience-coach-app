@@ -367,8 +367,23 @@ th {
 
 .progress-gallery {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   margin-top: 14px;
+}
+
+.progress-date-group {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffdf7;
+}
+
+.progress-date-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
 }
 
 .progress-image-card {
@@ -388,6 +403,12 @@ th {
   border-radius: 8px;
   overflow: hidden;
   background: var(--green-soft);
+}
+
+.progress-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .mini-progress-row {
@@ -400513,10 +400534,12 @@ function profileImagePanel(profileUser, client) {
 }
 
 function progressImagePanel(client, images) {
+  const sortedImages = [...images].sort((a, b) => String(b.imageDate || b.createdAt || "").localeCompare(String(a.imageDate || a.createdAt || "")));
   return `
     <section class="card progress-panel">
       <div class="section-head">
-        <div><p class="eyebrow">Progress photos</p><h2>Private progress gallery</h2><p class="muted">Only the client, assigned coach, and Admin can view these images.</p></div>
+        <div><p class="eyebrow">Progress photos</p><h2>Private dated gallery</h2><p class="muted">Saved photos are grouped by date for the client, assigned coach, and Admin.</p></div>
+        <span class="badge purple">${sortedImages.length} saved</span>
       </div>
       ${canUserAccessClient(store, state.currentUser, client.id) ? `
         <div class="form-grid">
@@ -400528,23 +400551,46 @@ function progressImagePanel(client, images) {
         <button class="success" id="uploadProgressImageButton">Upload Progress Photo</button>
       ` : ""}
       <div class="progress-gallery">
-        ${images.map(progressImageCard).join("") || `<div class="empty">No progress photos yet.</div>`}
+        ${progressImageDateGallery(sortedImages)}
       </div>
     </section>
   `;
 }
 
+function progressImageDateGallery(images) {
+  if (!images.length) return `<div class="empty">No progress photos yet.</div>`;
+  const groups = images.reduce((grouped, image) => {
+    const date = image.imageDate || image.createdAt?.slice(0, 10) || "No date";
+    grouped[date] ||= [];
+    grouped[date].push(image);
+    return grouped;
+  }, {});
+  return Object.entries(groups).map(([date, datedImages]) => `
+    <section class="progress-date-group">
+      <div class="section-head compact">
+        <h3>${date}</h3>
+        <span class="badge green">${datedImages.length} photo${datedImages.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="progress-date-grid">
+        ${datedImages.map(progressImageCard).join("")}
+      </div>
+    </section>
+  `).join("");
+}
+
 function progressImageCard(image) {
   const uploader = store.users.find((user) => user.id === image.uploadedByUserId);
+  const client = store.clients.find((item) => item.id === image.clientId);
   const canArchive = state.currentUser.role === "Admin" || (state.currentUser.role === "Client" && state.currentUser.id === image.uploadedByUserId && store.settings.allowClientProgressImageDelete);
   return `
     <article class="progress-image-card">
       <div class="progress-image-thumb">${image.imageUrl ? `<img src="${image.imageUrl}" alt="${image.imageCategory} progress photo" />` : avatar("", image.imageCategory)}</div>
       <div>
         <div class="section-head compact"><h4>${image.imageCategory}</h4><span class="badge green">${image.imageDate}</span></div>
+        ${state.currentUser.role === "Admin" ? `<p class="muted">Client: ${client?.name || image.clientId}</p>` : ""}
         <p>${image.clientNotes || "No client notes."}</p>
         ${image.coachNotes && (state.currentUser.role !== "Client" || image.coachNotesVisibleToClient) ? `<p><strong>Coach note:</strong> ${image.coachNotes}</p>` : ""}
-        <p class="muted">Uploaded by ${uploader?.name || "Unknown"} / storage key: ${image.imageStorageKey}</p>
+        <p class="muted">Uploaded by ${uploader?.name || "Unknown"} / saved ${new Date(image.createdAt || image.imageDate).toLocaleDateString()}</p>
         ${state.currentUser.role !== "Client" ? `<textarea data-progress-note="${image.id}" placeholder="Coach note">${image.coachNotes}</textarea><button data-save-progress-note="${image.id}">Save Coach Note</button>` : ""}
         ${canArchive ? `<button class="ghost" data-archive-progress-image="${image.id}">Archive Image</button>` : ""}
       </div>
