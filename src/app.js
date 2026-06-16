@@ -5501,10 +5501,12 @@ function bindGlobal() {
   });
   document.querySelectorAll("[data-nutrition-profile]").forEach((field) => {
     const updateNutritionProfile = () => {
+      if (field.id === "nutritionAllergy") state.nutritionDemo.manualAllergyChoice = true;
       state.nutritionDemo = { ...state.nutritionDemo, ...collectNutritionDemoOptions(), generatedPlan: null };
       render();
     };
     const cacheNutritionProfile = () => {
+      if (field.id === "nutritionAllergy") state.nutritionDemo.manualAllergyChoice = true;
       state.nutritionDemo = { ...state.nutritionDemo, ...collectNutritionDemoOptions(), generatedPlan: null };
     };
     field.addEventListener("change", updateNutritionProfile);
@@ -6990,6 +6992,7 @@ function nutritionDemoPanel(options = {}) {
   const visibleClients = visibleClientsForUser(store, state.currentUser);
   const clientNutritionProfile = nutritionProfileFromSelectedClient();
   const nutritionForm = { ...demo, ...clientNutritionProfile };
+  if (demo.manualAllergyChoice) nutritionForm.allergy = demo.allergy;
   const targetSummary = calculateNutritionTargets(nutritionForm);
   return `
     <article class="card admin-card ${standalone ? "" : adminPanelClass("nutritionDemo")}" id="admin-nutrition-demo">
