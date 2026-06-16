@@ -4899,10 +4899,10 @@ function bindGlobal() {
     state.view = "exerciseDetail";
     render();
   }));
-  document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", () => {
+  document.querySelectorAll("[data-approve-plan]").forEach((button) => button.addEventListener("click", async () => {
     ensureMonthlyPlanHasWorkouts(store, button.dataset.approvePlan, latestClientAssessment(state.clientId));
     const plan = approveMonthlyPlan(store, button.dataset.approvePlan);
-    saveStore();
+    await saveAndSyncIdentity({ clientIds: [plan.clientId], includeAll: true });
     state.planDraftNotice = `${plan.month} ${plan.trainingLevel} plan approved. The client can now open Monthly Plan and see the full month of workouts.`;
     render();
   }));
@@ -5065,13 +5065,15 @@ function bindGlobal() {
     state.planDraftNotice = `Assessment saved for ${selectedClient().name}. Coach can generate a draft monthly plan from the summary suggestion.`;
     state.assessmentStep = 5;
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
+    saveAndSyncIdentity({ clientIds: [saved.clientId], includeAll: true });
     render();
   });
-  document.querySelector("#generateAssessmentPlan")?.addEventListener("click", () => {
+  document.querySelector("#generateAssessmentPlan")?.addEventListener("click", async () => {
     const saved = saveAssessment(store, state.assessment);
     state.assessment = { ...state.assessment, assessmentId: saved.assessmentId };
     const currentPlan = getClientVisiblePlan(store, saved.clientId);
     const result = createReassessmentDraftIfNeeded(store, saved, currentPlan, true);
+    await saveAndSyncIdentity({ clientIds: [saved.clientId], includeAll: true });
     state.planDraftNotice = result.draftPlan
       ? `Draft ${result.draftPlan.trainingLevel} monthly plan created from the assessment. Review it, then approve it before the client can see it.`
       : `The assessment did not require a new draft plan. You can still manually edit or generate a plan from Admin controls.`;
