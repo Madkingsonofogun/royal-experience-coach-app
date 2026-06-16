@@ -398459,7 +398459,11 @@ const LIVE_SNAPSHOT_IDS = {
   coaches: 900000003,
   chat_messages: 900000004,
   chat_resets: 900000005,
-  progress_images: 900000006
+  progress_images: 900000006,
+  monthly_plans: 900000007,
+  monthly_plan_items: 900000008,
+  meal_plans: 900000009,
+  today_workout_adjustments: 900000010
 };
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
@@ -399324,7 +399328,11 @@ function liveSnapshotDataFor(collectionName, latestRecord = null) {
     coaches: "coaches",
     chat_messages: "chatMessages",
     chat_resets: "chatResets",
-    progress_images: "progressImages"
+    progress_images: "progressImages",
+    monthly_plans: "monthlyPlans",
+    monthly_plan_items: "monthlyPlanItems",
+    meal_plans: "mealPlans",
+    today_workout_adjustments: "todayWorkoutAdjustments"
   };
   const storeKey = map[collectionName];
   const records = Array.isArray(store[storeKey]) ? [...store[storeKey]] : [];
@@ -399429,7 +399437,11 @@ function liveIdentityCollections() {
     { storeKey: "users", collectionName: "users" },
     { storeKey: "clients", collectionName: "clients" },
     { storeKey: "coaches", collectionName: "coaches" },
-    { storeKey: "progressImages", collectionName: "progress_images" }
+    { storeKey: "progressImages", collectionName: "progress_images" },
+    { storeKey: "monthlyPlans", collectionName: "monthly_plans" },
+    { storeKey: "monthlyPlanItems", collectionName: "monthly_plan_items" },
+    { storeKey: "mealPlans", collectionName: "meal_plans" },
+    { storeKey: "todayWorkoutAdjustments", collectionName: "today_workout_adjustments" }
   ];
 }
 
@@ -399473,7 +399485,11 @@ async function pushLiveIdentitySnapshots() {
     pushLiveSnapshotCollection("users"),
     pushLiveSnapshotCollection("clients"),
     pushLiveSnapshotCollection("coaches"),
-    pushLiveSnapshotCollection("progress_images")
+    pushLiveSnapshotCollection("progress_images"),
+    pushLiveSnapshotCollection("monthly_plans"),
+    pushLiveSnapshotCollection("monthly_plan_items"),
+    pushLiveSnapshotCollection("meal_plans"),
+    pushLiveSnapshotCollection("today_workout_adjustments")
   ]);
   return true;
 }
@@ -399635,7 +399651,12 @@ async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collec
     }
     throw new Error(errorText || `Supabase returned ${response.status}`);
   }
-  return response.json();
+  const rows = await response.json();
+  const snapshotRow = rows.find((row) => Array.isArray(row.data));
+  if (snapshotRow) {
+    return snapshotRow.data.map((record) => ({ record_id: record.id, data: record, created_at: snapshotRow.created_at, snapshotSource: true }));
+  }
+  return rows;
 }
 
 async function fetchFallbackLiveBackupRows(projectUrl, key, collectionName) {
@@ -403873,7 +403894,7 @@ function bindGlobal() {
     state.nutritionAssignNotice = "";
     render();
   });
-  document.querySelector("#assignNutritionPlan")?.addEventListener("click", () => {
+  document.querySelector("#assignNutritionPlan")?.addEventListener("click", async () => {
     state.editModal = null;
     state.editModalDirty = false;
     state.nutritionDemo.dayModalOpen = false;
@@ -403882,7 +403903,7 @@ function bindGlobal() {
     store.settings.nutritionDemoMode = "Active";
     try {
       ensureStoreListShape(store);
-      const assigned = assignGeneratedMealPlanToClient(document.querySelector("#nutritionAssignClient")?.value || state.clientId);
+      const assigned = await assignGeneratedMealPlanToClient(document.querySelector("#nutritionAssignClient")?.value || state.clientId);
       if (!assigned) window.alert(state.nutritionAssignNotice || "Choose a client before assigning a meal plan.");
     } catch (error) {
       console.error("Meal plan assignment failed.", error);
@@ -404502,7 +404523,7 @@ function bindGlobal() {
     window.alert(`Temporary PIN for ${user.name}: ${reset.temporaryPin}`);
     render();
   });
-  document.querySelector("#saveClientModal")?.addEventListener("click", (event) => {
+  document.querySelector("#saveClientModal")?.addEventListener("click", async (event) => {
     try {
       const clientId = event.currentTarget.dataset.clientId;
       const patch = collectEditFields("client");
@@ -404533,7 +404554,7 @@ function bindGlobal() {
         patch.assignedWorkoutTemplateName = selectedTemplate?.workoutName || "";
       }
       adminUpdateClient(store, state.currentUser, clientId, patch);
-      saveAndSyncIdentity({ clientIds: [clientId] });
+      await saveAndSyncIdentity({ clientIds: [clientId], includeAll: true });
       changeSelectedClient(clientId, false);
       window.alert("Client changes saved.");
       state.editModal = null;
@@ -404674,7 +404695,7 @@ function bindGlobal() {
     saveAndSyncIdentity({ clientIds: [event.currentTarget.dataset.clientId] });
     render();
   });
-  document.querySelector("#clientModalGenerateDraft")?.addEventListener("click", (event) => {
+  document.querySelector("#clientModalGenerateDraft")?.addEventListener("click", async (event) => {
     const planOfferingId = document.querySelector("#clientModalPlanOfferingForDraft")?.value;
     const workoutTemplateId = document.querySelector("#clientModalWorkoutTemplate")?.value;
     if (!planOfferingId) return window.alert("Choose a plan offering first.");
@@ -404687,24 +404708,25 @@ function bindGlobal() {
         assignedWorkoutTemplateName: template?.workoutName || ""
       });
     }
-    saveAndSyncIdentity({ clientIds: [event.currentTarget.dataset.clientId] });
+    await saveAndSyncIdentity({ clientIds: [event.currentTarget.dataset.clientId], includeAll: true });
     store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Generated new Draft monthly plan ${draft.id} from Edit Client popup`, createdAt: new Date().toISOString() });
     window.alert("New Draft monthly plan created.");
     render();
   });
-  document.querySelector("#clientModalArchivePlan")?.addEventListener("click", (event) => {
+  document.querySelector("#clientModalArchivePlan")?.addEventListener("click", async (event) => {
     adminArchiveMonthlyPlan(store, state.currentUser, event.currentTarget.dataset.planId);
+    await saveAndSyncIdentity({ includeAll: true });
     window.alert("Current monthly plan archived.");
     render();
   });
-  document.querySelector("#clientModalWorkoutWarning")?.addEventListener("click", () => {
+  document.querySelector("#clientModalWorkoutWarning")?.addEventListener("click", async () => {
     try {
       const clientId = document.querySelector("#saveClientModal")?.dataset.clientId;
       const workoutTemplateId = document.querySelector("#clientModalWorkoutTemplate")?.value;
       const planOfferingId = document.querySelector("#clientModalPlanOfferingForDraft")?.value;
       if (!clientId || !workoutTemplateId) return window.alert("Choose a workout template first.");
       adminAssignWorkoutTemplateToClientPlan(store, state.currentUser, clientId, workoutTemplateId, { planOfferingId });
-      saveAndSyncIdentity({ clientIds: [clientId] });
+      await saveAndSyncIdentity({ clientIds: [clientId], includeAll: true });
       window.alert("Future workouts updated from the selected template. Past workout history was kept.");
       render();
     } catch (error) {
@@ -406582,7 +406604,7 @@ function resetNutritionPlannerForAction() {
   return state.nutritionDemo.generatedPlan;
 }
 
-function assignGeneratedMealPlanToClient(clientId) {
+async function assignGeneratedMealPlanToClient(clientId) {
   ensureStoreListShape(store);
   const client = store.clients.find((item) => item.id === clientId);
   if (!state.nutritionDemo.generatedPlan) {
@@ -406631,13 +406653,7 @@ function assignGeneratedMealPlanToClient(clientId) {
     createdAt: new Date().toISOString()
   });
   state.nutritionAssignNotice = `Meal plan assigned to ${client.name}. The client can now see it on their Meal Plan tab.`;
-  try {
-    window.localStorage?.setItem(STORE_STORAGE_KEY, JSON.stringify(store));
-  } catch (error) {
-    console.warn("Meal plan assigned, but local browser save hit a storage limit.", error);
-    state.nutritionAssignNotice = `Meal plan assigned to ${client.name}, but this browser could not save it locally because storage is full.`;
-  }
-  scheduleAutomaticCloudBackup();
+  await saveAndSyncIdentity({ includeAll: true });
   return true;
 }
 
