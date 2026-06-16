@@ -2123,7 +2123,7 @@ function adminProfilePage() {
 }
 
 function coachProfilePage() {
-  const coach = store.coaches.find((item) => item.id === state.currentUser.linkedId);
+  const coach = coachProfileForCurrentUser(true);
   if (!coach) return `<section class="workspace"><div class="empty">Coach profile not found. Contact Admin.</div></section>`;
   const profileLocked = Boolean(coach.profileLocked || state.currentUser.profileLocked);
   return `
@@ -2153,6 +2153,24 @@ function coachProfilePage() {
       </article>
     </section>
   `;
+}
+
+function coachProfileForCurrentUser(repairLink = false) {
+  if (!state.currentUser || state.currentUser.role !== "Coach") return null;
+  const user = store.users.find((item) => item.id === state.currentUser.id) || state.currentUser;
+  const cleanPhone = (value) => String(value || "").replace(/\D/g, "");
+  const coach = store.coaches.find((item) =>
+    item.id === user.linkedId
+    || (user.email && item.email && String(item.email).toLowerCase() === String(user.email).toLowerCase())
+    || (user.phone && item.phone && cleanPhone(item.phone) === cleanPhone(user.phone))
+    || (user.name && item.name && String(item.name).trim().toLowerCase() === String(user.name).trim().toLowerCase())
+  );
+  if (coach && repairLink && user.linkedId !== coach.id) {
+    user.linkedId = coach.id;
+    state.currentUser.linkedId = coach.id;
+    saveAndSyncIdentity({ userIds: [user.id], coachIds: [coach.id], includeAll: true });
+  }
+  return coach || null;
 }
 
 function coachProfileImagePanel(profileUser, coach, canEdit = true) {

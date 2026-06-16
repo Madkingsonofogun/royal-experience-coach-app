@@ -1934,8 +1934,12 @@ export function updateClientSelfProfile(store, clientUser, patch) {
 
 export function updateCoachSelfProfile(store, coachUser, patch) {
   if (!coachUser || coachUser.role !== "Coach") throw new Error("Only coaches can update their own profile details.");
-  const coach = findById(store.coaches, coachUser.linkedId, "Coach");
   const user = findById(store.users, coachUser.id, "User");
+  const coachIds = matchingCoachIdsFor(store, coachUser.linkedId || coachUser.id);
+  const coach = store.coaches.find((item) => coachIds.includes(item.id));
+  if (!coach) throw new Error("Coach profile not found. Contact Admin.");
+  coachUser.linkedId = coach.id;
+  user.linkedId = coach.id;
   if (coach.profileLocked || user.profileLocked) throw new Error("Your coach profile is locked. Contact Admin to request changes.");
   if (patch.name !== undefined) {
     const name = String(patch.name || "").trim();
