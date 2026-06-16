@@ -2125,7 +2125,8 @@ function adminProfilePage() {
 function coachProfilePage() {
   const coach = coachProfileForCurrentUser(true);
   if (!coach) return `<section class="workspace"><div class="empty">Coach profile not found. Contact Admin.</div></section>`;
-  const profileLocked = Boolean(coach.profileLocked || state.currentUser.profileLocked);
+  const freshUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
+  const profileLocked = Boolean(coach.profileLocked || freshUser.profileLocked);
   return `
     <section class="workspace">
       <div class="section-head">
@@ -2133,7 +2134,7 @@ function coachProfilePage() {
         <span class="badge green">Coach</span>
       </div>
       ${profileLocked ? `<article class="card locked">Your profile is locked. Contact Admin to unlock profile editing.</article>` : ""}
-      ${coachProfileImagePanel(state.currentUser, coach, !profileLocked)}
+      ${coachProfileImagePanel(freshUser, coach, !profileLocked)}
       <article class="card ${profileLocked ? "locked" : ""}">
         <h3>My Coach Information</h3>
         <p class="muted">Update your personal coach profile, contact information, emergency contact, and 4-digit PIN.</p>
@@ -2171,6 +2172,20 @@ function coachProfileForCurrentUser(repairLink = false) {
     saveAndSyncIdentity({ userIds: [user.id], coachIds: [coach.id], includeAll: true });
   }
   return coach || null;
+}
+
+function coachUserForProfile(coach) {
+  if (!coach) return null;
+  const cleanPhone = (value) => String(value || "").replace(/\D/g, "");
+  return store.users.find((user) =>
+    user.role === "Coach"
+    && (
+      user.linkedId === coach.id
+      || (coach.email && user.email && String(user.email).toLowerCase() === String(coach.email).toLowerCase())
+      || (coach.phone && user.phone && cleanPhone(user.phone) === cleanPhone(coach.phone))
+      || (coach.name && user.name && String(user.name).trim().toLowerCase() === String(coach.name).trim().toLowerCase())
+    )
+  ) || null;
 }
 
 function coachProfileImagePanel(profileUser, coach, canEdit = true) {
@@ -4093,7 +4108,7 @@ function clientEditModal(clientId) {
 function coachEditModal(coachId) {
   const coach = store.coaches.find((item) => item.id === coachId);
   if (!coach) return "";
-  const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
+  const user = coachUserForProfile(coach);
   return `
     <div class="modal-backdrop" role="dialog" aria-modal="true">
       <section class="modal-card">
@@ -6144,23 +6159,25 @@ function bindGlobal() {
     state.editModal = { type: "packageAssign", id: event.currentTarget.value };
     render();
   });
-  document.querySelector("#saveCoachModal")?.addEventListener("click", (event) => {
+  document.querySelector("#saveCoachModal")?.addEventListener("click", async (event) => {
     const coachId = event.currentTarget.dataset.coachId;
     const patch = collectEditFields("coach");
     patch.fullName = patch.name;
     patch.profileLocked = patch.profileLocked === "true";
     adminUpdateCoach(store, state.currentUser, coachId, patch);
-    saveAndSyncIdentity({ coachIds: [coachId] });
+    const coach = store.coaches.find((item) => item.id === coachId);
+    const user = coachUserForProfile(coach);
+    await saveAndSyncIdentity({ userIds: user ? [user.id] : [], coachIds: [coachId], includeAll: true });
     state.editModal = null;
     render();
   });
-  document.querySelector("#coachModalToggleProfileLock")?.addEventListener("click", (event) => {
+  document.querySelector("#coachModalToggleProfileLock")?.addEventListener("click", async (event) => {
     const coachId = event.currentTarget.dataset.coachId;
     const coach = store.coaches.find((item) => item.id === coachId);
-    const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
+    const user = coachUserForProfile(coach);
     const currentlyLocked = Boolean(coach?.profileLocked || user?.profileLocked);
     adminUpdateCoach(store, state.currentUser, coachId, { profileLocked: !currentlyLocked });
-    saveAndSyncIdentity({ userIds: user ? [user.id] : [], coachIds: [coachId] });
+    await saveAndSyncIdentity({ userIds: user ? [user.id] : [], coachIds: [coachId], includeAll: true });
     window.alert(currentlyLocked ? "Coach profile page unlocked." : "Coach profile page locked.");
     render();
   });

@@ -2132,8 +2132,18 @@ export function adminUpdateCoach(store, adminUser, coachId, patch) {
   requireAdmin(adminUser);
   const coach = findById(store.coaches, coachId, "Coach");
   Object.assign(coach, patch, { updatedAt: nowIso() });
-  const user = store.users.find((item) => item.role === "Coach" && item.linkedId === coachId);
+  const cleanPhone = (value) => String(value || "").replace(/\D/g, "");
+  const user = store.users.find((item) =>
+    item.role === "Coach"
+    && (
+      item.linkedId === coachId
+      || (coach.email && item.email && String(item.email).toLowerCase() === String(coach.email).toLowerCase())
+      || (coach.phone && item.phone && cleanPhone(item.phone) === cleanPhone(coach.phone))
+      || (coach.name && item.name && String(item.name).trim().toLowerCase() === String(coach.name).trim().toLowerCase())
+    )
+  );
   if (user) {
+    user.linkedId = coach.id;
     if (patch.name || patch.fullName) user.name = patch.name || patch.fullName;
     if (patch.firstName !== undefined) user.firstName = patch.firstName;
     if (patch.lastName !== undefined) user.lastName = patch.lastName;
