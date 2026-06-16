@@ -7471,7 +7471,19 @@ function nutritionMealDuplicateKey(meal, options = {}) {
 }
 
 function nutritionMealPlanRepeatKey(meal) {
-  return [normalizeNutritionText(meal.mealType), normalizeNutritionText(meal.name)].join("|");
+  const flavorWords = [
+    "cajun", "jerk", "soul herb", "creole", "lemon pepper", "garlic herb", "rosemary", "fajita",
+    "mango lime", "ginger sesame", "teriyaki light", "greek", "tzatziki style", "curry", "tandoori",
+    "italian herb", "pesto light", "glow", "strong", "quick", "loaded"
+  ];
+  let name = normalizeNutritionText(meal.name);
+  flavorWords
+    .sort((a, b) => b.length - a.length)
+    .forEach((word) => {
+      const normalized = normalizeNutritionText(word);
+      name = name.replace(new RegExp(`^${normalized}\\s+`), "");
+    });
+  return [normalizeNutritionText(meal.mealType), name].join("|");
 }
 
 function nutritionMealDisplayType(meal, index = 0) {
@@ -8433,6 +8445,8 @@ function generateNutritionDemoPlan(options) {
       totalSodium: meals.reduce((sum, meal) => sum + nutritionMealNutrient(meal, "sodium"), 0)
     });
   }
+  removeRepeatedMealsFromGeneratedPlan(days, options);
+  recalculateNutritionDays(days);
   const totals = days.reduce((sum, day) => ({
     calories: sum.calories + day.totalCalories,
     protein: sum.protein + day.totalProtein,
@@ -8461,6 +8475,45 @@ function generateNutritionDemoPlan(options) {
       warnings: targets.warnings
     }
   };
+}
+
+function removeRepeatedMealsFromGeneratedPlan(days, options) {
+  const usedIds = new Set();
+  const usedKeys = new Set();
+  days.forEach((day) => {
+    day.meals = (day.meals || []).map((meal) => {
+      const key = nutritionMealPlanRepeatKey(meal);
+      if (!usedIds.has(meal.id) && !usedKeys.has(key)) {
+        usedIds.add(meal.id);
+        usedKeys.add(key);
+        return meal;
+      }
+      const replacement = pickSmartNutritionMeal(meal.mealType, options, usedIds, meal.id, usedKeys);
+      if (replacement) {
+        usedIds.add(replacement.id);
+        usedKeys.add(nutritionMealPlanRepeatKey(replacement));
+        return nutritionMealWithSlot(replacement, {
+          label: meal.slotLabel || meal.mealLabel || meal.mealType,
+          type: replacement.mealType
+        });
+      }
+      usedIds.add(meal.id);
+      usedKeys.add(key);
+      return meal;
+    });
+  });
+}
+
+function recalculateNutritionDays(days) {
+  days.forEach((day) => {
+    day.totalCalories = (day.meals || []).reduce((sum, meal) => sum + Number(meal.calories || 0), 0);
+    day.totalProtein = (day.meals || []).reduce((sum, meal) => sum + Number(meal.protein || 0), 0);
+    day.totalCarbs = (day.meals || []).reduce((sum, meal) => sum + Number(meal.carbs || 0), 0);
+    day.totalFat = (day.meals || []).reduce((sum, meal) => sum + Number(meal.fat || 0), 0);
+    day.totalFiber = (day.meals || []).reduce((sum, meal) => sum + nutritionMealNutrient(meal, "fiber"), 0);
+    day.totalSugar = (day.meals || []).reduce((sum, meal) => sum + nutritionMealNutrient(meal, "sugar"), 0);
+    day.totalSodium = (day.meals || []).reduce((sum, meal) => sum + nutritionMealNutrient(meal, "sodium"), 0);
+  });
 }
 
 function nutritionDailyMainMealCount(options = {}) {
