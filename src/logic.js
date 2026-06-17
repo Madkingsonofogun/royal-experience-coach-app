@@ -1186,13 +1186,31 @@ export function approveMonthlyPlan(store, planId) {
   if (!plan) throw new Error("Plan not found");
   ensureMonthlyPlanHasWorkouts(store, plan.id);
   store.monthlyPlans.forEach((item) => {
-    if (item.clientId === plan.clientId && item.status === "Active") item.status = "Archived";
+    if (item.clientId === plan.clientId && item.status === "Active") {
+      item.status = "Archived";
+      item.planStatus = "Archived";
+      item.approved = false;
+      item.coachApproved = false;
+      item.updatedAt = nowIso();
+    }
   });
   plan.status = "Active";
   plan.planStatus = "Active";
   plan.approved = true;
   plan.coachApproved = true;
   plan.approvedAt = nowIso();
+  plan.updatedAt = plan.approvedAt;
+  const client = store.clients.find((item) => item.id === plan.clientId);
+  if (client) {
+    client.activeMonthlyPlanId = plan.id;
+    client.activeMonthlyPlanMonth = plan.month;
+    client.activeWorkoutPlanName = plan.planName || `${plan.month || "Current"} ${plan.trainingLevel || plan.planLevel || "Training"} plan`;
+    client.currentTrainingLevel = plan.trainingLevel || plan.planLevel || client.currentTrainingLevel;
+    client.currentPlanLevel = client.currentTrainingLevel;
+    client.currentRestrictions = plan.restrictions || client.currentRestrictions || [];
+    client.lastWorkoutPlanApprovedAt = plan.approvedAt;
+    client.updatedAt = plan.approvedAt;
+  }
   return plan;
 }
 

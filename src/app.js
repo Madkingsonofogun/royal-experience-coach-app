@@ -1124,6 +1124,21 @@ async function pushLiveIdentityRecordsFor({ userIds = [], clientIds = [], coachI
   return Boolean(jobs.length);
 }
 
+async function pushLiveClientPlanRecords(clientId) {
+  if (!canUseSupabaseBackup() || !clientId) return false;
+  const jobs = [];
+  const client = store.clients.find((item) => item.id === clientId);
+  if (client) jobs.push(pushLiveIdentityRecord("clients", client));
+  store.monthlyPlans
+    .filter((plan) => plan.clientId === clientId)
+    .forEach((plan) => jobs.push(pushLiveIdentityRecord("monthly_plans", plan)));
+  store.monthlyPlanItems
+    .filter((item) => item.clientId === clientId)
+    .forEach((item) => jobs.push(pushLiveIdentityRecord("monthly_plan_items", item)));
+  await Promise.all(jobs);
+  return Boolean(jobs.length);
+}
+
 async function pushLiveIdentitySnapshots() {
   await Promise.all([
     pushLiveSnapshotCollection("users"),
@@ -1286,7 +1301,7 @@ async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
 }
 
 async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collectionName) {
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data&order=created_at.asc`;
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data,created_at&order=created_at.asc`;
   const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 4500);
   if (!response.ok) {
     const errorText = await response.text();
@@ -1298,7 +1313,9 @@ async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collec
   const rows = await response.json();
   const snapshotRow = rows.find((row) => Array.isArray(row.data));
   if (snapshotRow) {
-    return snapshotRow.data.map((record) => ({ record_id: record.id, data: record, created_at: snapshotRow.created_at, snapshotSource: true }));
+    const snapshotRecords = snapshotRow.data.map((record) => ({ record_id: record.id, data: record, created_at: snapshotRow.created_at, snapshotSource: true }));
+    const directRecords = rows.filter((row) => !Array.isArray(row.data));
+    return [...snapshotRecords, ...directRecords].sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
   }
   return rows;
 }
@@ -2333,7 +2350,7 @@ function clientProgramSummaryPanel(client) {
         <p><strong>Package:</strong> ${escapeHtml(client.packageType || pkg?.packageName || "Not assigned")}</p>
         <p><strong>Plan offering:</strong> ${escapeHtml(offering?.planName || "Not assigned")}</p>
         <p><strong>Training level:</strong> ${escapeHtml(activePlan?.trainingLevel || client.currentTrainingLevel || "Not set")}</p>
-        <p><strong>Workout plan:</strong> ${activePlan ? `${escapeHtml(activePlan.month || "Current month")} / ${escapeHtml(activePlan.status || "Active")}` : "No active approved workout plan"}</p>
+        <p><strong>Workout plan:</strong> ${activePlan ? `${escapeHtml(activePlan.month || "Current month")} / ${escapeHtml(activePlan.status || "Active")}` : client.activeWorkoutPlanName ? `${escapeHtml(client.activeWorkoutPlanName)} / Active` : "No active approved workout plan"}</p>
         <p><strong>Training days:</strong> ${client.trainingDaysPerWeek || offering?.trainingDaysPerWeek || "Not set"} per week</p>
         <p><strong>Session length:</strong> ${client.sessionLength || offering?.sessionLength || "Not set"} min</p>
         <p><strong>Sessions remaining:</strong> ${client.sessionsRemaining ?? "Not set"}</p>
@@ -4951,7 +4968,9 @@ function bindGlobal() {
     saveStore();
     state.planDraftNotice = `${plan.month} ${plan.trainingLevel} plan approved. The client can now open Monthly Plan and see the full month of workouts.`;
     render();
-    saveAndSyncIdentity({ clientIds: [plan.clientId], includeAll: true }).catch((error) => {
+    pushLiveClientPlanRecords(plan.clientId)
+      .then(() => saveAndSyncIdentity({ clientIds: [plan.clientId], includeAll: true, skipBackup: true }))
+      .catch((error) => {
       state.syncStatus = `Plan approved locally, but Supabase sync failed: ${error.message}`;
       render();
     });
