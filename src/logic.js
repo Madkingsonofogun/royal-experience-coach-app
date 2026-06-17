@@ -924,6 +924,8 @@ export function clientOwnsRecord(record, clientId) {
 export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, coachAgrees) {
   const assessmentLevel = assessment.trainingLevel || assessment.recommendedTrainingLevel || normalizeTrainingLevel(assessment.planLevel);
   const currentLevel = currentPlan?.trainingLevel || normalizeTrainingLevel(currentPlan?.planLevel);
+  const client = store.clients.find((c) => c.id === assessment.clientId);
+  const smartOffering = chooseSmartPlanOfferingForAssessment(store, client, assessment);
   const changed = !currentPlan
     || currentLevel !== assessmentLevel
     || JSON.stringify(currentPlan.restrictions || []) !== JSON.stringify(assessment.restrictions || [])
@@ -932,7 +934,7 @@ export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, 
   const draftPlan = {
     id: makeId("plan"),
     clientId: assessment.clientId,
-    coachId: store.clients.find((c) => c.id === assessment.clientId)?.coachId,
+    coachId: client?.coachId,
     month: nextMonthLabel(),
     status: "Draft",
     planStatus: "Draft",
@@ -940,11 +942,18 @@ export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, 
     coachApproved: false,
     planLevel: assessmentLevel,
     trainingLevel: assessmentLevel,
+    planName: smartOffering?.planName || `Smart Coach ${assessmentLevel} plan`,
     restrictions: assessment.restrictions,
     workoutPermission: assessment.workoutPermission,
+    sourcePlanOfferingId: smartOffering?.id || null,
+    sourceWorkoutTemplateIds: smartOffering?.workoutTemplateIds || [],
+    sourceWorkoutTemplateId: smartOffering?.workoutTemplateIds?.[0] || null,
     createdFromAssessmentId: assessment.assessmentId,
     generatedFromAssessmentId: assessment.assessmentId,
-    generatedFrom: changed ? "Assessment recommendation" : "Coach accepted suggested workouts",
+    generatedFrom: changed ? "Smart Coach assessment score recommendation" : "Coach accepted Smart Coach suggested workouts",
+    smartCoachReason: smartOffering
+      ? `Selected ${smartOffering.planName} because the assessment score recommended ${assessmentLevel}, with ${client?.sportFocus || "training"} focus and ${client?.trainingDaysPerWeek || "set"} days per week.`
+      : `Selected a ${assessmentLevel} plan from assessment score ${assessment.averageCapabilityScore}.`,
     coachEditable: true,
     coachCanAddExercises: true,
     coachCanReplaceWorkouts: true,
@@ -953,6 +962,42 @@ export function createReassessmentDraftIfNeeded(store, assessment, currentPlan, 
   store.monthlyPlans.push(draftPlan);
   ensureMonthlyPlanHasWorkouts(store, draftPlan.id, assessment);
   return { shouldPrompt: true, draftPlan };
+}
+
+function chooseSmartPlanOfferingForAssessment(store, client, assessment) {
+  if (!client) return null;
+  const targetLevel = normalizeTrainingLevel(assessment.trainingLevel || assessment.recommendedTrainingLevel || assessment.planLevel);
+  const targetIndex = trainingLevelIndex(targetLevel);
+  const sportText = String(client.sportFocus || "").toLowerCase();
+  const goalWords = String(client.goal || "").toLowerCase().split(/\s+/).filter((word) => word.length > 3);
+  const trainingDays = Number(client.trainingDaysPerWeek || 0);
+  const sessionLength = Number(client.sessionLength || 0);
+  const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery" || toArray(assessment.restrictions).includes("Pain high");
+  const scored = (store.planOfferings || [])
+    .filter((offering) => !offering.archived && offering.active !== false)
+    .map((offering) => {
+      const offeringLevel = normalizeTrainingLevel(offering.trainingLevel || offering.planLevel);
+      const offeringIndex = trainingLevelIndex(offeringLevel);
+      if (offeringIndex > targetIndex && !recoveryMode) return null;
+      if (recoveryMode && offeringIndex > Math.max(0, targetIndex)) return null;
+      const text = `${offering.planName || ""} ${offering.description || ""} ${offering.sportFocus || ""} ${offering.goal || ""} ${offering.packageType || ""}`.toLowerCase();
+      let score = 0;
+      if (offeringLevel === targetLevel) score += 80;
+      if (offeringIndex < targetIndex) score += 16;
+      if (sportText && text.includes(sportText.split(" ")[0])) score += 28;
+      if (goalWords.some((word) => text.includes(word))) score += 18;
+      if (trainingDays && Number(offering.trainingDaysPerWeek || 0) === trainingDays) score += 22;
+      if (sessionLength && Number(offering.sessionLength || 0) === sessionLength) score += 18;
+      if (client.packageType && String(offering.packageType || "").toLowerCase().includes(String(client.packageType).toLowerCase().split(" ")[0])) score += 10;
+      if (recoveryMode && /recovery|beginner|low.?impact|mobility/i.test(text)) score += 24;
+      if (assessment.riskLevel === "High" && /advanced|pro|fighter|power|high.?intensity/i.test(text)) score -= 50;
+      if (toArray(offering.workoutTemplateIds).length) score += 8;
+      return { offering, score };
+    })
+    .filter(Boolean)
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || String(a.offering.planName || "").localeCompare(String(b.offering.planName || "")));
+  return scored[0]?.offering || null;
 }
 
 export function ensureMonthlyPlanHasWorkouts(store, planId, assessment = null) {

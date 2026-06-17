@@ -2593,8 +2593,8 @@ function draftPlanSection(draftPlans) {
             <div class="section-head">
               <div>
                 <p class="eyebrow">${plan.month} / ${plan.trainingLevel}</p>
-                <h3>Assessment-generated draft</h3>
-                <p class="muted">Coach-editable suggested workouts based on the latest assessment, client goals, sport focus, pain/restrictions, equipment, and progression level.</p>
+                <h3>${escapeHtml(plan.planName || "Smart Coach assessment-generated draft")}</h3>
+                <p class="muted">${escapeHtml(plan.smartCoachReason || "Coach-editable suggested workouts based on the latest assessment score, client goals, sport focus, pain/restrictions, equipment, and progression level.")}</p>
               </div>
               <button class="success" data-approve-plan="${plan.id}">Approve and Activate</button>
             </div>
@@ -2857,7 +2857,7 @@ function summaryBlock(summary) {
       </div>
       ${state.currentUser?.role === "Client"
         ? `<span class="badge orange">Coach review required</span>`
-        : `<button class="primary" id="generateAssessmentPlan">Use Suggestion: ${summary.recommendedNextStep}</button>`}
+        : `<button class="primary" id="generateAssessmentPlan">Smart Coach Choose Plan: ${summary.recommendedNextStep}</button>`}
     </div>
     ${state.planDraftNotice ? `<div class="result-band"><strong>Coach plan workflow</strong><p>${state.planDraftNotice}</p></div>` : ""}
     <div class="grid-4 stat-strip">
