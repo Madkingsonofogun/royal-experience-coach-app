@@ -37,6 +37,7 @@ import {
   adminSetUserPin,
   adminSetLoginDisabled,
   adminResolvePinResetRequest,
+  adminRemoveMonthlyPlan,
   adminUpdateClient,
   adminUpdateAssessmentTemplate,
   adminUpdateExercise,
@@ -4153,7 +4154,7 @@ function clientEditModal(clientId) {
             <button id="clientModalWorkoutWarning">Change Future Workouts Only</button>
           </div>
           <div class="admin-list modal-list">
-            ${store.monthlyPlans.filter((plan) => plan.clientId === client.id).map((plan) => `<div class="admin-row"><span>${plan.month} / ${plan.status} / ${plan.trainingLevel || plan.planLevel}</span></div>`).join("") || `<div class="empty">No monthly plan history yet.</div>`}
+            ${store.monthlyPlans.filter((plan) => plan.clientId === client.id).map((plan) => `<div class="admin-row"><span>${plan.month} / ${plan.status} / ${plan.trainingLevel || plan.planLevel}</span><div class="actions"><button data-remove-client-plan="${plan.id}">Remove Plan</button></div></div>`).join("") || `<div class="empty">No monthly plan history yet.</div>`}
           </div>
         </div>
         <div class="${tabClass("Assessments")}">
@@ -6512,11 +6513,34 @@ function bindGlobal() {
     render();
   });
   document.querySelector("#clientModalArchivePlan")?.addEventListener("click", async (event) => {
-    adminArchiveMonthlyPlan(store, state.currentUser, event.currentTarget.dataset.planId);
-    await saveAndSyncIdentity({ includeAll: true });
+    const plan = adminArchiveMonthlyPlan(store, state.currentUser, event.currentTarget.dataset.planId);
+    saveStore();
+    await pushLiveClientPlanRecords(plan.clientId).catch((error) => {
+      console.warn("Could not sync archived plan.", error);
+    });
     window.alert("Current monthly plan archived.");
     render();
   });
+  document.querySelectorAll("[data-remove-client-plan]").forEach((button) => button.addEventListener("click", async () => {
+    if (!window.confirm("Remove this workout plan from the client profile? The plan and its workout days will no longer show for the client.")) return;
+    const result = adminRemoveMonthlyPlan(store, state.currentUser, button.dataset.removeClientPlan);
+    saveStore();
+    await Promise.all([
+      deleteLiveSupabaseRecord("monthly_plans", result.removedPlan.id),
+      ...result.removedItemIds.map((id) => deleteLiveSupabaseRecord("monthly_plan_items", id)),
+      ...result.removedAdjustmentIds.map((id) => deleteLiveSupabaseRecord("today_workout_adjustments", id))
+    ]).catch((error) => {
+      console.warn("Could not delete all live plan rows.", error);
+    });
+    await pushLiveClientPlanRecords(result.clientId).catch((error) => {
+      console.warn("Could not sync client after removing plan.", error);
+    });
+    await saveAndSyncIdentity({ clientIds: [result.clientId], includeAll: true, skipBackup: true }).catch((error) => {
+      console.warn("Could not refresh live snapshots after removing plan.", error);
+    });
+    window.alert("Workout plan removed from this client and live view updated.");
+    render();
+  }));
   document.querySelector("#clientModalWorkoutWarning")?.addEventListener("click", async () => {
     try {
       const clientId = document.querySelector("#saveClientModal")?.dataset.clientId;

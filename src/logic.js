@@ -2207,8 +2207,41 @@ export function adminArchiveMonthlyPlan(store, adminUser, planId) {
   plan.planStatus = "Archived";
   plan.archived = true;
   plan.updatedAt = nowIso();
+  const client = store.clients.find((item) => item.id === plan.clientId);
+  if (client?.activeMonthlyPlanId === plan.id) {
+    client.activeMonthlyPlanId = "";
+    client.activeMonthlyPlanMonth = "";
+    client.activeWorkoutPlanName = "";
+    client.updatedAt = nowIso();
+  }
   logAdminAction(store, adminUser, `Archived monthly plan ${plan.id}`);
   return plan;
+}
+
+export function adminRemoveMonthlyPlan(store, adminUser, planId) {
+  requireAdmin(adminUser);
+  const plan = findById(store.monthlyPlans, planId, "Monthly plan");
+  const planItems = store.monthlyPlanItems.filter((item) => item.monthlyPlanId === plan.id);
+  const adjustments = store.todayWorkoutAdjustments.filter((item) => item.monthlyPlanId === plan.id);
+  const client = store.clients.find((item) => item.id === plan.clientId);
+  store.monthlyPlans = store.monthlyPlans.filter((item) => item.id !== plan.id);
+  store.monthlyPlanItems = store.monthlyPlanItems.filter((item) => item.monthlyPlanId !== plan.id);
+  store.todayWorkoutAdjustments = store.todayWorkoutAdjustments.filter((item) => item.monthlyPlanId !== plan.id);
+  if (client?.activeMonthlyPlanId === plan.id || plan.status === "Active") {
+    client.activeMonthlyPlanId = "";
+    client.activeMonthlyPlanMonth = "";
+    client.activeWorkoutPlanName = "";
+    client.currentAdjustmentMode = "Normal";
+    client.lastWorkoutPlanApprovedAt = "";
+    client.updatedAt = nowIso();
+  }
+  logAdminAction(store, adminUser, `Removed monthly plan ${plan.id} for ${client?.name || plan.clientId}`);
+  return {
+    removedPlan: plan,
+    removedItemIds: planItems.map((item) => item.id),
+    removedAdjustmentIds: adjustments.map((item) => item.id),
+    clientId: plan.clientId
+  };
 }
 
 export function adminArchiveClient(store, adminUser, clientId) {
