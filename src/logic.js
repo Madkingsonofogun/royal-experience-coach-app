@@ -1307,10 +1307,16 @@ export function authenticateUser(store, identifierOrRole, pin, optionalPin = nul
     if (role) return user.role === role;
     return [user.email, user.phone].filter(Boolean).map((value) => String(value).toLowerCase()).includes(identifier);
   });
-  const matched = candidates.find((user) => user.pinHash === hashPin(pinValue, user.pinSalt));
+  const matches = candidates.filter((user) => user.pinHash === hashPin(pinValue, user.pinSalt));
+  const matched = matches.find((user) => !isLoginBlocked(user)) || matches[0];
   if (!matched) return null;
-  if (matched.accountLocked || ["Pending", "Rejected", "Suspended", "Archived"].includes(matched.accountStatus)) return null;
+  if (isLoginBlocked(matched)) return null;
   return matched;
+}
+
+function isLoginBlocked(user) {
+  return Boolean(user?.accountLocked === true || String(user?.accountLocked).toLowerCase() === "true")
+    || ["Pending", "Rejected", "Suspended", "Archived"].includes(user?.accountStatus);
 }
 
 export function loginBlockedMessage(store, identifierOrRole, pin, optionalPin = null) {
@@ -1318,11 +1324,12 @@ export function loginBlockedMessage(store, identifierOrRole, pin, optionalPin = 
   const role = optionalPin == null && legacyRoles.includes(identifierOrRole) ? identifierOrRole : null;
   const identifier = role ? null : String(identifierOrRole || "").toLowerCase();
   const pinValue = String(role ? pin : pin || "");
-  const user = store.users.find((item) => {
+  const users = store.users.filter((item) => {
     if (role && item.role !== role) return false;
     if (!role && ![item.email, item.phone].filter(Boolean).map((value) => String(value).toLowerCase()).includes(identifier)) return false;
     return item.pinHash === hashPin(pinValue, item.pinSalt);
   });
+  const user = users.find((item) => isLoginBlocked(item)) || users[0];
   if (!user) return "PIN or account type did not match.";
   if (user.accountStatus === "Pending") return "Your account is waiting for Admin approval. Please check back later or contact Admin.";
   if (user.accountStatus === "Rejected") return "Your account request was not approved. Please contact Admin.";

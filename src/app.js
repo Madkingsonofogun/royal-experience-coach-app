@@ -1139,6 +1139,22 @@ async function pushLiveClientPlanRecords(clientId) {
   return Boolean(jobs.length);
 }
 
+async function pushLiveWorkoutUpdate(workout) {
+  if (!canUseSupabaseBackup() || !workout?.id) return false;
+  const jobs = [
+    pushLiveIdentityRecord("monthly_plan_items", workout)
+  ];
+  const client = store.clients.find((item) => item.id === workout.clientId);
+  if (client) jobs.push(pushLiveIdentityRecord("clients", client));
+  const plan = store.monthlyPlans.find((item) => item.id === workout.monthlyPlanId);
+  if (plan) jobs.push(pushLiveIdentityRecord("monthly_plans", plan));
+  store.todayWorkoutAdjustments
+    .filter((item) => item.clientId === workout.clientId && item.workoutDate === workout.workoutDate)
+    .forEach((adjustment) => jobs.push(pushLiveIdentityRecord("today_workout_adjustments", adjustment)));
+  await Promise.all(jobs);
+  return true;
+}
+
 async function pushLiveIdentitySnapshots() {
   await Promise.all([
     pushLiveSnapshotCollection("users"),
@@ -2953,7 +2969,7 @@ function workoutDetailPage() {
         <div class="actions">
           <button class="ghost" data-view="${state.currentUser.role === "Client" ? "client" : "plan"}">Back</button>
           <button class="ghost" data-view="chat">Message Coach</button>
-          ${detail.canEdit ? `<button class="success">Send Workout Update</button>` : ""}
+          ${detail.canEdit ? `<button class="success" data-send-workout-update="${detail.id}">Send Workout Update</button>` : ""}
         </div>
       </div>
       ${detail.adjustedForToday ? `<div class="result-band"><strong>Adjusted workout</strong><span>Today's version is based on the latest check-in and coach/app approval.</span></div>` : ""}
@@ -3823,6 +3839,12 @@ function saveCoachWorkoutItemModal(approveToday = false) {
   if (approveToday && workout.workoutDate === today) {
     approveWorkoutSnapshotForToday(workout, "Edited Suggested Change", "Coach approved adjusted workout from workout detail.");
   }
+  workout.updatedAt = new Date().toISOString();
+  saveStore();
+  pushLiveWorkoutUpdate(workout).catch((error) => {
+    state.syncStatus = `Workout updated locally, but Supabase sync failed: ${error.message}`;
+    render();
+  });
   state.editModal = null;
   window.alert(approveToday ? "Adjusted workout approved for today." : "Workout exercise updated.");
 }
@@ -5235,6 +5257,21 @@ function bindGlobal() {
     saveCoachWorkoutItemModal(true);
     render();
   });
+  document.querySelectorAll("[data-send-workout-update]").forEach((button) => button.addEventListener("click", () => {
+    const workout = store.monthlyPlanItems.find((item) => item.id === button.dataset.sendWorkoutUpdate);
+    if (!workout) return window.alert("Workout was not found.");
+    workout.updatedAt = new Date().toISOString();
+    workout.coachEditedAt = workout.coachEditedAt || workout.updatedAt;
+    workout.coachEditedByUserId = state.currentUser.id;
+    saveStore();
+    pushLiveWorkoutUpdate(workout)
+      .then(() => {
+        window.alert("Workout update sent to the client profile.");
+      })
+      .catch((error) => {
+        window.alert(`Workout saved on this device, but Supabase did not update: ${error.message}`);
+      });
+  }));
   document.querySelectorAll("[data-smart-coach-replace-item]").forEach((button) => button.addEventListener("click", () => {
     const select = document.querySelector("#coachReplacementExercise");
     if (select) select.value = button.dataset.smartCoachReplaceItem;
@@ -6040,7 +6077,8 @@ function bindGlobal() {
     saveAndSyncIdentity({
       userIds: user ? [user.id] : [],
       clientIds: user?.role === "Client" && user.linkedId ? [user.linkedId] : [],
-      coachIds: ["Coach", "Admin"].includes(user?.role) && user.linkedId ? [user.linkedId] : []
+      coachIds: ["Coach", "Admin"].includes(user?.role) && user.linkedId ? [user.linkedId] : [],
+      includeAll: action === "Approve"
     });
     state.editModal = null;
     render();
