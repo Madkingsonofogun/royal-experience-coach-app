@@ -519,6 +519,17 @@ export function getTodayWorkoutForClient(store, clientId, date) {
   return store.monthlyPlanItems.find((item) => item.clientId === clientId && item.monthlyPlanId === plan.id && item.workoutDate === date) || null;
 }
 
+export function getNextWorkoutForClient(store, clientId, date) {
+  const plan = getClientVisiblePlan(store, clientId);
+  if (!plan) return null;
+  const workouts = store.monthlyPlanItems
+    .filter((item) => item.clientId === clientId && item.monthlyPlanId === plan.id)
+    .sort((a, b) => String(a.workoutDate || "").localeCompare(String(b.workoutDate || "")) || Number(a.trainingDayNumber || 0) - Number(b.trainingDayNumber || 0));
+  return workouts.find((item) => String(item.workoutDate || "") >= String(date || todayIso()))
+    || workouts[0]
+    || null;
+}
+
 export function getWorkoutDetailForUser(store, user, clientId, workoutId, date = todayIso()) {
   if (!canUserAccessClient(store, user, clientId)) return null;
   const dashboard = getClientDashboard(store, clientId, date);
@@ -648,10 +659,12 @@ export function getClientDashboard(store, clientId, date) {
   const client = store.clients.find((item) => item.id === clientId);
   const plan = getClientVisiblePlan(store, clientId);
   const workout = getTodayWorkoutForClient(store, clientId, date);
+  const nextWorkout = workout || getNextWorkoutForClient(store, clientId, date);
+  const showingNextWorkout = Boolean(!workout && nextWorkout);
   const checkIn = store.dailyCheckIns.find((item) => item.clientId === clientId && item.workoutDate === date);
   const adjustment = store.todayWorkoutAdjustments.filter((item) => item.clientId === clientId && item.workoutDate === date).at(-1);
   const locked = store.coachAlerts.some((alert) => alert.clientId === clientId && alert.dailyCheckInId === checkIn?.id && alert.alertSeverity === "Serious" && alert.status === "New");
-  const visibleWorkout = locked ? null : adjustment?.coachApprovedWorkoutSnapshot || adjustment?.adjustedWorkoutSnapshot || workout;
+  const visibleWorkout = locked ? null : adjustment?.coachApprovedWorkoutSnapshot || adjustment?.adjustedWorkoutSnapshot || workout || nextWorkout;
   const message = locked
     ? lockedPainMessage(checkIn)
     : adjustment?.coachDecision === "No Workout Today"
@@ -662,8 +675,10 @@ export function getClientDashboard(store, clientId, date) {
           ? painCheckInMessage(checkIn) || "Today's workout has been adjusted based on your check-in."
           : checkIn
             ? painCheckInMessage(checkIn) || "You're good to follow today's plan."
-            : "Check in before workout.";
-  return { client, plan, workout: visibleWorkout, originalWorkout: workout, checkIn, adjustment, locked, message };
+            : showingNextWorkout
+              ? "No workout is dated for today, so the next scheduled workout is shown."
+              : "Check in before workout.";
+  return { client, plan, workout: visibleWorkout, originalWorkout: workout || nextWorkout, checkIn, adjustment, locked, message, showingNextWorkout };
 }
 
 function dashboardDecisionMessage(decision, checkIn) {

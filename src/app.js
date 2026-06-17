@@ -8881,7 +8881,7 @@ function workoutCard(workout, locked) {
   return `
     <article class="workout">
       <div class="section-head">
-        <div><p class="eyebrow">Week ${workout.weekNumber} / Training day ${workout.trainingDayNumber}</p><h2>${workout.title}</h2></div>
+        <div><p class="eyebrow">${workout.workoutDate === today ? "Today" : `Next scheduled: ${workout.workoutDate || "Date not set"}`} / Week ${workout.weekNumber} / Training day ${workout.trainingDayNumber}</p><h2>${workout.title}</h2></div>
         <span class="badge green">${workout.sessionLength} min</span>
       </div>
       <div class="chips"><span>${workout.trainingLevel || "Intermediate"}</span><span>${workout.items?.length || 0} exercises</span><span>${workout.items?.map((item) => item.equipment).filter(Boolean).join(", ") || "Mixed equipment"}</span></div>
