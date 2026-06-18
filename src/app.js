@@ -416,6 +416,7 @@ function render() {
     bindLogin();
     return;
   }
+  repairLoggedInCoachLink();
   const visibleClients = visibleClientsForUser(store, state.currentUser);
   if (state.currentUser.role === "Coach" && !visibleClients.length && !["home", "profile"].includes(state.view)) {
     state.view = "home";
@@ -452,6 +453,30 @@ function render() {
     ${nutritionRecipeModal()}
   `;
   bindGlobal();
+}
+
+function repairLoggedInCoachLink() {
+  if (state.currentUser?.role !== "Coach") return;
+  const user = store.users.find((item) => item.id === state.currentUser.id) || state.currentUser;
+  if (user.linkedId && store.coaches.some((coach) => coach.id === user.linkedId)) {
+    state.currentUser = user;
+    return;
+  }
+  const cleanPhone = (value) => String(value || "").replace(/\D/g, "");
+  const coach = store.coaches.find((item) =>
+    item.role === "Coach"
+    && (
+      (user.email && item.email && String(item.email).toLowerCase() === String(user.email).toLowerCase())
+      || (user.phone && item.phone && cleanPhone(item.phone) === cleanPhone(user.phone))
+      || (user.name && item.name && String(item.name).trim().toLowerCase() === String(user.name).trim().toLowerCase())
+    )
+  );
+  if (!coach) return;
+  user.linkedId = coach.id;
+  state.currentUser = user;
+  saveAndSyncIdentity({ userIds: [user.id], coachIds: [coach.id] }).catch((error) => {
+    console.warn("Could not sync repaired coach login link.", error);
+  });
 }
 
 function closeOpenPopups() {
@@ -2471,6 +2496,13 @@ function progressImageCard(image) {
 
 function assessmentPage() {
   const client = selectedClient();
+  if (!client) {
+    return `
+      <section class="workspace">
+        <div class="empty">No client has been assigned yet. Assessment tools will appear after Admin assigns a client to this coach.</div>
+      </section>
+    `;
+  }
   return `
     <section class="workspace panel">
       ${assessmentTemplatePicker(client)}
@@ -2555,6 +2587,13 @@ function weeklyPage() {
 
 function monthlyPlanPage() {
   const client = selectedClient();
+  if (!client) {
+    return `
+      <section class="workspace">
+        <div class="empty">No client has been assigned yet. Monthly plans will appear after Admin assigns a client to this coach.</div>
+      </section>
+    `;
+  }
   const plan = getClientVisiblePlan(store, client.id);
   const latestAssessment = latestClientAssessment(client.id) || summarizeAssessment({ ...state.assessment, clientId: client.id });
   if (plan) {
@@ -2635,6 +2674,14 @@ function draftPlanSection(draftPlans) {
 
 function exerciseLibraryPage() {
   const client = selectedClient();
+  if (!client) {
+    return `
+      <section class="workspace">
+        <div class="section-head"><div><p class="eyebrow">Exercise Library</p><h2>Full imported workbook library</h2></div></div>
+        <div class="empty">No client is selected yet, but the library is ready once Admin assigns a client.</div>
+      </section>
+    `;
+  }
   const assessment = latestClientAssessment(client.id) || summarizeAssessment(state.assessment);
   const usable = filterExercisesForAssessment(store.exercises, assessment);
   const searched = searchExerciseLibrary(store.exercises, state.libraryFilters.query);
@@ -2916,6 +2963,13 @@ function weeklyCheckInView(client) {
 function clientDashboard() {
   const dashboard = getClientDashboard(store, state.clientId, today);
   const client = dashboard.client;
+  if (!client) {
+    return `
+      <section class="workspace">
+        <div class="empty">No client has been assigned yet. The client dashboard will appear after Admin assigns a client to this coach.</div>
+      </section>
+    `;
+  }
   const workout = dashboard.workout;
   const profileUser = userForProfile(client);
   const progressImages = getProgressImagesForUser(store, state.currentUser, client.id).slice(-3);
@@ -6813,7 +6867,9 @@ function changeSelectedClient(clientId, shouldRender = true) {
 }
 
 function selectedClient() {
-  return store.clients.find((client) => client.id === state.clientId);
+  const selected = store.clients.find((client) => client.id === state.clientId);
+  if (selected && (!state.currentUser || canUserAccessClient(store, state.currentUser, selected.id))) return selected;
+  return visibleClientsForUser(store, state.currentUser || store.users[0])[0] || store.clients[0] || null;
 }
 
 function userForProfile(client) {
