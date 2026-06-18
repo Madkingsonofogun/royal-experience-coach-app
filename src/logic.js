@@ -1587,6 +1587,13 @@ export function adminSetUserPin(store, adminUser, targetUserId, newPin) {
   user.pinHash = hashPin(newPin, user.pinSalt);
   user.forcePinChange = true;
   user.temporaryPinExpiresAt = futureIsoHours(24);
+  user.accountLocked = false;
+  user.accountStatus = "Active";
+  user.accountLockReason = "";
+  user.disabled = false;
+  user.accountUnlockedByAdminId = adminUser.id;
+  user.accountUnlockedAt = nowIso();
+  user.updatedAt = user.accountUnlockedAt;
   logAdminAction(store, adminUser, `Changed PIN for ${user.name}`);
   return user;
 }

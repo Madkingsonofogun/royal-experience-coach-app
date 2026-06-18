@@ -396254,6 +396254,13 @@ function adminSetUserPin(store, adminUser, targetUserId, newPin) {
   user.pinHash = hashPin(newPin, user.pinSalt);
   user.forcePinChange = true;
   user.temporaryPinExpiresAt = futureIsoHours(24);
+  user.accountLocked = false;
+  user.accountStatus = "Active";
+  user.accountLockReason = "";
+  user.disabled = false;
+  user.accountUnlockedByAdminId = adminUser.id;
+  user.accountUnlockedAt = nowIso();
+  user.updatedAt = user.accountUnlockedAt;
   logAdminAction(store, adminUser, `Changed PIN for ${user.name}`);
   return user;
 }
@@ -399078,12 +399085,15 @@ function render() {
 function repairLoggedInCoachLink() {
   if (state.currentUser?.role !== "Coach") return;
   const user = store.users.find((item) => item.id === state.currentUser.id) || state.currentUser;
+  user.accountLocked = false;
+  user.accountStatus = user.accountStatus === "Active" || !user.accountStatus ? "Active" : user.accountStatus;
+  user.disabled = false;
   if (user.linkedId && store.coaches.some((coach) => coach.id === user.linkedId)) {
     state.currentUser = user;
     return;
   }
   const cleanPhone = (value) => String(value || "").replace(/\D/g, "");
-  const coach = store.coaches.find((item) =>
+  let coach = store.coaches.find((item) =>
     item.role === "Coach"
     && (
       (user.email && item.email && String(item.email).toLowerCase() === String(user.email).toLowerCase())
@@ -399091,8 +399101,31 @@ function repairLoggedInCoachLink() {
       || (user.name && item.name && String(item.name).trim().toLowerCase() === String(user.name).trim().toLowerCase())
     )
   );
-  if (!coach) return;
+  if (!coach) {
+    const now = new Date().toISOString();
+    coach = {
+      id: user.linkedId || `coach_${Date.now()}`,
+      role: "Coach",
+      name: user.name || "Coach",
+      firstName: user.firstName || String(user.name || "").split(" ")[0] || "",
+      lastName: user.lastName || String(user.name || "").split(" ").slice(1).join(" "),
+      email: String(user.email || "").toLowerCase(),
+      phone: String(user.phone || ""),
+      specialty: user.requestDetails?.coachTitle || user.specialty || "",
+      bio: user.requestDetails?.experience || user.bio || "",
+      emergencyContact: user.emergencyContact || "",
+      status: "Active",
+      profileLocked: Boolean(user.profileLocked),
+      profileImageUrl: user.profileImageUrl || "",
+      profileImageStorageKey: user.profileImageStorageKey || "",
+      profileImageUploadedAt: user.profileImageUploadedAt || null,
+      createdAt: now,
+      updatedAt: now
+    };
+    store.coaches.push(coach);
+  }
   user.linkedId = coach.id;
+  user.updatedAt = new Date().toISOString();
   state.currentUser = user;
   saveAndSyncIdentity({ userIds: [user.id], coachIds: [coach.id] }).catch((error) => {
     console.warn("Could not sync repaired coach login link.", error);
