@@ -1307,7 +1307,10 @@ export function authenticateUser(store, identifierOrRole, pin, optionalPin = nul
     if (role) return user.role === role;
     return [user.email, user.phone].filter(Boolean).map((value) => String(value).toLowerCase()).includes(identifier);
   });
-  const matches = candidates.filter((user) => user.pinHash === hashPin(pinValue, user.pinSalt));
+  const matches = candidates
+    .filter((user) => user.pinHash === hashPin(pinValue, user.pinSalt))
+    .map((user) => repairApprovedProfileLogin(store, user))
+    .sort((a, b) => loginRecordRank(b) - loginRecordRank(a));
   const matched = matches.find((user) => !isLoginBlocked(user)) || matches[0];
   if (!matched) return null;
   if (isLoginBlocked(matched)) return null;
@@ -1319,6 +1322,35 @@ function isLoginBlocked(user) {
     || ["Pending", "Rejected", "Suspended", "Archived"].includes(user?.accountStatus);
 }
 
+function loginRecordRank(user) {
+  const timestamp = user?.updatedAt || user?.accountUnlockedAt || user?.createdAt || "";
+  const time = timestamp ? Date.parse(timestamp) : 0;
+  const activeBonus = !isLoginBlocked(user) ? 1_000_000_000_000_000 : 0;
+  return activeBonus + (Number.isFinite(time) ? time : 0);
+}
+
+function repairApprovedProfileLogin(store, user) {
+  if (!user || !["Coach", "Client"].includes(user.role)) return user;
+  const profileList = user.role === "Coach" ? store.coaches : store.clients;
+  const cleanPhone = (value) => String(value || "").replace(/\D/g, "");
+  const profile = profileList.find((item) =>
+    item.id === user.linkedId
+    || (user.email && item.email && String(item.email).toLowerCase() === String(user.email).toLowerCase())
+    || (user.phone && item.phone && cleanPhone(item.phone) === cleanPhone(user.phone))
+    || (user.name && item.name && String(item.name).trim().toLowerCase() === String(user.name).trim().toLowerCase())
+  );
+  if (!profile || ["Archived", "Suspended"].includes(profile.status)) return user;
+  if (isLoginBlocked(user) && (user.linkedId || profile.createdByAdminId || profile.profileUnlockedByAdminId || profile.status === "Active")) {
+    user.linkedId = profile.id;
+    user.accountLocked = false;
+    user.accountStatus = "Active";
+    user.accountLockReason = "";
+    user.disabled = false;
+    user.updatedAt = nowIso();
+  }
+  return user;
+}
+
 export function loginBlockedMessage(store, identifierOrRole, pin, optionalPin = null) {
   const legacyRoles = ["Admin", "Coach", "Client"];
   const role = optionalPin == null && legacyRoles.includes(identifierOrRole) ? identifierOrRole : null;
@@ -1328,7 +1360,7 @@ export function loginBlockedMessage(store, identifierOrRole, pin, optionalPin = 
     if (role && item.role !== role) return false;
     if (!role && ![item.email, item.phone].filter(Boolean).map((value) => String(value).toLowerCase()).includes(identifier)) return false;
     return item.pinHash === hashPin(pinValue, item.pinSalt);
-  });
+  }).sort((a, b) => loginRecordRank(b) - loginRecordRank(a));
   const user = users.find((item) => isLoginBlocked(item)) || users[0];
   if (!user) return "PIN or account type did not match.";
   if (user.accountStatus === "Pending") return "Your account is waiting for Admin approval. Please check back later or contact Admin.";
