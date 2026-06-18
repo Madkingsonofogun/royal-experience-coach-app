@@ -1425,6 +1425,7 @@ export function adminReviewAccountRequest(store, adminUser, targetUserId, action
     user.accountStatus = "Active";
     user.accountUnlockedByAdminId = adminUser.id;
     user.accountUnlockedAt = nowIso();
+    user.updatedAt = user.accountUnlockedAt;
     user.accountLockReason = "";
     user.profileLocked = options.unlockProfile ? false : true;
   }
@@ -1493,6 +1494,7 @@ function approveRequestedUserProfile(store, adminUser, user, options) {
     user.linkedId = coach.id;
     user.coachPermissions = options.permissions || {};
     coach.profileLocked = !options.unlockProfile;
+    coach.updatedAt = nowIso();
   }
 }
 

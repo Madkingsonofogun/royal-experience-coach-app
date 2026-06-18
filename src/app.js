@@ -599,9 +599,23 @@ function deduplicateRecords(records) {
   records.forEach((record, index) => {
     const id = record?.id || record?.assessmentId || record?.checkInId || record?.messageId;
     const fallback = JSON.stringify(record) || `record_${index}`;
-    unique.set(String(id || fallback), record);
+    const key = String(id || fallback);
+    const existing = unique.get(key);
+    unique.set(key, preferNewerRecord(existing, record));
   });
   return [...unique.values()];
+}
+
+function recordTimestamp(record) {
+  const value = record?.updatedAt || record?.accountUnlockedAt || record?.approvedAt || record?.createdAt || record?.profileImageUploadedAt || "";
+  const time = value ? Date.parse(value) : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function preferNewerRecord(existing, incoming) {
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+  return recordTimestamp(incoming) >= recordTimestamp(existing) ? { ...existing, ...incoming } : { ...incoming, ...existing };
 }
 
 function profileImageTimestamp(record) {
@@ -1262,7 +1276,7 @@ function mergeLiveRecordIntoStore(storeKey, record) {
   const existingIndex = store[storeKey].findIndex((item) => item.id === record.id);
   if (existingIndex >= 0) {
     const existing = store[storeKey][existingIndex];
-    const merged = { ...existing, ...record };
+    const merged = preferNewerRecord(existing, record);
     if (JSON.stringify(existing) === JSON.stringify(merged)) return false;
     store[storeKey][existingIndex] = merged;
     return true;
@@ -6869,7 +6883,9 @@ function changeSelectedClient(clientId, shouldRender = true) {
 function selectedClient() {
   const selected = store.clients.find((client) => client.id === state.clientId);
   if (selected && (!state.currentUser || canUserAccessClient(store, state.currentUser, selected.id))) return selected;
-  return visibleClientsForUser(store, state.currentUser || store.users[0])[0] || store.clients[0] || null;
+  const visible = visibleClientsForUser(store, state.currentUser || store.users[0]);
+  if (visible[0]) return visible[0];
+  return state.currentUser?.role === "Admin" ? store.clients[0] || null : null;
 }
 
 function userForProfile(client) {
