@@ -108,7 +108,8 @@ const LIVE_SNAPSHOT_IDS = {
   monthly_plans: 900000007,
   monthly_plan_items: 900000008,
   meal_plans: 900000009,
-  today_workout_adjustments: 900000010
+  today_workout_adjustments: 900000010,
+  workout_completions: 900000011
 };
 const store = loadSavedStore(createStore());
 const today = "2026-05-29";
@@ -1042,7 +1043,8 @@ function liveSnapshotDataFor(collectionName, latestRecord = null) {
     monthly_plans: "monthlyPlans",
     monthly_plan_items: "monthlyPlanItems",
     meal_plans: "mealPlans",
-    today_workout_adjustments: "todayWorkoutAdjustments"
+    today_workout_adjustments: "todayWorkoutAdjustments",
+    workout_completions: "workoutCompletions"
   };
   const storeKey = map[collectionName];
   const records = Array.isArray(store[storeKey]) ? [...store[storeKey]] : [];
@@ -1151,7 +1153,8 @@ function liveIdentityCollections() {
     { storeKey: "monthlyPlans", collectionName: "monthly_plans" },
     { storeKey: "monthlyPlanItems", collectionName: "monthly_plan_items" },
     { storeKey: "mealPlans", collectionName: "meal_plans" },
-    { storeKey: "todayWorkoutAdjustments", collectionName: "today_workout_adjustments" }
+    { storeKey: "todayWorkoutAdjustments", collectionName: "today_workout_adjustments" },
+    { storeKey: "workoutCompletions", collectionName: "workout_completions" }
   ];
 }
 
@@ -1221,6 +1224,17 @@ async function pushLiveWorkoutUpdate(workout) {
   return true;
 }
 
+async function pushLiveWorkoutCompletion(record) {
+  if (!record?.id) return false;
+  const jobs = [
+    pushLiveIdentityRecord("workout_completions", record)
+  ];
+  const client = store.clients.find((item) => item.id === record.clientId);
+  if (client) jobs.push(pushLiveIdentityRecord("clients", client));
+  await Promise.all(jobs);
+  return true;
+}
+
 async function pushLiveIdentitySnapshots() {
   await Promise.all([
     pushLiveSnapshotCollection("users"),
@@ -1230,7 +1244,8 @@ async function pushLiveIdentitySnapshots() {
     pushLiveSnapshotCollection("monthly_plans"),
     pushLiveSnapshotCollection("monthly_plan_items"),
     pushLiveSnapshotCollection("meal_plans"),
-    pushLiveSnapshotCollection("today_workout_adjustments")
+    pushLiveSnapshotCollection("today_workout_adjustments"),
+    pushLiveSnapshotCollection("workout_completions")
   ]);
   return true;
 }
@@ -2142,6 +2157,7 @@ function homeDashboard() {
       </div>
       <div class="dashboard-grid">
         ${state.currentUser.role === "Client" ? "" : smartDecisionPanel(client, latestAssessment, lastCheckIn)}
+        ${clientCompletionSummaryPanel(client)}
         ${todayPreviewPanel(client)}
         ${approvedAppointmentsPanel(client)}
         ${assessmentSchedulePanel(client)}
@@ -2442,6 +2458,99 @@ function clientProgramSummaryPanel(client) {
       <div class="actions">
         <button class="ghost" data-view="plan">Open Monthly Plan</button>
         <button class="ghost" data-open-client-meal-plan>Open Meal Plan</button>
+      </div>
+    </article>
+  `;
+}
+
+function workoutCompletionFor(workoutId, clientId = state.clientId) {
+  return (store.workoutCompletions || []).find((item) => item.workoutId === workoutId && item.clientId === clientId && item.completed);
+}
+
+function clientWorkoutCompletionSummary(clientId) {
+  const records = (store.workoutCompletions || []).filter((item) => item.clientId === clientId && item.completed);
+  const latest = [...records].sort((a, b) => String(b.completedAt || "").localeCompare(String(a.completedAt || "")))[0];
+  return {
+    completed: records.length,
+    latest
+  };
+}
+
+function clientMealCompletionSummary(clientId) {
+  const plans = (store.mealPlans || []).filter((plan) => plan.clientId === clientId);
+  const tracking = plans.flatMap((plan) => (plan.mealTracking || []).map((item) => ({ ...item, planName: plan.planName })));
+  const eaten = tracking.filter((item) => item.status === "Ate" || item.status === "Substituted");
+  const latest = [...tracking].sort((a, b) => String(b.completedAt || b.createdAt || "").localeCompare(String(a.completedAt || a.createdAt || "")))[0];
+  return {
+    completed: eaten.length,
+    tracked: tracking.length,
+    latest
+  };
+}
+
+function markClientWorkoutComplete(workoutId) {
+  const client = clientForCurrentUser();
+  const workout = (store.monthlyPlanItems || []).find((item) => item.id === workoutId && item.clientId === client?.id);
+  if (!client || !workout) {
+    window.alert("Workout could not be found for this client.");
+    return null;
+  }
+  store.workoutCompletions ||= [];
+  const now = new Date().toISOString();
+  const id = `workout_completion_${client.id}_${workout.id}`;
+  const record = {
+    id,
+    clientId: client.id,
+    workoutId: workout.id,
+    monthlyPlanId: workout.monthlyPlanId || "",
+    workoutDate: workout.workoutDate || today,
+    workoutTitle: workout.title || workout.workoutName || "Workout",
+    trainingDayNumber: workout.trainingDayNumber || "",
+    weekNumber: workout.weekNumber || "",
+    completed: true,
+    completedByUserId: state.currentUser?.id || "",
+    completedAt: now,
+    createdAt: now,
+    updatedAt: now
+  };
+  const existingIndex = store.workoutCompletions.findIndex((item) => item.id === id);
+  if (existingIndex >= 0) store.workoutCompletions[existingIndex] = { ...store.workoutCompletions[existingIndex], ...record };
+  else store.workoutCompletions.push(record);
+  store.notifications ||= [];
+  const coachUser = store.users.find((user) => user.role === "Coach" && user.linkedId === client.coachId);
+  if (coachUser) {
+    store.notifications.push({
+      id: `notification_workout_complete_${record.id}_${Date.now()}`,
+      userId: coachUser.id,
+      clientId: client.id,
+      title: `${client.name} completed a workout`,
+      body: `${record.workoutTitle} was marked complete.`,
+      read: false,
+      createdAt: now
+    });
+  }
+  saveStore();
+  pushLiveWorkoutCompletion(record)
+    .then(() => saveAndSyncIdentity({ clientIds: [client.id], includeAll: true, skipBackup: true }))
+    .catch((error) => {
+      state.syncStatus = `Workout completion saved on this device, but Supabase did not update: ${error.message}`;
+    });
+  return record;
+}
+
+function clientCompletionSummaryPanel(client) {
+  if (!client || state.currentUser?.role === "Client") return "";
+  const workouts = clientWorkoutCompletionSummary(client.id);
+  const meals = clientMealCompletionSummary(client.id);
+  return `
+    <article class="card">
+      <h3>Client completion tracking</h3>
+      <div class="detail-grid">
+        <p><strong>Workouts completed:</strong> ${workouts.completed}</p>
+        <p><strong>Meals completed:</strong> ${meals.completed}</p>
+        <p><strong>Meals tracked:</strong> ${meals.tracked}</p>
+        <p><strong>Latest workout:</strong> ${workouts.latest ? `${escapeHtml(workouts.latest.workoutTitle || "Workout")} / ${formatReadableDate(workouts.latest.completedAt)}` : "None yet"}</p>
+        <p><strong>Latest meal:</strong> ${meals.latest ? `${escapeHtml(meals.latest.mealName || "Meal")} / ${escapeHtml(meals.latest.status || "Tracked")}` : "None yet"}</p>
       </div>
     </article>
   `;
@@ -3011,6 +3120,7 @@ function clientDashboard() {
     `;
   }
   const workout = dashboard.workout;
+  const workoutCompleted = workout ? workoutCompletionFor(workout.id, client.id) : null;
   const profileUser = userForProfile(client);
   const progressImages = getProgressImagesForUser(store, state.currentUser, client.id).slice(-3);
   return `
@@ -3039,7 +3149,7 @@ function clientDashboard() {
         <button class="ghost" data-view="plan">View Full Monthly Plan</button>
         <button class="ghost" data-open-client-meal-plan>View Meal Plan</button>
         <button class="ghost" data-view="profile">Upload Progress Photo</button>
-        ${workout?.coachAllowsMarkComplete && !dashboard.locked ? `<button class="success" id="markComplete">Mark Workout Complete</button>` : ""}
+        ${workout?.coachAllowsMarkComplete && !dashboard.locked ? `<button class="success" id="markComplete" ${workoutCompleted ? "disabled" : ""}>${workoutCompleted ? "Workout Completed" : "Mark Workout Complete"}</button>` : ""}
       </div>
       ${progressImages.length ? `<article class="card"><h3>Recent progress photos</h3><div class="mini-progress-row">${progressImages.map((image) => `<div><strong>${image.imageCategory}</strong><span>${image.imageDate}</span></div>`).join("")}</div></article>` : ""}
       ${dailyCheckInForm()}
@@ -3053,6 +3163,7 @@ function workoutDetailPage() {
   if (!detail) {
     return `<section class="workspace"><div class="empty">This workout is not available for this account.</div><button class="ghost" data-view="${state.currentUser.role === "Client" ? "client" : "plan"}">Back</button></section>`;
   }
+  const completed = workoutCompletionFor(detail.id, client.id);
   return `
     <section class="workspace">
       <div class="section-head">
@@ -3064,6 +3175,7 @@ function workoutDetailPage() {
         <div class="actions">
           <button class="ghost" data-view="${state.currentUser.role === "Client" ? "client" : "plan"}">Back</button>
           <button class="ghost" data-view="chat">Message Coach</button>
+          ${state.currentUser.role === "Client" && !detail.locked ? `<button class="success" id="markComplete" ${completed ? "disabled" : ""}>${completed ? "Workout Completed" : "Mark Workout Complete"}</button>` : ""}
           ${detail.canEdit ? `<button class="success" data-send-workout-update="${detail.id}">Send Workout Update</button>` : ""}
         </div>
       </div>
@@ -5071,6 +5183,12 @@ function bindGlobal() {
     state.view = "workoutDetail";
     render();
   }));
+  document.querySelector("#markComplete")?.addEventListener("click", () => {
+    const workoutId = state.selectedWorkoutId || getClientDashboard(store, state.clientId, today).workout?.id;
+    const record = markClientWorkoutComplete(workoutId);
+    if (record) window.alert("Workout marked complete. Your coach can now see it.");
+    render();
+  });
   document.querySelectorAll("[data-exercise-detail]").forEach((button) => button.addEventListener("click", () => {
     state.selectedExerciseId = button.dataset.exerciseDetail;
     state.selectedWorkoutId = button.dataset.workoutContext || state.selectedWorkoutId;
@@ -5853,6 +5971,15 @@ function bindGlobal() {
     const mealIndex = Number(event.currentTarget.dataset.mealIndex || 0);
     const note = document.querySelector(`#mealTrackNote-${dayNumber}-${mealIndex}`)?.value || "";
     trackMealStatus(planId, dayNumber, mealIndex, event.currentTarget.dataset.trackMealStatus, note);
+    render();
+  }));
+  document.querySelectorAll("[data-mark-meal-ate]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const planId = event.currentTarget.dataset.planId;
+    const dayNumber = Number(event.currentTarget.dataset.day || 1);
+    const mealIndex = Number(event.currentTarget.dataset.mealIndex || 0);
+    trackMealStatus(planId, dayNumber, mealIndex, "Ate", "Marked complete from meal plan card.");
+    window.alert("Meal marked complete. Your coach can now see it.");
     render();
   }));
   document.querySelector("[data-substitute-client-meal]")?.addEventListener("click", (event) => {
@@ -7018,11 +7145,12 @@ function smartDecisionPanel(client, assessment, lastCheckIn) {
 
 function todayPreviewPanel(client) {
   const dashboard = getClientDashboard(store, client.id, today);
+  const completed = dashboard.workout ? workoutCompletionFor(dashboard.workout.id, client.id) : null;
   return `
     <article class="card decision-card">
       <p class="eyebrow">Today</p>
       <h3>${dashboard.workout?.title || "No workout scheduled"}</h3>
-      <p>${dashboard.message}</p>
+      <p>${dashboard.message}${completed ? ` Completed ${formatReadableDate(completed.completedAt)}.` : ""}</p>
       ${dashboard.workout ? `<div class="chips"><span>Week ${dashboard.workout.weekNumber}</span><span>Day ${dashboard.workout.trainingDayNumber}</span><span>${dashboard.workout.sessionLength} min</span></div>` : ""}
       <button class="primary" data-view="client">Open Client View</button>
     </article>
@@ -7992,17 +8120,24 @@ function nutritionMealPreviewCard(meal, planId, dayNumber, mealIndex) {
   const plan = (store.mealPlans || []).find((item) => item.id === planId);
   const favoriteIds = clientFavoriteMealIds(plan?.clientId);
   const isFavorite = favoriteIds.includes(meal.id);
+  const tracking = mealTrackingRecord(plan, dayNumber, mealIndex);
+  const isEaten = tracking?.status === "Ate" || tracking?.status === "Substituted";
+  const canTrack = state.currentUser?.role === "Client" && clientForCurrentUser()?.id === plan?.clientId;
   return `
-    <button class="meal-preview-card" data-open-meal-recipe data-plan-id="${escapeHtml(planId)}" data-day="${dayNumber}" data-meal-index="${mealIndex}" title="Open recipe for ${escapeHtml(meal.name)}">
+    <article class="meal-preview-card meal-preview-action-card">
       <span>
         <strong>${escapeHtml(nutritionMealDisplayType(meal, mealIndex))}:</strong> ${escapeHtml(meal.name)}
         <small>${meal.calories} cal / P ${meal.protein}g / C ${meal.carbs}g / F ${meal.fat}g / ${escapeHtml(meal.prepTime || "Prep time not listed")}</small>
       </span>
       <span class="meal-preview-badges">
         ${isFavorite ? `<span class="badge green">Favorite</span>` : ""}
-        <span class="badge green">Recipe</span>
+        ${isEaten ? `<span class="badge green">Eaten</span>` : tracking ? `<span class="badge orange">${escapeHtml(tracking.status)}</span>` : ""}
       </span>
-    </button>
+      <span class="actions">
+        ${canTrack ? `<button class="success" data-mark-meal-ate data-plan-id="${escapeHtml(planId)}" data-day="${dayNumber}" data-meal-index="${mealIndex}" ${isEaten ? "disabled" : ""}>${isEaten ? "Meal Completed" : "Ate"}</button>` : ""}
+        <button class="primary" data-open-meal-recipe data-plan-id="${escapeHtml(planId)}" data-day="${dayNumber}" data-meal-index="${mealIndex}" title="Open recipe for ${escapeHtml(meal.name)}">Recipe</button>
+      </span>
+    </article>
   `;
 }
 
@@ -8312,13 +8447,27 @@ function trackMealStatus(planId, dayNumber, mealIndex, status, note = "") {
     protein: status === "Ate" || status === "Substituted" ? Number(meal.protein || 0) : 0,
     carbs: status === "Ate" || status === "Substituted" ? Number(meal.carbs || 0) : 0,
     fat: status === "Ate" || status === "Substituted" ? Number(meal.fat || 0) : 0,
-    createdAt: new Date().toISOString()
+    completedAt: status === "Ate" || status === "Substituted" ? new Date().toISOString() : "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   const existingIndex = plan.mealTracking.findIndex((item) => item.id === recordId);
   if (existingIndex >= 0) plan.mealTracking[existingIndex] = record;
   else plan.mealTracking.push(record);
   plan.updatedAt = new Date().toISOString();
   saveStore();
+  pushLiveIdentityRecord("meal_plans", plan)
+    .then(() => saveAndSyncIdentity({ clientIds: [plan.clientId], includeAll: true, skipBackup: true }))
+    .catch((error) => {
+      state.syncStatus = `Meal completion saved on this device, but Supabase did not update: ${error.message}`;
+    });
+}
+
+function mealTrackingRecord(plan, dayNumber, mealIndex) {
+  return (plan?.mealTracking || []).find((item) =>
+    Number(item.day) === Number(dayNumber)
+    && Number(item.mealIndex) === Number(mealIndex)
+  ) || null;
 }
 
 function mealTrackingSummary(plan, day) {
@@ -8628,7 +8777,7 @@ function nutritionAssignedPlanView(plan, options = {}) {
                 <p class="eyebrow">Day ${day.day}</p>
                 <h3>${day.totalCalories} cal / ${day.totalProtein}g protein</h3>
                 <p class="muted">C ${day.totalCarbs}g / F ${day.totalFat}g / Fiber ${day.totalFiber || 0}g / Sugar ${day.totalSugar || 0}g / Sodium ${day.totalSodium || 0}mg</p>
-                ${options.clientView ? nutritionMealTrackingLine(plan, day) : ""}
+                ${nutritionMealTrackingLine(plan, day)}
               </div>
             </div>
             <div class="meal-preview-list">
@@ -9038,11 +9187,12 @@ function dailyScore(label, key, value) {
 function workoutCard(workout, locked) {
   if (locked) return `<div class="locked">Please contact your coach before completing today's workout.</div>`;
   if (!workout) return `<div class="empty">No workout scheduled today.</div>`;
+  const completed = workoutCompletionFor(workout.id, workout.clientId);
   return `
     <article class="workout">
       <div class="section-head">
         <div><p class="eyebrow">${workout.workoutDate === today ? "Today" : `Next scheduled: ${workout.workoutDate || "Date not set"}`} / Week ${workout.weekNumber} / Training day ${workout.trainingDayNumber}</p><h2>${workout.title}</h2></div>
-        <span class="badge green">${workout.sessionLength} min</span>
+        <span class="badge ${completed ? "green" : "orange"}">${completed ? "Completed" : `${workout.sessionLength} min`}</span>
       </div>
       <div class="chips"><span>${workout.trainingLevel || "Intermediate"}</span><span>${workout.items?.length || 0} exercises</span><span>${workout.items?.map((item) => item.equipment).filter(Boolean).join(", ") || "Mixed equipment"}</span></div>
       <div class="workout-items">${workout.items.map((item) => `<button class="workout-item-button" data-exercise-detail="${item.exerciseId}" data-workout-context="${workout.id}"><strong>${item.name}</strong><span>${item.sessionPart}</span><small>${formatDose(item)}${item.replacementReason ? ` / ${item.replacementReason}` : ""}</small></button>`).join("")}</div>

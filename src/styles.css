@@ -1355,6 +1355,14 @@ dd {
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
+.meal-preview-action-card {
+  cursor: default;
+}
+
+.meal-preview-action-card .actions {
+  flex-shrink: 0;
+}
+
 .meal-preview-card:hover,
 .meal-preview-card:focus {
   transform: translateY(-1px);
