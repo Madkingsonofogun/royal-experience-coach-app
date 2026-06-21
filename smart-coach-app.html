@@ -401131,15 +401131,34 @@ function clientProgramSummaryPanel(client) {
 }
 
 function workoutCompletionFor(workoutId, clientId = state.clientId) {
-  return (store.workoutCompletions || []).find((item) => item.workoutId === workoutId && item.clientId === clientId && item.completed);
+  return (store.workoutCompletions || []).find((item) => item.workoutId === workoutId && item.clientId === clientId);
+}
+
+function completedWorkoutExerciseIndexes(workoutId, clientId = state.clientId) {
+  const record = workoutCompletionFor(workoutId, clientId);
+  return (record?.exerciseCompletions || [])
+    .filter((item) => item.completed)
+    .map((item) => Number(item.itemIndex));
+}
+
+function workoutExerciseCompletionFor(workoutId, itemIndex, clientId = state.clientId) {
+  const record = workoutCompletionFor(workoutId, clientId);
+  return (record?.exerciseCompletions || []).find((item) => Number(item.itemIndex) === Number(itemIndex) && item.completed) || null;
 }
 
 function clientWorkoutCompletionSummary(clientId) {
-  const records = (store.workoutCompletions || []).filter((item) => item.clientId === clientId && item.completed);
+  const clientRecords = (store.workoutCompletions || []).filter((item) => item.clientId === clientId);
+  const records = clientRecords.filter((item) => item.completed);
+  const exerciseCompleted = clientRecords.reduce((sum, item) => sum + (item.exerciseCompletions || []).filter((exercise) => exercise.completed).length, 0);
   const latest = [...records].sort((a, b) => String(b.completedAt || "").localeCompare(String(a.completedAt || "")))[0];
+  const latestExercise = clientRecords
+    .flatMap((record) => (record.exerciseCompletions || []).map((item) => ({ ...item, workoutTitle: record.workoutTitle })))
+    .sort((a, b) => String(b.completedAt || "").localeCompare(String(a.completedAt || "")))[0];
   return {
     completed: records.length,
-    latest
+    exerciseCompleted,
+    latest,
+    latestExercise
   };
 }
 
@@ -401155,17 +401174,41 @@ function clientMealCompletionSummary(clientId) {
   };
 }
 
-function markClientWorkoutComplete(workoutId) {
+function markClientWorkoutExerciseComplete(workoutId, itemIndex) {
   const client = clientForCurrentUser();
   const workout = (store.monthlyPlanItems || []).find((item) => item.id === workoutId && item.clientId === client?.id);
   if (!client || !workout) {
     window.alert("Workout could not be found for this client.");
     return null;
   }
+  const workoutItem = (workout.items || [])[Number(itemIndex)];
+  if (!workoutItem) {
+    window.alert("Exercise could not be found in this workout.");
+    return null;
+  }
   store.workoutCompletions ||= [];
   const now = new Date().toISOString();
   const id = `workout_completion_${client.id}_${workout.id}`;
+  const existing = store.workoutCompletions.find((item) => item.id === id);
+  const exerciseRecord = {
+    id: `${id}_exercise_${itemIndex}`,
+    itemIndex: Number(itemIndex),
+    exerciseId: workoutItem.exerciseId || "",
+    exerciseName: workoutItem.name || workoutItem.exerciseName || "Exercise",
+    sessionPart: workoutItem.sessionPart || "",
+    completed: true,
+    completedByUserId: state.currentUser?.id || "",
+    completedAt: now,
+    createdAt: existing?.exerciseCompletions?.find((item) => Number(item.itemIndex) === Number(itemIndex))?.createdAt || now,
+    updatedAt: now
+  };
+  const exerciseCompletions = [...(existing?.exerciseCompletions || [])].filter((item) => Number(item.itemIndex) !== Number(itemIndex));
+  exerciseCompletions.push(exerciseRecord);
+  exerciseCompletions.sort((a, b) => Number(a.itemIndex) - Number(b.itemIndex));
+  const totalExercises = (workout.items || []).length;
+  const completed = totalExercises > 0 && exerciseCompletions.filter((item) => item.completed).length >= totalExercises;
   const record = {
+    ...(existing || {}),
     id,
     clientId: client.id,
     workoutId: workout.id,
@@ -401174,10 +401217,13 @@ function markClientWorkoutComplete(workoutId) {
     workoutTitle: workout.title || workout.workoutName || "Workout",
     trainingDayNumber: workout.trainingDayNumber || "",
     weekNumber: workout.weekNumber || "",
-    completed: true,
+    completed,
+    totalExercises,
+    completedExerciseCount: exerciseCompletions.filter((item) => item.completed).length,
+    exerciseCompletions,
     completedByUserId: state.currentUser?.id || "",
-    completedAt: now,
-    createdAt: now,
+    completedAt: completed ? now : existing?.completedAt || "",
+    createdAt: existing?.createdAt || now,
     updatedAt: now
   };
   const existingIndex = store.workoutCompletions.findIndex((item) => item.id === id);
@@ -401190,8 +401236,8 @@ function markClientWorkoutComplete(workoutId) {
       id: `notification_workout_complete_${record.id}_${Date.now()}`,
       userId: coachUser.id,
       clientId: client.id,
-      title: `${client.name} completed a workout`,
-      body: `${record.workoutTitle} was marked complete.`,
+      title: `${client.name} completed an exercise`,
+      body: `${exerciseRecord.exerciseName} was marked complete in ${record.workoutTitle}.`,
       read: false,
       createdAt: now
     });
@@ -401214,9 +401260,11 @@ function clientCompletionSummaryPanel(client) {
       <h3>Client completion tracking</h3>
       <div class="detail-grid">
         <p><strong>Workouts completed:</strong> ${workouts.completed}</p>
+        <p><strong>Exercises completed:</strong> ${workouts.exerciseCompleted}</p>
         <p><strong>Meals completed:</strong> ${meals.completed}</p>
         <p><strong>Meals tracked:</strong> ${meals.tracked}</p>
         <p><strong>Latest workout:</strong> ${workouts.latest ? `${escapeHtml(workouts.latest.workoutTitle || "Workout")} / ${formatReadableDate(workouts.latest.completedAt)}` : "None yet"}</p>
+        <p><strong>Latest exercise:</strong> ${workouts.latestExercise ? `${escapeHtml(workouts.latestExercise.exerciseName || "Exercise")} / ${escapeHtml(workouts.latestExercise.workoutTitle || "Workout")}` : "None yet"}</p>
         <p><strong>Latest meal:</strong> ${meals.latest ? `${escapeHtml(meals.latest.mealName || "Meal")} / ${escapeHtml(meals.latest.status || "Tracked")}` : "None yet"}</p>
       </div>
     </article>
@@ -401816,7 +401864,7 @@ function clientDashboard() {
         <button class="ghost" data-view="plan">View Full Monthly Plan</button>
         <button class="ghost" data-open-client-meal-plan>View Meal Plan</button>
         <button class="ghost" data-view="profile">Upload Progress Photo</button>
-        ${workout?.coachAllowsMarkComplete && !dashboard.locked ? `<button class="success" id="markComplete" ${workoutCompleted ? "disabled" : ""}>${workoutCompleted ? "Workout Completed" : "Mark Workout Complete"}</button>` : ""}
+        ${workoutCompleted?.completed ? `<span class="badge green">All exercises completed</span>` : ""}
       </div>
       ${progressImages.length ? `<article class="card"><h3>Recent progress photos</h3><div class="mini-progress-row">${progressImages.map((image) => `<div><strong>${image.imageCategory}</strong><span>${image.imageDate}</span></div>`).join("")}</div></article>` : ""}
       ${dailyCheckInForm()}
@@ -401842,7 +401890,7 @@ function workoutDetailPage() {
         <div class="actions">
           <button class="ghost" data-view="${state.currentUser.role === "Client" ? "client" : "plan"}">Back</button>
           <button class="ghost" data-view="chat">Message Coach</button>
-          ${state.currentUser.role === "Client" && !detail.locked ? `<button class="success" id="markComplete" ${completed ? "disabled" : ""}>${completed ? "Workout Completed" : "Mark Workout Complete"}</button>` : ""}
+          ${state.currentUser.role === "Client" && completed?.completed ? `<span class="badge green">All exercises completed</span>` : ""}
           ${detail.canEdit ? `<button class="success" data-send-workout-update="${detail.id}">Send Workout Update</button>` : ""}
         </div>
       </div>
@@ -401862,11 +401910,13 @@ function workoutDetailPage() {
 
 function workoutExerciseCard(item, canEdit) {
   const detail = item.detail || {};
+  const canClientTrack = state.currentUser?.role === "Client";
+  const exerciseCompleted = canClientTrack ? workoutExerciseCompletionFor(state.selectedWorkoutId, item.itemIndex, state.clientId) : null;
   return `
     <article class="exercise-preview-card">
       <div class="section-head compact">
         <div><p class="eyebrow">${item.sessionPart}</p><h4>${item.exerciseName}</h4></div>
-        <span class="badge ${item.difficulty === "Hard" ? "red" : item.difficulty === "Medium" ? "orange" : "green"}">${item.difficulty}</span>
+        <span class="badge ${exerciseCompleted ? "green" : item.difficulty === "Hard" ? "red" : item.difficulty === "Medium" ? "orange" : "green"}">${exerciseCompleted ? "Complete" : item.difficulty}</span>
       </div>
       ${doseDetailGrid(item)}
       <div class="chips">
@@ -401875,6 +401925,7 @@ function workoutExerciseCard(item, canEdit) {
       </div>
       <p>${detail.purpose || "Coach-selected exercise for today's workout."}</p>
       <div class="actions">
+        ${canClientTrack ? `<button class="success" data-mark-exercise-complete="${state.selectedWorkoutId}:${item.itemIndex}" ${exerciseCompleted ? "disabled" : ""}>${exerciseCompleted ? "Exercise Completed" : "Mark Exercise Complete"}</button>` : ""}
         ${item.hasVideo ? `<a class="button-link" href="${detail.videoUrl}" target="_blank" rel="noopener">Watch Video</a>` : ""}
         <button class="primary" data-exercise-detail="${item.exerciseId}" data-workout-context="${state.selectedWorkoutId}">View Details</button>
         ${canEdit ? `<button class="ghost" data-coach-workout-item="${state.selectedWorkoutId}:${item.itemIndex}" data-coach-workout-mode="replace">Replace Exercise</button><button class="ghost" data-coach-workout-item="${state.selectedWorkoutId}:${item.itemIndex}" data-coach-workout-mode="dose">Edit Rounds / Sets / Time</button><button class="ghost" data-coach-workout-item="${state.selectedWorkoutId}:${item.itemIndex}" data-coach-workout-mode="note">Add Coach Note</button>` : ""}
@@ -403850,12 +403901,12 @@ function bindGlobal() {
     state.view = "workoutDetail";
     render();
   }));
-  document.querySelector("#markComplete")?.addEventListener("click", () => {
-    const workoutId = state.selectedWorkoutId || getClientDashboard(store, state.clientId, today).workout?.id;
-    const record = markClientWorkoutComplete(workoutId);
-    if (record) window.alert("Workout marked complete. Your coach can now see it.");
+  document.querySelectorAll("[data-mark-exercise-complete]").forEach((button) => button.addEventListener("click", (event) => {
+    const [workoutId, itemIndex] = String(event.currentTarget.dataset.markExerciseComplete || "").split(":");
+    const record = markClientWorkoutExerciseComplete(workoutId, Number(itemIndex));
+    if (record) window.alert("Exercise marked complete. Your coach can now see it.");
     render();
-  });
+  }));
   document.querySelectorAll("[data-exercise-detail]").forEach((button) => button.addEventListener("click", () => {
     state.selectedExerciseId = button.dataset.exerciseDetail;
     state.selectedWorkoutId = button.dataset.workoutContext || state.selectedWorkoutId;
@@ -405813,12 +405864,14 @@ function smartDecisionPanel(client, assessment, lastCheckIn) {
 function todayPreviewPanel(client) {
   const dashboard = getClientDashboard(store, client.id, today);
   const completed = dashboard.workout ? workoutCompletionFor(dashboard.workout.id, client.id) : null;
+  const exerciseCount = dashboard.workout?.items?.length || completed?.totalExercises || 0;
+  const completedExercises = completed?.completedExerciseCount || 0;
   return `
     <article class="card decision-card">
       <p class="eyebrow">Today</p>
       <h3>${dashboard.workout?.title || "No workout scheduled"}</h3>
-      <p>${dashboard.message}${completed ? ` Completed ${formatReadableDate(completed.completedAt)}.` : ""}</p>
-      ${dashboard.workout ? `<div class="chips"><span>Week ${dashboard.workout.weekNumber}</span><span>Day ${dashboard.workout.trainingDayNumber}</span><span>${dashboard.workout.sessionLength} min</span></div>` : ""}
+      <p>${dashboard.message}${completed?.completed ? ` Completed ${formatReadableDate(completed.completedAt)}.` : ""}</p>
+      ${dashboard.workout ? `<div class="chips"><span>Week ${dashboard.workout.weekNumber}</span><span>Day ${dashboard.workout.trainingDayNumber}</span><span>${dashboard.workout.sessionLength} min</span><span>${completedExercises}/${exerciseCount} exercises complete</span></div>` : ""}
       <button class="primary" data-view="client">Open Client View</button>
     </article>
   `;
@@ -407855,13 +407908,15 @@ function workoutCard(workout, locked) {
   if (locked) return `<div class="locked">Please contact your coach before completing today's workout.</div>`;
   if (!workout) return `<div class="empty">No workout scheduled today.</div>`;
   const completed = workoutCompletionFor(workout.id, workout.clientId);
+  const exerciseCount = workout.items?.length || completed?.totalExercises || 0;
+  const completedExercises = completed?.completedExerciseCount || 0;
   return `
     <article class="workout">
       <div class="section-head">
         <div><p class="eyebrow">${workout.workoutDate === today ? "Today" : `Next scheduled: ${workout.workoutDate || "Date not set"}`} / Week ${workout.weekNumber} / Training day ${workout.trainingDayNumber}</p><h2>${workout.title}</h2></div>
-        <span class="badge ${completed ? "green" : "orange"}">${completed ? "Completed" : `${workout.sessionLength} min`}</span>
+        <span class="badge ${completed?.completed ? "green" : "orange"}">${completed?.completed ? "Completed" : `${completedExercises}/${exerciseCount} done`}</span>
       </div>
-      <div class="chips"><span>${workout.trainingLevel || "Intermediate"}</span><span>${workout.items?.length || 0} exercises</span><span>${workout.items?.map((item) => item.equipment).filter(Boolean).join(", ") || "Mixed equipment"}</span></div>
+      <div class="chips"><span>${workout.trainingLevel || "Intermediate"}</span><span>${workout.items?.length || 0} exercises</span><span>${completedExercises}/${exerciseCount} complete</span><span>${workout.items?.map((item) => item.equipment).filter(Boolean).join(", ") || "Mixed equipment"}</span></div>
       <div class="workout-items">${workout.items.map((item) => `<button class="workout-item-button" data-exercise-detail="${item.exerciseId}" data-workout-context="${workout.id}"><strong>${item.name}</strong><span>${item.sessionPart}</span><small>${formatDose(item)}${item.replacementReason ? ` / ${item.replacementReason}` : ""}</small></button>`).join("")}</div>
       <div class="actions"><button class="primary" data-workout-detail="${workout.id}">View Full Workout</button></div>
     </article>
