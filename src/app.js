@@ -96,6 +96,11 @@ import {
 import { blankAssessment, createStore } from "./data.js";
 import { mealDemoLibrary, nutritionDemoStats } from "./meal-demo-data.js";
 
+const FITNESS_FOCUS_OPTIONS = ["Weight Loss", "Strength", "Muscle Building", "Conditioning", "Mobility", "Low-Impact Fitness", "General Fitness", "Hybrid Coaching", "Advanced Hybrid Fitness"];
+const WORKOUT_CATEGORY_OPTIONS = ["Strength", "Conditioning", "Cardio", "Mobility", "Core", "Recovery", "Low Impact", "Functional Fitness", "Hybrid Training"];
+const EXERCISE_CATEGORY_OPTIONS = ["Strength", "Cardio", "Mobility", "Core", "Recovery", "Low Impact", "Functional Fitness"];
+const TRAINING_TYPE_OPTIONS = ["Strength training", "Conditioning", "General fitness", "Weight loss training", "Muscle gain training", "Recovery", "Mobility", "Low-impact fitness", "Hybrid coaching"];
+
 const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
 const LIVE_BACKUP_ID = "identity_live_v2";
 const LIVE_SNAPSHOT_IDS = {
@@ -157,7 +162,7 @@ const state = {
     activityLevel: "Moderately active",
     workoutDaysPerWeek: 3,
     averageWorkoutLength: 45,
-    trainingType: "Boxing",
+    trainingType: "Hybrid coaching",
     mealsPerDay: 3,
     snacksPerDay: 1,
     prepTimePreference: "Any",
@@ -184,7 +189,7 @@ const state = {
     confirmPin: "",
     requestNote: "",
     goal: "",
-    sportFocus: "Boxing",
+    sportFocus: "General Fitness",
     alreadyTrainsWithCoach: false,
     coachNameIfKnown: "",
     coachTitle: "",
@@ -200,10 +205,10 @@ const state = {
       email: "",
       phone: "",
       goal: "",
-      sportFocus: "Boxing",
+      sportFocus: "General Fitness",
       trainingDaysPerWeek: 3,
       sessionLength: 45,
-      package: "Hybrid coaching",
+      package: "Hybrid Coaching",
       assignedCoach: "coach_1",
       startDate: today,
       status: "Active",
@@ -228,7 +233,7 @@ const state = {
     exercise: {
       exerciseName: "",
       category: "Strength",
-      sportFocus: "Boxing",
+      sportFocus: "General Fitness",
       goal: "Conditioning",
       difficulty: "Easy",
       trainingLevel: "Beginner",
@@ -250,19 +255,19 @@ const state = {
     workout: {
       workoutName: "",
       description: "",
-      sportFocus: "Boxing",
+      sportFocus: "General Fitness",
       goal: "Conditioning",
       trainingLevel: "Intermediate",
       planLevel: "Intermediate",
       difficulty: "Medium",
       sessionLength: 45,
       trainingDayType: "Day 1",
-      workoutCategory: "Boxing",
+      workoutCategory: "Hybrid Training",
       coachNotes: "",
       clientNotes: ""
     },
     workoutItem: {
-      workoutTemplateId: "template_boxing_baseline",
+      workoutTemplateId: "template_hybrid_baseline",
       sessionPart: "Warm-Up",
       exerciseId: "marching",
       sets: "",
@@ -274,7 +279,7 @@ const state = {
     planOffering: {
       planName: "",
       description: "",
-      sportFocus: "Boxing",
+      sportFocus: "General Fitness",
       goal: "Conditioning",
       trainingLevel: "Intermediate",
       planLevel: "Intermediate",
@@ -282,18 +287,18 @@ const state = {
       sessionLength: 45,
       price: 249,
       sessionsIncluded: 12,
-      packageType: "Hybrid coaching",
-      workoutTemplateIds: ["template_boxing_baseline"]
+      packageType: "Hybrid Coaching",
+      workoutTemplateIds: ["template_hybrid_baseline"]
     },
     package: {
       packageName: "",
-      planOfferingId: "offering_boxing_3day",
+      planOfferingId: "offering_hybrid_3day",
       price: 249,
       sessionsIncluded: 12
     },
     assessmentTemplate: {
       templateName: "",
-      sportFocus: "Boxing",
+      sportFocus: "General Fitness",
       goal: "Conditioning",
       movementTestIds: movementTests.map((test) => test.id)
     }
@@ -398,6 +403,7 @@ let loginInitialSyncStarted = false;
 let lastShoppingListPrintAt = 0;
 
 scheduleLegacyMealPlanCleanup();
+saveStoreLocalOnly();
 const app = document.querySelector("#app");
 render();
 startLoginAccountAutoRefresh();
@@ -571,12 +577,12 @@ async function refreshLoginAccountsAutomatically(showResult) {
 function loadSavedStore(defaultStore) {
   try {
     const saved = window.localStorage?.getItem(STORE_STORAGE_KEY);
-    if (!saved) return defaultStore;
+    if (!saved) return migrateGeneralFitnessStore(defaultStore);
     const parsed = JSON.parse(saved);
-    return mergeStore(defaultStore, parsed);
+    return migrateGeneralFitnessStore(mergeStore(defaultStore, parsed));
   } catch (error) {
     console.warn("Could not load saved app data.", error);
-    return defaultStore;
+    return migrateGeneralFitnessStore(defaultStore);
   }
 }
 
@@ -593,6 +599,262 @@ function mergeStore(defaultStore, savedStore) {
   });
   reconcileLinkedProfileImagesForStore(merged);
   return merged;
+}
+
+function migrateGeneralFitnessStore(targetStore) {
+  ensureStoreListShape(targetStore);
+  ensureDefaultHybridContent(targetStore);
+  targetStore.exercises = (targetStore.exercises || []).map(sanitizeExerciseForGeneralFitness).filter((exercise) => !exercise.hiddenCombat);
+  (targetStore.clients || []).forEach((client) => {
+    client.sportFocus = generalFitnessFocus(client.sportFocus || client.goal);
+    client.goal = sanitizeCombatText(client.goal || "General fitness");
+    client.packageType = sanitizeCombatText(client.packageType || "Hybrid Coaching");
+    client.equipmentAvailable = (client.equipmentAvailable || []).filter((item) => !/bag|mitt|pad/i.test(String(item)));
+    client.progressNotes = sanitizeCombatText(client.progressNotes || "");
+  });
+  (targetStore.planOfferings || []).forEach((offering) => {
+    offering.planName = sanitizeWorkoutTitle(offering.planName || "Hybrid Coaching Plan");
+    offering.description = sanitizeCombatText(offering.description || "");
+    offering.sportFocus = generalFitnessFocus(offering.sportFocus || offering.goal || offering.planName);
+    offering.goal = sanitizeCombatText(offering.goal || "General fitness");
+    offering.packageType = sanitizeCombatText(offering.packageType || "Hybrid Coaching");
+    if (combatSpecificAppText([offering.planName, offering.description, offering.workoutCategory].join(" "))) {
+      offering.hiddenCombat = true;
+      offering.active = false;
+      offering.archived = true;
+    }
+  });
+  (targetStore.packages || []).forEach((pkg) => {
+    pkg.packageName = sanitizeWorkoutTitle(pkg.packageName || "Hybrid Coaching");
+    if (combatSpecificAppText(pkg.packageName)) {
+      pkg.hiddenCombat = true;
+      pkg.active = false;
+      pkg.archived = true;
+    }
+  });
+  (targetStore.workoutTemplates || []).forEach((template) => {
+    template.workoutName = sanitizeWorkoutTitle(template.workoutName || "Hybrid Fitness Workout");
+    template.description = sanitizeCombatText(template.description || "");
+    template.sportFocus = generalFitnessFocus(template.sportFocus || template.goal || template.workoutName);
+    template.workoutCategory = generalWorkoutCategory(template.workoutCategory || template.goal || template.workoutName);
+    template.goal = sanitizeCombatText(template.goal || "General fitness");
+    if (combatSpecificAppText([template.workoutName, template.description, template.trainingDayType].join(" "))) {
+      template.hiddenCombat = true;
+      template.active = false;
+      template.archived = true;
+    }
+  });
+  (targetStore.planTemplates || []).forEach((template) => {
+    template.templateName = sanitizeWorkoutTitle(template.templateName || "Hybrid Monthly Template");
+    template.sportFocus = generalFitnessFocus(template.sportFocus || template.goal || template.templateName);
+    template.goal = sanitizeCombatText(template.goal || "General fitness");
+  });
+  (targetStore.assessmentTemplates || []).forEach((template) => {
+    if (combatSpecificAppText([template.templateName, template.sportFocus, template.goal, template.templatePurpose].join(" "))) {
+      template.hiddenCombat = true;
+      template.active = false;
+      template.archived = true;
+    }
+    template.templateName = sanitizeWorkoutTitle(template.templateName || "Movement Assessment Template");
+    template.sportFocus = generalFitnessFocus(template.sportFocus || template.goal || template.templateName);
+    template.goal = sanitizeCombatText(template.goal || "General fitness");
+  });
+  (targetStore.monthlyPlanItems || []).forEach((item) => {
+    sanitizeWorkoutSnapshot(item);
+  });
+  (targetStore.dailyCheckIns || []).forEach((checkIn) => {
+    sanitizeWorkoutSnapshot(checkIn.adjustedWorkout);
+  });
+  (targetStore.todayWorkoutAdjustments || []).forEach((adjustment) => {
+    sanitizeWorkoutSnapshot(adjustment.originalWorkoutSnapshot);
+    sanitizeWorkoutSnapshot(adjustment.appSuggestedWorkoutSnapshot);
+    sanitizeWorkoutSnapshot(adjustment.coachApprovedWorkoutSnapshot);
+    sanitizeWorkoutSnapshot(adjustment.adjustedWorkoutSnapshot);
+  });
+  (targetStore.coachAlerts || []).forEach((alert) => {
+    sanitizeWorkoutSnapshot(alert.suggestedWorkoutSnapshot);
+  });
+  return targetStore;
+}
+
+function sanitizeWorkoutSnapshot(workout) {
+  if (!workout) return workout;
+  workout.title = sanitizeWorkoutTitle(workout.title || workout.workoutName || "Hybrid Fitness Workout");
+  workout.workoutName = workout.workoutName ? sanitizeWorkoutTitle(workout.workoutName) : workout.workoutName;
+  workout.sportFocus = generalFitnessFocus(workout.sportFocus || workout.title);
+  workout.workoutCategory = generalWorkoutCategory(workout.workoutCategory || workout.title);
+  workout.items = (workout.items || []).map(replaceCombatWorkoutExercise).filter(Boolean);
+  return workout;
+}
+
+function sanitizeExerciseForGeneralFitness(exercise = {}) {
+  const clean = { ...exercise };
+  const text = [clean.exerciseName, clean.name, clean.category, clean.sportFocus, clean.replacementCategory, clean.description].join(" ");
+  if (combatSpecificAppText(text)) {
+    clean.hiddenCombat = true;
+    clean.active = false;
+    clean.archived = true;
+    return clean;
+  }
+  clean.exerciseName = sanitizeWorkoutTitle(clean.exerciseName || clean.name || "Exercise");
+  clean.name = clean.exerciseName;
+  clean.category = sanitizeCombatText(clean.category || "");
+  clean.sportFocus = generalFitnessFocus(clean.sportFocus || clean.category || clean.exerciseName);
+  clean.replacementCategory = generalWorkoutCategory(clean.replacementCategory || clean.category || clean.exerciseName).toLowerCase();
+  return clean;
+}
+
+function replaceCombatWorkoutExercise(exercise = {}) {
+  const text = [exercise.name, exercise.exerciseName, exercise.exerciseId, exercise.sessionPart].join(" ");
+  if (!combatSpecificAppText(text)) {
+    return {
+      ...exercise,
+      name: sanitizeWorkoutTitle(exercise.name || exercise.exerciseName || "Exercise"),
+      exerciseName: exercise.exerciseName ? sanitizeWorkoutTitle(exercise.exerciseName) : exercise.exerciseName,
+      sessionPart: sanitizeSessionPartForGeneralFitness(exercise.sessionPart)
+    };
+  }
+  if (/shadow|boxing|kickboxing|punch|bag|mitt|pad|spar|combo|defense/i.test(text)) {
+    return {
+      exerciseId: "marching",
+      name: "Marching intervals",
+      exerciseName: "Marching intervals",
+      sessionPart: "Conditioning",
+      rounds: exercise.rounds || 4,
+      time: exercise.time || 90,
+      rest: exercise.rest || 60
+    };
+  }
+  return null;
+}
+
+function sanitizeSessionPartForGeneralFitness(part = "") {
+  const text = String(part || "").toLowerCase();
+  if (text.includes("skill") || text.includes("technique")) return "Conditioning";
+  return sanitizeCombatText(part || "Conditioning");
+}
+
+function ensureDefaultHybridContent(targetStore) {
+  const now = new Date().toISOString();
+  const defaultOfferings = [
+    ["offering_hybrid_2day", "2-Day Hybrid Coaching", 2, 30, 179, "Beginner"],
+    ["offering_hybrid_3day", "3-Day Hybrid Coaching", 3, 45, 249, "Intermediate"],
+    ["offering_hybrid_4day", "4-Day Hybrid Coaching", 4, 60, 329, "Advanced"],
+    ["offering_hybrid_5day", "5-Day Hybrid Coaching", 5, 60, 399, "Advanced"],
+    ["offering_nutrition_addon", "Nutrition Add-On", 0, 0, 50, "Beginner"]
+  ];
+  defaultOfferings.forEach(([id, planName, trainingDaysPerWeek, sessionLength, price, trainingLevel]) => {
+    if ((targetStore.planOfferings || []).some((offering) => offering.id === id)) return;
+    targetStore.planOfferings.push({
+      id,
+      planName,
+      description: `${planName} for smart general fitness and hybrid coaching clients.`,
+      sportFocus: "Hybrid Coaching",
+      goal: planName.includes("Nutrition") ? "Nutrition support" : "General fitness",
+      trainingLevel,
+      planLevel: trainingLevel,
+      trainingDaysPerWeek,
+      sessionLength,
+      price,
+      sessionsIncluded: trainingDaysPerWeek ? trainingDaysPerWeek * 4 : 0,
+      packageType: "Hybrid Coaching",
+      workoutTemplateIds: [],
+      active: true,
+      archived: false,
+      createdByAdminId: "admin_1",
+      createdAt: now,
+      updatedAt: now
+    });
+  });
+  const defaultPackages = [
+    ["package_hybrid_2day", "2-Day Hybrid Coaching", "offering_hybrid_2day"],
+    ["package_hybrid_3day", "3-Day Hybrid Coaching", "offering_hybrid_3day"],
+    ["package_hybrid_4day", "4-Day Hybrid Coaching", "offering_hybrid_4day"],
+    ["package_hybrid_5day", "5-Day Hybrid Coaching", "offering_hybrid_5day"],
+    ["package_nutrition_addon", "Nutrition Add-On", "offering_nutrition_addon"]
+  ];
+  defaultPackages.forEach(([id, packageName, planOfferingId]) => {
+    if ((targetStore.packages || []).some((pkg) => pkg.id === id)) return;
+    const offering = targetStore.planOfferings.find((item) => item.id === planOfferingId);
+    targetStore.packages.push({
+      id,
+      packageName,
+      planOfferingId,
+      planOfferingIds: [planOfferingId],
+      price: offering?.price || 0,
+      sessionsIncluded: offering?.sessionsIncluded || 0,
+      active: true,
+      archived: false,
+      createdByAdminId: "admin_1",
+      createdAt: now,
+      updatedAt: now
+    });
+  });
+}
+
+function combatSpecificAppText(value = "") {
+  const text = String(value || "");
+  return /\b(boxing|kickboxing|bjj|mma|fight|fighter|combat|shadowboxing|shadow boxing|combo|combos|mitt|mitts|pad|pads|spar|sparring|punch|punching|kick|kicking|defense|defensive|heavy bag|bag round|bag rounds|footwork)\b/i.test(text)
+    && !/\b(jump rope|battle rope|battle ropes|agility ladder|ladder drill|running ladder|cardio ladder|running|walk|walking|bike|row|rowing|elliptical|march|marching|step-up|step up|sled|conditioning circuit)\b/i.test(text);
+}
+
+function generalFitnessFocus(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (/weight|fat loss|lose|slim/.test(text)) return "Weight Loss";
+  if (/muscle|hypertrophy|gain/.test(text)) return "Muscle Building";
+  if (/strength/.test(text)) return "Strength";
+  if (/mobility|flexibility/.test(text)) return "Mobility";
+  if (/recovery|chair|low.?impact|pain|injury/.test(text)) return "Low-Impact Fitness";
+  if (/conditioning|endurance|cardio|boxing|kickboxing|fight|mma/.test(text)) return "Conditioning";
+  if (/advanced|performance|athlete|pro/.test(text)) return "Advanced Hybrid Fitness";
+  if (/hybrid/.test(text)) return "Hybrid Coaching";
+  return "General Fitness";
+}
+
+function generalWorkoutCategory(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (/strength|squat|hinge|lunge|push|pull/.test(text)) return "Strength";
+  if (/cardio|conditioning|endurance|jump rope|battle rope/.test(text)) return "Conditioning";
+  if (/mobility|flexibility|range/.test(text)) return "Mobility";
+  if (/core|brace|plank/.test(text)) return "Core";
+  if (/recovery|chair|low.?impact/.test(text)) return "Recovery";
+  return "Hybrid Training";
+}
+
+function sanitizeCombatText(value = "") {
+  return String(value || "")
+    .replace(/boxing strength and conditioning/gi, "Hybrid Strength and Conditioning")
+    .replace(/intermediate boxing strength and conditioning/gi, "Intermediate Hybrid Strength and Conditioning")
+    .replace(/baseline boxing monthly template/gi, "Baseline Hybrid Monthly Template")
+    .replace(/3-day boxing plan/gi, "3-Day Hybrid Coaching Plan")
+    .replace(/hybrid boxing coaching/gi, "Hybrid Coaching")
+    .replace(/light shadowboxing/gi, "Marching intervals")
+    .replace(/shadow boxing/gi, "marching intervals")
+    .replace(/shadowboxing/gi, "marching intervals")
+    .replace(/heavy bag power rounds/gi, "Battle rope intervals")
+    .replace(/bag rounds/gi, "conditioning rounds")
+    .replace(/boxing and fight-conditioning/gi, "general fitness conditioning")
+    .replace(/kickboxing endurance/gi, "conditioning")
+    .replace(/kickboxing/gi, "conditioning")
+    .replace(/boxing/gi, "conditioning")
+    .replace(/fight-conditioning/gi, "conditioning")
+    .replace(/fight conditioning/gi, "conditioning")
+    .replace(/fight/gi, "fitness")
+    .replace(/BJJ|MMA/gi, "functional fitness")
+    .trim();
+}
+
+function sanitizeWorkoutTitle(value = "") {
+  return sanitizeCombatText(value)
+    .replace(/^conditioning Strength and Conditioning$/i, "Hybrid Strength and Conditioning")
+    .replace(/^Intermediate conditioning Strength and Conditioning$/i, "Intermediate Hybrid Strength and Conditioning")
+    .replace(/^conditioning Assessment Template$/i, "Conditioning Assessment Template")
+    .replace(/\s+/g, " ")
+    .trim() || "Hybrid Fitness Workout";
+}
+
+function displayWorkoutTitle(workout = {}) {
+  return sanitizeWorkoutTitle(workout.title || workout.workoutName || "Hybrid Fitness Workout");
 }
 
 function reconcileLinkedProfileImagesForStore(targetStore) {
@@ -1352,6 +1614,7 @@ async function syncLiveIdentityRecords() {
     store.users = deduplicateRecords(store.users);
     store.clients = deduplicateRecords(store.clients);
     store.coaches = deduplicateRecords(store.coaches);
+    migrateGeneralFitnessStore(store);
     reconcileLinkedProfileImages();
     if (state.currentUser) state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
     if (!store.clients.some((client) => client.id === state.clientId)) {
@@ -1378,6 +1641,7 @@ async function forceReplaceIdentityFromSupabase() {
   if (users.length) store.users = preserveLocalProfileImages("users", deduplicateRecords(users));
   if (clients.length) store.clients = preserveLocalProfileImages("clients", deduplicateRecords(clients));
   if (coaches.length) store.coaches = preserveLocalProfileImages("coaches", deduplicateRecords(coaches));
+  migrateGeneralFitnessStore(store);
   reconcileLinkedProfileImages();
   if (state.currentUser) state.currentUser = store.users.find((user) => user.id === state.currentUser.id) || state.currentUser;
   if (!store.clients.some((client) => client.id === state.clientId)) {
@@ -2090,7 +2354,7 @@ function signupForm() {
     ${state.signup.accountType === "Client" ? `
       <label>Goal <input data-signup-field="goal" value="${state.signup.goal}" /></label>
       <label>Preferred sport focus
-        <select data-signup-field="sportFocus">${["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "General Fitness"].map((item) => `<option value="${item}" ${state.signup.sportFocus === item ? "selected" : ""}>${item}</option>`).join("")}</select>
+        <select data-signup-field="sportFocus">${FITNESS_FOCUS_OPTIONS.map((item) => `<option value="${item}" ${state.signup.sportFocus === item ? "selected" : ""}>${item}</option>`).join("")}</select>
       </label>
       <label><input class="inline-check" data-signup-check="alreadyTrainsWithCoach" type="checkbox" ${state.signup.alreadyTrainsWithCoach ? "checked" : ""} /> I already train with a coach</label>
       <label>Coach name if known <input data-signup-field="coachNameIfKnown" value="${state.signup.coachNameIfKnown}" /></label>
@@ -2188,7 +2452,7 @@ function profilePage() {
         ${infoCard("Height", formatClientHeight(client))}
         ${infoCard("Current weight", formatClientWeight(client.currentWeightLb || client.weight))}
         ${infoCard("Goal", client.goal)}
-        ${infoCard("Sport focus", client.sportFocus)}
+        ${infoCard("Fitness focus", client.sportFocus)}
         ${infoCard("Training days", `${client.trainingDaysPerWeek} per week`)}
         ${infoCard("Session length", `${client.sessionLength} min`)}
         ${infoCard("Start date", client.startDate)}
@@ -2301,7 +2565,7 @@ function coachProfilePage() {
           <label>Name <input id="coachSelfName" value="${escapeHtml(coach.name || state.currentUser.name || "")}" ${profileLocked ? "disabled" : ""} /></label>
           <label>Email <input id="coachSelfEmail" value="${escapeHtml(state.currentUser.email || coach.email || "")}" ${profileLocked ? "disabled" : ""} /></label>
           <label>Phone number <input id="coachSelfPhone" value="${escapeHtml(state.currentUser.phone || coach.phone || "")}" ${profileLocked ? "disabled" : ""} /></label>
-          <label>Specialty <input id="coachSelfSpecialty" value="${escapeHtml(coach.specialty || "")}" placeholder="Boxing, strength, conditioning..." ${profileLocked ? "disabled" : ""} /></label>
+          <label>Specialty <input id="coachSelfSpecialty" value="${escapeHtml(coach.specialty || "")}" placeholder="Strength, conditioning, mobility, hybrid coaching..." ${profileLocked ? "disabled" : ""} /></label>
           <label class="wide">Emergency contact <input id="coachSelfEmergencyContact" value="${escapeHtml(coach.emergencyContact || "")}" placeholder="Name / phone" ${profileLocked ? "disabled" : ""} /></label>
         </div>
         <label>About me <textarea id="coachSelfBio" placeholder="Coach bio, experience, and training approach" ${profileLocked ? "disabled" : ""}>${escapeHtml(coach.bio || "")}</textarea></label>
@@ -2904,7 +3168,7 @@ function exerciseLibraryPage() {
         <div class="form-grid">
           <label>Search <input id="librarySearch" value="${state.libraryFilters.query}" placeholder="Search exercise, cue, equipment..." /></label>
           <label>Category <input id="libraryCategory" value="${state.libraryFilters.category}" placeholder="Strength, Mobility..." /></label>
-          <label>Sport focus <input id="librarySport" value="${state.libraryFilters.sportFocus}" placeholder="Boxing, General..." /></label>
+          <label>Fitness focus <input id="librarySport" value="${state.libraryFilters.sportFocus}" placeholder="Strength, conditioning, general..." /></label>
           <label>Training level <select id="libraryLevel"><option value="">All</option>${["Beginner", "Intermediate", "Advanced", "Pro"].map((x) => `<option value="${x}" ${state.libraryFilters.trainingLevel === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>
           <label>Equipment <input id="libraryEquipment" value="${state.libraryFilters.equipment}" placeholder="Bodyweight, Dumbbell..." /></label>
           <label>Body area <input id="libraryBodyArea" value="${state.libraryFilters.bodyArea}" placeholder="Knee, Shoulder..." /></label>
@@ -2951,7 +3215,7 @@ function coachView() {
           <p>${client.goal}</p>
           <dl>
             <div><dt>Client ID</dt><dd>${client.id}</dd></div>
-            <div><dt>Sport focus</dt><dd>${client.sportFocus}</dd></div>
+            <div><dt>Fitness focus</dt><dd>${client.sportFocus}</dd></div>
             <div><dt>Package</dt><dd>${client.packageType}</dd></div>
             <div><dt>Training level</dt><dd>${client.currentTrainingLevel || client.currentPlanLevel || "No assessment yet"}</dd></div>
           </dl>
@@ -3021,7 +3285,7 @@ function assessmentStep(client, summary) {
         ${infoCard("Client ID", client.id)}
         ${infoCard("Date", state.assessment.assessmentDate)}
         ${infoCard("Goal", client.goal)}
-        ${infoCard("Sport focus", client.sportFocus)}
+        ${infoCard("Fitness focus", client.sportFocus)}
         ${infoCard("Training days", `${client.trainingDaysPerWeek} per week`)}
         ${infoCard("Session length", `${client.sessionLength} min`)}
         ${infoCard("Package", client.packageType)}
@@ -3217,7 +3481,7 @@ function workoutDetailPage() {
       <div class="section-head">
         <div>
           <p class="eyebrow">${detail.adjustedForToday ? "Adjusted for today based on your check-in" : `Workout detail / ${client.name}`}</p>
-          <h2>${detail.title}</h2>
+          <h2>${displayWorkoutTitle(detail)}</h2>
           <p class="muted">Week ${detail.weekNumber} / Training day ${detail.trainingDayNumber} / ${detail.sessionLength} minutes / ${detail.trainingLevel || "Intermediate"}</p>
         </div>
         <div class="actions">
@@ -3543,6 +3807,8 @@ function alertCard(alert) {
 function adminView() {
   const alerts = getAdminAlerts(store);
   const d = state.adminDrafts;
+  const visibleWorkoutTemplates = store.workoutTemplates.filter((template) => !template.hiddenCombat && !template.archived);
+  const visibleExercises = store.exercises.filter((exercise) => !exercise.hiddenCombat && !exercise.archived);
   const creationActions = [
     { label: "Add Client", panel: "clients" },
     { label: "Add Coach", panel: "coaches" },
@@ -3672,7 +3938,7 @@ function adminView() {
             ${adminInput("client", "phone", "Phone number")}
             ${adminInput("client", "age", "Age", "number")}
             ${adminInput("client", "goal", "Goal")}
-            ${adminSelect("client", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
+            ${adminSelect("client", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS)}
             ${adminInput("client", "trainingDaysPerWeek", "Training days per week", "number")}
             ${adminSelect("client", "sessionLength", "Session length", [30, 45, 60, 120])}
             ${adminInput("client", "package", "Package")}
@@ -3710,12 +3976,12 @@ function adminView() {
           <h3>Add Exercise</h3>
           <div class="form-grid">
             ${adminInput("exercise", "exerciseName", "Exercise name")}
-            ${adminSelect("exercise", "category", "Category", ["Strength", "Cardio", "Boxing", "Kickboxing", "Mobility", "Core", "Recovery"])}
-            ${adminSelect("exercise", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "General Fitness"])}
+            ${adminSelect("exercise", "category", "Category", EXERCISE_CATEGORY_OPTIONS)}
+            ${adminSelect("exercise", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS)}
             ${adminInput("exercise", "goal", "Goal")}
             ${adminSelect("exercise", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"])}
             ${adminSelect("exercise", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"])}
-            ${adminSelect("exercise", "sessionPart", "Session part", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"])}
+            ${adminSelect("exercise", "sessionPart", "Session part", ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery"])}
             ${adminInput("exercise", "equipment", "Equipment needed")}
             ${adminInput("exercise", "bodyArea", "Body area")}
             ${adminInput("exercise", "stressArea", "Stress area")}
@@ -3738,21 +4004,21 @@ function adminView() {
           <h3>Add Workout Template</h3>
           <div class="form-grid">
             ${adminInput("workout", "workoutName", "Workout name")}
-            ${adminSelect("workout", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
+            ${adminSelect("workout", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS)}
             ${adminInput("workout", "goal", "Goal")}
             ${adminSelect("workout", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"])}
             ${adminSelect("workout", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"])}
             ${adminSelect("workout", "sessionLength", "Session length", [30, 45, 60, 120])}
             ${adminSelect("workout", "trainingDayType", "Training day type", ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"])}
-            ${adminSelect("workout", "workoutCategory", "Workout category", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "Conditioning", "Recovery", "General Fitness"])}
+            ${adminSelect("workout", "workoutCategory", "Workout category", WORKOUT_CATEGORY_OPTIONS)}
           </div>
           <label>Description <textarea data-admin-draft="workout:description">${d.workout.description}</textarea></label>
           <button class="primary full" id="adminCreateWorkout">Add New Workout</button>
           <button class="success full" id="adminImportWorkoutRows">Import Workbook Workout Template</button>
           <div class="form-grid compact-form">
-            ${adminSelect("workoutItem", "workoutTemplateId", "Workout", store.workoutTemplates.map((workout) => ({ value: workout.id, label: workout.workoutName })))}
-            ${adminSelect("workoutItem", "exerciseId", "Exercise", store.exercises.map((exercise) => ({ value: exercise.id, label: exercise.exerciseName || exercise.name })))}
-            ${adminSelect("workoutItem", "sessionPart", "Block", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"])}
+            ${adminSelect("workoutItem", "workoutTemplateId", "Workout", visibleWorkoutTemplates.map((workout) => ({ value: workout.id, label: workout.workoutName })))}
+            ${adminSelect("workoutItem", "exerciseId", "Exercise", visibleExercises.map((exercise) => ({ value: exercise.id, label: exercise.exerciseName || exercise.name })))}
+            ${adminSelect("workoutItem", "sessionPart", "Block", ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery"])}
             ${adminInput("workoutItem", "sets", "Sets", "number")}
             ${adminInput("workoutItem", "reps", "Reps", "number")}
             ${adminInput("workoutItem", "time", "Time")}
@@ -3760,13 +4026,13 @@ function adminView() {
             ${adminInput("workoutItem", "rounds", "Rounds", "number")}
           </div>
           <button class="full" id="adminAddWorkoutItem">Add Exercise To Workout</button>
-          <div class="admin-list">${store.workoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><button data-open-workout-editor="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-delete-template="${workout.id}">Delete</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
+          <div class="admin-list">${visibleWorkoutTemplates.map((workout) => `<div class="admin-row"><span>${workout.workoutName} / ${workout.trainingLevel || workout.planLevel} / ${store.workoutTemplateItems.filter((item) => item.workoutTemplateId === workout.id).length} items</span><button data-open-workout-editor="${workout.id}">Edit</button><button data-archive-template="${workout.id}">Archive</button><button data-delete-template="${workout.id}">Delete</button><button data-reorder-template="${workout.id}">Reorder</button></div>`).join("")}</div>
         </article>
         <article class="card admin-card ${adminPanelClass("offerings")}" id="admin-plan-offerings-new">
           <h3>Add Plan Offering</h3>
           <div class="form-grid">
             ${adminInput("planOffering", "planName", "Plan name")}
-            ${adminSelect("planOffering", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
+            ${adminSelect("planOffering", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS)}
             ${adminInput("planOffering", "goal", "Goal")}
             ${adminSelect("planOffering", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"])}
             ${adminInput("planOffering", "trainingDaysPerWeek", "Training days per week", "number")}
@@ -3799,7 +4065,7 @@ function adminView() {
           <h3>Add Assessment Template</h3>
           <div class="form-grid">
             ${adminInput("assessmentTemplate", "templateName", "Template name")}
-            ${adminSelect("assessmentTemplate", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"])}
+            ${adminSelect("assessmentTemplate", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS)}
             ${adminInput("assessmentTemplate", "goal", "Goal")}
           </div>
           <h4>Movement tests in this template</h4>
@@ -3807,7 +4073,7 @@ function adminView() {
             ${movementTests.map((test) => `<button class="chip-toggle ${d.assessmentTemplate.movementTestIds.includes(test.id) ? "active" : ""}" data-template-test="${test.id}">${test.name}</button>`).join("")}
           </div>
           <button class="primary full" id="adminCreateAssessmentTemplate">Add Assessment Template</button>
-          <div class="admin-list">${store.assessmentTemplates.map((template) => `<div class="admin-row"><span>${template.templateName} / ${template.sportFocus || "Any sport"} / ${template.movementTestIds?.length || 0} tests</span><button data-open-assessment-template-editor="${template.id}">Edit</button><button data-delete-assessment-template="${template.id}">Delete</button></div>`).join("")}</div>
+          <div class="admin-list">${store.assessmentTemplates.map((template) => `<div class="admin-row"><span>${template.templateName} / ${template.sportFocus || "Any focus"} / ${template.movementTestIds?.length || 0} tests</span><button data-open-assessment-template-editor="${template.id}">Edit</button><button data-delete-assessment-template="${template.id}">Delete</button></div>`).join("")}</div>
         </article>
         <article class="card ${adminPanelClass("security")}">
           <h3>User Passwords</h3>
@@ -4238,7 +4504,7 @@ function exerciseLibraryAdminList() {
   const sports = ["All", ...uniqueValues(store.exercises.map((exercise) => exercise.sportFocus))];
   const levels = ["All", "Beginner", "Intermediate", "Advanced", "Pro"];
   const difficulties = ["All", "Easy", "Medium", "Hard"];
-  const parts = ["All", "Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"];
+  const parts = ["All", "Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery"];
   const filtered = store.exercises.filter((exercise) => {
     const text = `${exercise.exerciseName || exercise.name} ${exercise.description || ""} ${exercise.category || ""}`.toLowerCase();
     if (f.search && !text.includes(f.search.toLowerCase())) return false;
@@ -4258,7 +4524,7 @@ function exerciseLibraryAdminList() {
     <div class="form-grid compact-form">
       <label>Search exercises<input data-exercise-filter="search" value="${escapeHtml(f.search)}" placeholder="Search by name or notes" /></label>
       ${filterSelect("category", "Category", categories, f.category)}
-      ${filterSelect("sportFocus", "Sport focus", sports, f.sportFocus)}
+      ${filterSelect("sportFocus", "Fitness focus", sports, f.sportFocus)}
       ${filterSelect("trainingLevel", "Training level", levels, f.trainingLevel)}
       ${filterSelect("difficulty", "Difficulty", difficulties, f.difficulty)}
       <label>Equipment<input data-exercise-filter="equipment" value="${escapeHtml(f.equipment)}" placeholder="Bands, bag, dumbbells" /></label>
@@ -4312,7 +4578,9 @@ function clientEditModal(clientId) {
   const latestPlan = store.monthlyPlans
     .filter((plan) => plan.clientId === clientId)
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
-  const selectedWorkoutTemplateId = client.assignedWorkoutTemplateId || latestPlan?.sourceWorkoutTemplateId || latestPlan?.sourceWorkoutTemplateIds?.[0] || store.planOfferings.find((offering) => offering.id === client.planOfferingId)?.workoutTemplateIds?.[0] || store.workoutTemplates[0]?.id || "";
+  const visibleWorkoutTemplates = store.workoutTemplates.filter((template) => !template.hiddenCombat && !template.archived);
+  const visiblePlanOfferings = store.planOfferings.filter((offering) => !offering.hiddenCombat && !offering.archived);
+  const selectedWorkoutTemplateId = client.assignedWorkoutTemplateId || latestPlan?.sourceWorkoutTemplateId || latestPlan?.sourceWorkoutTemplateIds?.[0] || store.planOfferings.find((offering) => offering.id === client.planOfferingId)?.workoutTemplateIds?.[0] || visibleWorkoutTemplates[0]?.id || "";
   const latestAssessment = store.assessments.filter((item) => item.clientId === clientId).at(-1);
   const latestReassessment = store.assessments.filter((item) => item.clientId === clientId && item.assessmentType === "Reassessment").at(-1);
   const tabs = ["Profile", "Coach & Access", "Program", "Package", "Workouts", "Assessments", "Notes"];
@@ -4372,7 +4640,7 @@ function clientEditModal(clientId) {
           <div class="result-band"><strong>Program warning</strong><span>Changing program details may require a new monthly plan. Workout history will stay saved.</span></div>
           <div class="form-grid">
             ${editInput("client", "programName", "Program name", client.programName || client.packageType || "")}
-            ${editSelect("client", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], client.sportFocus)}
+            ${editSelect("client", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS, client.sportFocus)}
             ${editInput("client", "goal", "Goal", client.goal || "")}
             ${editSelect("client", "currentTrainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], client.currentTrainingLevel || "Beginner")}
             ${editSelect("client", "trainingDaysPerWeek", "Training days per week", [1, 2, 3, 4, 5, 6, 7], client.trainingDaysPerWeek)}
@@ -4387,7 +4655,7 @@ function clientEditModal(clientId) {
           <div class="result-band"><strong>Package warning</strong><span>This package change may affect workout days per week.</span></div>
           <div class="form-grid">
             ${editSelect("client", "packageId", "Package", [{ value: "", label: "No package" }, ...store.packages.map((pkg) => ({ value: pkg.id, label: pkg.packageName }))], currentPackageId)}
-            ${editSelect("client", "planOfferingId", "Plan offering", [{ value: "", label: "No plan offering" }, ...store.planOfferings.map((offering) => ({ value: offering.id, label: offering.planName }))], client.planOfferingId || store.packages.find((pkg) => pkg.id === currentPackageId)?.planOfferingId || "")}
+            ${editSelect("client", "planOfferingId", "Plan offering", [{ value: "", label: "No plan offering" }, ...visiblePlanOfferings.map((offering) => ({ value: offering.id, label: offering.planName }))], client.planOfferingId || store.packages.find((pkg) => pkg.id === currentPackageId)?.planOfferingId || "")}
             ${editInput("client", "sessionsPurchased", "Sessions purchased", client.sessionsPurchased || client.sessionsIncluded || "", "number")}
             ${editInput("client", "sessionsUsed", "Sessions used", client.sessionsUsed || "", "number")}
             ${editInput("client", "sessionsRemaining", "Sessions remaining", client.sessionsRemaining || "", "number")}
@@ -4402,8 +4670,8 @@ function clientEditModal(clientId) {
             ${infoCard("Draft plans", store.monthlyPlans.filter((plan) => plan.clientId === client.id && plan.status === "Draft").length)}
           </div>
           <div class="form-grid">
-            ${modalSelect("clientModalPlanOfferingForDraft", "Plan offering for new Draft", store.planOfferings.map((offering) => ({ value: offering.id, label: offering.planName })), client.planOfferingId || store.planOfferings[0]?.id)}
-            ${modalSelect("clientModalWorkoutTemplate", "Assign workout template", store.workoutTemplates.map((template) => ({ value: template.id, label: template.workoutName })), selectedWorkoutTemplateId)}
+            ${modalSelect("clientModalPlanOfferingForDraft", "Plan offering for new Draft", visiblePlanOfferings.map((offering) => ({ value: offering.id, label: offering.planName })), client.planOfferingId || visiblePlanOfferings[0]?.id)}
+            ${modalSelect("clientModalWorkoutTemplate", "Assign workout template", visibleWorkoutTemplates.map((template) => ({ value: template.id, label: template.workoutName })), selectedWorkoutTemplateId)}
           </div>
           <div class="modal-actions left-actions">
             <button id="clientModalGenerateDraft" data-client-id="${client.id}">Generate New Draft Plan</button>
@@ -4486,6 +4754,7 @@ function coachEditModal(coachId) {
 function planOfferingEditModal(offeringId) {
   const offering = store.planOfferings.find((item) => item.id === offeringId);
   if (!offering) return "";
+  const visibleWorkoutTemplates = store.workoutTemplates.filter((template) => !template.hiddenCombat && !template.archived);
   return `
     <div class="modal-backdrop" role="dialog" aria-modal="true">
       <section class="modal-card">
@@ -4495,7 +4764,7 @@ function planOfferingEditModal(offeringId) {
         </div>
         <div class="form-grid">
           ${editInput("offering", "planName", "Plan name", offering.planName)}
-          ${editSelect("offering", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], offering.sportFocus)}
+          ${editSelect("offering", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS, offering.sportFocus)}
           ${editInput("offering", "goal", "Goal", offering.goal)}
           ${editSelect("offering", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], offering.trainingLevel || offering.planLevel)}
           ${editInput("offering", "trainingDaysPerWeek", "Training days per week", offering.trainingDaysPerWeek, "number")}
@@ -4507,7 +4776,7 @@ function planOfferingEditModal(offeringId) {
         <label>Description <textarea data-edit-offering-field="description">${escapeHtml(offering.description || "")}</textarea></label>
         <label>Connected workout templates
           <select id="editOfferingTemplates" multiple size="6">
-            ${store.workoutTemplates.map((template) => `<option value="${template.id}" ${(offering.workoutTemplateIds || []).includes(template.id) ? "selected" : ""}>${template.workoutName}</option>`).join("")}
+            ${visibleWorkoutTemplates.map((template) => `<option value="${template.id}" ${(offering.workoutTemplateIds || []).includes(template.id) ? "selected" : ""}>${template.workoutName}</option>`).join("")}
           </select>
         </label>
         <div class="modal-actions">
@@ -4635,7 +4904,7 @@ function assessmentTemplateEditModal(templateId) {
         </div>
         <div class="form-grid">
           ${editInput("assessmentTemplate", "templateName", "Template name", template.templateName)}
-          ${editSelect("assessmentTemplate", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], template.sportFocus)}
+          ${editSelect("assessmentTemplate", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS, template.sportFocus)}
           ${editInput("assessmentTemplate", "goal", "Goal", template.goal)}
         </div>
         <h3>Movement tests in this template</h3>
@@ -4672,7 +4941,7 @@ function accountReviewModal(userId) {
           <p><strong>Phone:</strong> ${user.phone || "None"}</p>
           <p><strong>Note:</strong> ${user.requestNote || "No note"}</p>
           <p><strong>Goal:</strong> ${details.goal || "None"}</p>
-          <p><strong>Sport focus:</strong> ${details.sportFocus || "None"}</p>
+          <p><strong>Fitness focus:</strong> ${details.sportFocus || "None"}</p>
           <p><strong>Coach info:</strong> ${details.coachNameIfKnown || details.coachTitle || "None"}</p>
           <p><strong>Experience:</strong> ${details.experience || "None"}</p>
           <p><strong>Reason:</strong> ${details.coachRequestReason || "None"}</p>
@@ -4728,7 +4997,7 @@ function exerciseEditModal(exerciseId) {
           <dl class="detail-grid">
             ${detail("Purpose", exercise.purpose || exercise.goal)}
             ${detail("Category", exercise.category)}
-            ${detail("Sport focus", exercise.sportFocus)}
+            ${detail("Fitness focus", exercise.sportFocus)}
             ${detail("Goal", exercise.goal)}
             ${detail("Recovery alternative", exercise.recoveryAlternative ? "Yes" : "No")}
             ${detail("Session part", exercise.sessionPart)}
@@ -4813,12 +5082,12 @@ function exerciseEditModeModal(exercise, workoutItem, usage) {
           ${editInput("exercise", "exerciseName", "Exercise name", exercise.exerciseName || exercise.name)}
           ${editInput("exercise", "description", "Short description", exercise.description)}
           ${editInput("exercise", "purpose", "Purpose", exercise.purpose || exercise.goal)}
-          ${editSelect("exercise", "category", "Category", ["Strength", "Cardio", "Boxing", "Kickboxing", "Mobility", "Core", "Recovery"], exercise.category)}
-          ${editSelect("exercise", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "General Fitness"], exercise.sportFocus)}
+          ${editSelect("exercise", "category", "Category", EXERCISE_CATEGORY_OPTIONS, exercise.category)}
+          ${editSelect("exercise", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS, exercise.sportFocus)}
           ${editInput("exercise", "goal", "Goal", exercise.goal)}
           ${editSelect("exercise", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], exercise.trainingLevel || exercise.planLevel)}
           ${editSelect("exercise", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], exercise.difficulty)}
-          ${editSelect("exercise", "sessionPart", "Session part", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"], exercise.sessionPart)}
+          ${editSelect("exercise", "sessionPart", "Session part", ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery"], exercise.sessionPart)}
           ${editInput("exercise", "equipment", "Equipment needed", listValue(exercise.equipment))}
           ${editInput("exercise", "bodyArea", "Body area", listValue(exercise.bodyArea))}
           ${editInput("exercise", "stressArea", "Stress area", listValue(exercise.stressArea))}
@@ -4920,13 +5189,13 @@ function workoutEditModal(workoutId) {
         </div>
         <div class="form-grid">
           ${editInput("workout", "workoutName", "Workout name", workout.workoutName)}
-          ${editSelect("workout", "sportFocus", "Sport focus", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "General Fitness"], workout.sportFocus)}
+          ${editSelect("workout", "sportFocus", "Fitness focus", FITNESS_FOCUS_OPTIONS, workout.sportFocus)}
           ${editInput("workout", "goal", "Goal", workout.goal)}
           ${editSelect("workout", "trainingLevel", "Training level", ["Beginner", "Intermediate", "Advanced", "Pro"], workout.trainingLevel || workout.planLevel)}
           ${editSelect("workout", "difficulty", "Difficulty", ["Easy", "Medium", "Hard"], workout.difficulty)}
           ${editSelect("workout", "sessionLength", "Session length", [30, 45, 60, 120], workout.sessionLength)}
           ${editSelect("workout", "trainingDayType", "Training day type", ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5"], workout.trainingDayType)}
-          ${editSelect("workout", "workoutCategory", "Workout category", ["Boxing", "Kickboxing", "BJJ", "Fight Conditioning", "Strength", "Conditioning", "Recovery", "General Fitness"], workout.workoutCategory)}
+          ${editSelect("workout", "workoutCategory", "Workout category", WORKOUT_CATEGORY_OPTIONS, workout.workoutCategory)}
         </div>
         <label>Description <textarea data-edit-workout-field="description">${escapeHtml(workout.description || "")}</textarea></label>
         <label>Coach notes <textarea data-edit-workout-field="coachNotes">${escapeHtml(workout.coachNotes || "")}</textarea></label>
@@ -4938,7 +5207,7 @@ function workoutEditModal(workoutId) {
         <div class="section-title"><h3>Add Exercise</h3><span>Use full library</span></div>
         <div class="form-grid compact-form">
           ${modalSelect("modalNewItemExercise", "Exercise", store.exercises.map((exerciseItem) => ({ value: exerciseItem.id, label: exerciseItem.exerciseName || exerciseItem.name })))}
-          ${modalSelect("modalNewItemPart", "Block", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"])}
+          ${modalSelect("modalNewItemPart", "Block", ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery"])}
           ${modalInput("modalNewItemSets", "Sets", "", "number")}
           ${modalInput("modalNewItemReps", "Reps", "", "number")}
           ${modalInput("modalNewItemTime", "Time", "")}
@@ -4960,7 +5229,7 @@ function workoutItemEditRow(item) {
     <div class="admin-row modal-item-row">
       <button data-open-workout-exercise="${item.exerciseId}:${item.id}">View Exercise</button>
       ${modalSelect(`itemExercise-${item.id}`, "Exercise", store.exercises.map((exercise) => ({ value: exercise.id, label: exercise.exerciseName || exercise.name })), item.exerciseId)}
-      ${modalSelect(`itemPart-${item.id}`, "Block", ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery"], item.sessionPart)}
+      ${modalSelect(`itemPart-${item.id}`, "Block", ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery"], item.sessionPart)}
       ${modalInput(`itemSets-${item.id}`, "Sets", item.sets || "", "number")}
       ${modalInput(`itemReps-${item.id}`, "Reps", item.reps || "", "number")}
       ${modalInput(`itemTime-${item.id}`, "Time", item.time || "")}
@@ -7202,7 +7471,7 @@ function todayPreviewPanel(client) {
   return `
     <article class="card decision-card">
       <p class="eyebrow">Today</p>
-      <h3>${dashboard.workout?.title || "No workout scheduled"}</h3>
+      <h3>${dashboard.workout ? displayWorkoutTitle(dashboard.workout) : "No workout scheduled"}</h3>
       <p>${dashboard.message}${completed?.completed ? ` Completed ${formatReadableDate(completed.completedAt)}.` : ""}</p>
       ${dashboard.workout ? `<div class="chips"><span>Week ${dashboard.workout.weekNumber}</span><span>Day ${dashboard.workout.trainingDayNumber}</span><span>${dashboard.workout.sessionLength} min</span><span>${completedExercises}/${exerciseCount} exercises complete</span></div>` : ""}
       <button class="primary" data-view="client">Open Client View</button>
@@ -7535,7 +7804,7 @@ function nutritionDemoPanel(options = {}) {
         <label>Workout length min <input id="nutritionWorkoutLength" data-nutrition-profile type="number" min="0" max="180" value="${escapeHtml(targetSummary.profile.averageWorkoutLength)}" /></label>
         <label>Training type
           <select id="nutritionTrainingType" data-nutrition-profile>
-            ${["Strength training", "Boxing", "Kickboxing", "MMA", "Running", "General fitness", "Weight loss training", "Muscle gain training", "Recovery", "Mobility", "Conditioning"].map((type) => `<option value="${type}" ${targetSummary.profile.trainingType === type ? "selected" : ""}>${type}</option>`).join("")}
+            ${TRAINING_TYPE_OPTIONS.map((type) => `<option value="${type}" ${targetSummary.profile.trainingType === type ? "selected" : ""}>${type}</option>`).join("")}
           </select>
         </label>
         <label>Meals / day <input id="nutritionMealsPerDay" data-nutrition-profile type="number" min="2" max="5" value="${escapeHtml(targetSummary.profile.mealsPerDay)}" /></label>
@@ -7677,7 +7946,7 @@ function nutritionGoalFromClient(goal = "") {
   if (/muscle|strength|gain/.test(text)) return "Muscle gain";
   if (/fat loss|lean|retain/.test(text)) return "Fat loss with muscle retention";
   if (/weight loss|lose|slim/.test(text)) return "Weight loss";
-  if (/performance|fighter|fight|athlete|conditioning|endurance/.test(text)) return "Athletic performance";
+  if (/performance|athlete|conditioning|endurance/.test(text)) return "Athletic performance";
   if (/maintain/.test(text)) return "Maintenance";
   if (/postpartum/.test(text)) return "Postpartum return to fitness";
   return "General wellness";
@@ -7685,9 +7954,7 @@ function nutritionGoalFromClient(goal = "") {
 
 function nutritionTrainingTypeFromClient(client = {}) {
   const text = `${client.sportFocus || ""} ${client.goal || ""}`.toLowerCase();
-  if (/kickboxing/.test(text)) return "Kickboxing";
-  if (/boxing/.test(text)) return "Boxing";
-  if (/mma/.test(text)) return "MMA";
+  if (/kickboxing|boxing|mma|fight|combat/.test(text)) return "Conditioning";
   if (/running/.test(text)) return "Running";
   if (/muscle|strength/.test(text)) return "Strength training";
   if (/recovery/.test(text)) return "Recovery";
@@ -9173,8 +9440,8 @@ function replaceSuggestedWorkout(workoutId) {
   if (!workout) return;
   const assessment = latestClientAssessment(workout.clientId) || summarizeAssessment({ ...state.assessment, clientId: workout.clientId });
   const sections = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery"
-    ? ["Warm-Up", "Recovery", "Skill / Technique", "Core", "Cooldown"]
-    : ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Cooldown"];
+    ? ["Warm-Up", "Recovery", "Mobility", "Core", "Cooldown"]
+    : ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Cooldown"];
   const used = new Set();
   workout.items = sections.map((section) => {
     const exercise = findSuggestedExerciseForWorkout({ ...workout, preferredSection: section }, assessment, used);
@@ -9246,7 +9513,7 @@ function workoutCard(workout, locked) {
   return `
     <article class="workout">
       <div class="section-head">
-        <div><p class="eyebrow">${workout.workoutDate === today ? "Today" : `Next scheduled: ${workout.workoutDate || "Date not set"}`} / Week ${workout.weekNumber} / Training day ${workout.trainingDayNumber}</p><h2>${workout.title}</h2></div>
+        <div><p class="eyebrow">${workout.workoutDate === today ? "Today" : `Next scheduled: ${workout.workoutDate || "Date not set"}`} / Week ${workout.weekNumber} / Training day ${workout.trainingDayNumber}</p><h2>${displayWorkoutTitle(workout)}</h2></div>
         <span class="badge ${completed?.completed ? "green" : "orange"}">${completed?.completed ? "Completed" : `${completedExercises}/${exerciseCount} done`}</span>
       </div>
       <div class="chips"><span>${workout.trainingLevel || "Intermediate"}</span><span>${workout.items?.length || 0} exercises</span><span>${completedExercises}/${exerciseCount} complete</span><span>${workout.items?.map((item) => item.equipment).filter(Boolean).join(", ") || "Mixed equipment"}</span></div>

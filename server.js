@@ -35,5 +35,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Fight coaching app running at http://localhost:${port}`);
+  console.log(`Royal Experience smart fitness app running at http://localhost:${port}`);
 });

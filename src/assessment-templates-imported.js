@@ -280,7 +280,7 @@ export const workbookAssessmentTemplates = [
         "area": "Restriction",
         "testName": "Breathing Tolerance During Light Movement",
         "purpose": "Breathing and recovery during easy training.",
-        "setup": "Use walking, marching, step touches, or light shadowboxing.",
+        "setup": "Use walking, marching, step touches, or light Marching intervals.",
         "clientAction": "Move lightly while coach checks breathing and recovery.",
         "coachLooksFor": "Can talk in short sentences, no chest pain/dizziness, recovers normally.",
         "redFlags": "Chest pain, dizziness, faint feeling, severe breathlessness.",
@@ -482,8 +482,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -495,11 +495,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -514,7 +514,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -728,10 +728,10 @@ export const workbookAssessmentTemplates = [
     "updatedAt": "2026-06-02T14:45:00.000Z"
   },
   {
-    "id": "assessment_template_boxing",
-    "templateName": "Boxing Assessment Template",
-    "sportFocus": "Boxing",
-    "goal": "Boxing skill readiness and conditioning",
+    "id": "assessment_template_cardio_conditioning",
+    "templateName": "Cardio Conditioning Assessment Template",
+    "sportFocus": "General Fitness",
+    "goal": "Conditioning skill readiness and conditioning",
     "movementTestIds": [
       "balance",
       "push",
@@ -749,22 +749,22 @@ export const workbookAssessmentTemplates = [
       "squat"
     ],
     "sourceWorkbook": "focus_based_assessment_templates_no_bjj_youth.xlsx",
-    "templatePurpose": "Boxing skill readiness and conditioning",
+    "templatePurpose": "Conditioning skill readiness and conditioning",
     "adminReviewStatus": "Workbook imported - Needs Review",
     "customTests": [
       {
         "area": "Sport Skill",
-        "testName": "Boxing Stance Test",
-        "purpose": "Checks stance, balance, guard, and readiness for boxing movement.",
-        "setup": "Client stands in boxing stance with hands up and knees soft.",
-        "clientAction": "Hold stance, shift weight, and reset stance without crossing feet.",
-        "coachLooksFor": "Feet shoulder-width, knees soft, chin tucked, hands up, balance, no crossing feet.",
-        "redFlags": "Crossing feet, locked knees, poor balance, chin exposed, pain.",
+        "testName": "Conditioning Stance Test",
+        "purpose": "Checks stance, balance, guard, and readiness for Conditioning movement.",
+        "setup": "Client stands in Conditioning stance with hands up and knees soft.",
+        "clientAction": "Hold stance, shift weight, and reset stance without cardioing feet.",
+        "coachLooksFor": "Feet shoulder-width, knees soft, chin tucked, hands up, balance, no cardioing feet.",
+        "redFlags": "cardioing feet, locked knees, poor balance, chin exposed, pain.",
         "scoringScale": "",
         "scoreMeaning": "",
         "ifLowFocusOn": "Stance holds, mirror stance drills, step-and-reset, balance work.",
         "systemTags": [
-          "Boxing Stance"
+          "Conditioning Stance"
         ],
         "matchedMovementTestIds": [
           "balance"
@@ -792,17 +792,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Footwork Baseline",
+        "testName": "agility Baseline",
         "purpose": "Tests forward/back/side steps while keeping stance.",
         "setup": "Use open space or line on floor.",
         "clientAction": "Step forward, back, left, right, then reset stance.",
-        "coachLooksFor": "No crossing feet, controlled steps, stance width, balance, reset ability.",
-        "redFlags": "Crossing feet, stumbling, unsafe balance, knee/ankle pain.",
+        "coachLooksFor": "No cardioing feet, controlled steps, stance width, balance, reset ability.",
+        "redFlags": "cardioing feet, stumbling, unsafe balance, knee/ankle pain.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Step-and-reset drills, line drills, slow footwork.",
+        "ifLowFocusOn": "Step-and-reset drills, line drills, slow agility.",
         "systemTags": [
-          "Footwork"
+          "agility"
         ],
         "matchedMovementTestIds": [
           "balance",
@@ -811,17 +811,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Jab Mechanics",
-        "purpose": "Tests lead-hand punch control, shoulder safety, and balance.",
-        "setup": "Boxing stance, light shadowboxing pace.",
-        "clientAction": "Throw controlled jabs and return hand to guard.",
+        "testName": "cardio Mechanics",
+        "purpose": "Tests lead-hand cardio control, shoulder safety, and balance.",
+        "setup": "Conditioning stance, light Marching intervals pace.",
+        "clientAction": "Throw controlled cardios and return hand to guard.",
         "coachLooksFor": "Extension, shoulder protects chin, hand return, balance, wrist alignment.",
         "redFlags": "Wrist collapse, shoulder pain, overreaching, hand drops.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Slow jab drill, mirror jab, wall jab, band jab if ready.",
+        "ifLowFocusOn": "Slow cardio drill, mirror cardio, wall cardio, band cardio if ready.",
         "systemTags": [
-          "Jab"
+          "cardio"
         ],
         "matchedMovementTestIds": [
           "push"
@@ -829,17 +829,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Cross Mechanics",
-        "purpose": "Tests rear-hand punch mechanics, rotation, and core control.",
-        "setup": "Boxing stance; no full power during assessment.",
-        "clientAction": "Throw controlled cross with safe rotation, then return to guard.",
+        "testName": "cardio Mechanics",
+        "purpose": "Tests rear-hand cardio mechanics, rotation, and core control.",
+        "setup": "Conditioning stance; no full power during assessment.",
+        "clientAction": "Throw controlled cardio with safe rotation, then return to guard.",
         "coachLooksFor": "Rear side rotation, guard recovery, controlled pivot if ready, no back/shoulder pain.",
         "redFlags": "Back pain, over-rotation, losing stance, wrist/shoulder pain.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Slow cross mechanics, hip rotation drill, no-power cross.",
+        "ifLowFocusOn": "Slow cardio mechanics, hip rotation drill, no-power cardio.",
         "systemTags": [
-          "Cross"
+          "cardio"
         ],
         "matchedMovementTestIds": [
           "push"
@@ -847,17 +847,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Jab-Cross Combination",
-        "purpose": "Tests coordination and ability to connect basic punches.",
-        "setup": "Boxing stance, mirror or shadowboxing.",
-        "clientAction": "Throw jab-cross slowly, breathe, reset guard.",
-        "coachLooksFor": "Balance after combo, breathing, hand return, no rushing.",
+        "testName": "cardio Combination",
+        "purpose": "Tests coordination and ability to connect basic cardioes.",
+        "setup": "Conditioning stance, mirror or Marching intervals.",
+        "clientAction": "Throw cardio slowly, breathe, reset guard.",
+        "coachLooksFor": "Balance after circuits, breathing, hand return, no rushing.",
         "redFlags": "Falling forward, hands dropping, breath-holding, pain.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Single punches, slow-count combos, stance reset.",
+        "ifLowFocusOn": "Single cardioes, slow-count circuits, stance reset.",
         "systemTags": [
-          "Combo"
+          "circuits"
         ],
         "matchedMovementTestIds": [
           "push"
@@ -865,17 +865,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Conditioning",
-        "testName": "Boxing Conditioning Round",
+        "testName": "Conditioning Conditioning Round",
         "purpose": "Tests ability to keep form while tired.",
-        "setup": "Shadowboxing or bag work if equipment available.",
-        "clientAction": "Perform 1-3 minutes light boxing movement.",
-        "coachLooksFor": "Breathing, form breakdown, footwork, recovery after round.",
+        "setup": "Marching intervals or cardio work if equipment available.",
+        "clientAction": "Perform 1-3 minutes light Conditioning movement.",
+        "coachLooksFor": "Breathing, form breakdown, agility, recovery after round.",
         "redFlags": "Chest pain, dizziness, severe breathlessness, unsafe fatigue.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Shorter rounds, longer rest, low-impact boxing drills.",
+        "ifLowFocusOn": "Shorter rounds, longer rest, low-impact Conditioning drills.",
         "systemTags": [
-          "Boxing Conditioning"
+          "Conditioning Conditioning"
         ],
         "matchedMovementTestIds": [
           "conditioning"
@@ -999,7 +999,7 @@ export const workbookAssessmentTemplates = [
         "area": "Restriction",
         "testName": "Breathing Tolerance During Light Movement",
         "purpose": "Breathing and recovery during easy training.",
-        "setup": "Use walking, marching, step touches, or light shadowboxing.",
+        "setup": "Use walking, marching, step touches, or light Marching intervals.",
         "clientAction": "Move lightly while coach checks breathing and recovery.",
         "coachLooksFor": "Can talk in short sentences, no chest pain/dizziness, recovers normally.",
         "redFlags": "Chest pain, dizziness, faint feeling, severe breathlessness.",
@@ -1182,8 +1182,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -1195,11 +1195,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -1214,7 +1214,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -1428,10 +1428,10 @@ export const workbookAssessmentTemplates = [
     "updatedAt": "2026-06-02T14:45:00.000Z"
   },
   {
-    "id": "assessment_template_kickboxing",
-    "templateName": "Kickboxing Assessment Template",
-    "sportFocus": "Kickboxing",
-    "goal": "Kickboxing skill, hip mobility, balance, and conditioning",
+    "id": "assessment_template_agility_conditioning",
+    "templateName": "Agility Conditioning Assessment Template",
+    "sportFocus": "General Fitness",
+    "goal": "Conditioning skill, hip mobility, balance, and conditioning",
     "movementTestIds": [
       "balance",
       "hipMobility",
@@ -1447,22 +1447,22 @@ export const workbookAssessmentTemplates = [
       "squat"
     ],
     "sourceWorkbook": "focus_based_assessment_templates_no_bjj_youth.xlsx",
-    "templatePurpose": "Kickboxing skill, hip mobility, balance, and conditioning",
+    "templatePurpose": "Conditioning skill, hip mobility, balance, and conditioning",
     "adminReviewStatus": "Workbook imported - Needs Review",
     "customTests": [
       {
         "area": "Sport Skill",
-        "testName": "Kickboxing Stance Test",
+        "testName": "Conditioning Stance Test",
         "purpose": "Checks stance, balance, guard, and weight shifting.",
-        "setup": "Client stands in kickboxing stance near support if needed.",
+        "setup": "Client stands in Conditioning stance near support if needed.",
         "clientAction": "Hold stance and shift weight front/back without losing balance.",
         "coachLooksFor": "Balanced stance, hands up, knees soft, safe weight shift.",
-        "redFlags": "Wobbling, crossing feet, knee/ankle pain, guard drops.",
+        "redFlags": "Wobbling, cardioing feet, knee/ankle pain, guard drops.",
         "scoringScale": "",
         "scoreMeaning": "",
         "ifLowFocusOn": "Stance holds, slow step drills, supported balance.",
         "systemTags": [
-          "Kickboxing Stance"
+          "Conditioning Stance"
         ],
         "matchedMovementTestIds": [
           "balance",
@@ -1471,17 +1471,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Front Kick Readiness",
-        "purpose": "Tests hip flexion, balance, knee control, and safe kicking mechanics.",
-        "setup": "Stand near wall/chair; use knee lift if kick is not safe.",
-        "clientAction": "Perform controlled knee lift or slow front kick and return foot safely.",
+        "testName": "Front cardio Readiness",
+        "purpose": "Tests hip flexion, balance, knee control, and safe cardioing mechanics.",
+        "setup": "Stand near wall/chair; use knee lift if cardio is not safe.",
+        "clientAction": "Perform controlled knee lift or slow front cardio and return foot safely.",
         "coachLooksFor": "Balance, chamber, controlled extension, safe return, no hip/knee pain.",
         "redFlags": "Unsafe wobble, hip/knee pain, snapping uncontrolled, falling.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Knee lifts, supported front kick, hip mobility, balance drills.",
+        "ifLowFocusOn": "Knee lifts, supported front cardio, hip mobility, balance drills.",
         "systemTags": [
-          "Front Kick"
+          "Front cardio"
         ],
         "matchedMovementTestIds": [
           "balance",
@@ -1490,17 +1490,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Round Kick Readiness",
+        "testName": "Round cardio Readiness",
         "purpose": "Tests hip rotation, pivot ability, and lower-body control.",
         "setup": "Slow chamber/turnover drill, not full power for beginners.",
-        "clientAction": "Practice round-kick chamber/turnover or low kick prep slowly.",
+        "clientAction": "Practice round-cardio chamber/turnover or low cardio prep slowly.",
         "coachLooksFor": "Hip mobility, pivot control, knee/ankle safety, balance.",
         "redFlags": "Knee pain, hip pinching, ankle pain, unsafe pivot, falling.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Hip openers, chamber drills, low kick prep, pivot progressions.",
+        "ifLowFocusOn": "Hip openers, chamber drills, low cardio prep, pivot progressions.",
         "systemTags": [
-          "Round Kick"
+          "Round cardio"
         ],
         "matchedMovementTestIds": [
           "balance",
@@ -1510,17 +1510,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Sport Skill",
-        "testName": "Knee Strike Readiness",
+        "testName": "Knee cardio Readiness",
         "purpose": "Tests hip drive, core control, and balance.",
-        "setup": "Stand in kickboxing stance near support if needed.",
-        "clientAction": "Perform slow knee lift or controlled knee strike.",
+        "setup": "Stand in Conditioning stance near support if needed.",
+        "clientAction": "Perform slow knee lift or controlled knee cardio.",
         "coachLooksFor": "Posture, hip drive, core control, balance, safe foot return.",
         "redFlags": "Back pain, hip pain, balance loss, uncontrolled movement.",
         "scoringScale": "",
         "scoreMeaning": "",
         "ifLowFocusOn": "Supported knee lifts, core control, hip flexor strength.",
         "systemTags": [
-          "Knee Strike"
+          "Knee cardio"
         ],
         "matchedMovementTestIds": [
           "balance"
@@ -1528,17 +1528,17 @@ export const workbookAssessmentTemplates = [
       },
       {
         "area": "Conditioning",
-        "testName": "Kickboxing Conditioning Round",
-        "purpose": "Tests punch-kick coordination and conditioning.",
-        "setup": "Shadowboxing or bag/pad work depending on equipment.",
-        "clientAction": "Perform 1-3 minutes light kickboxing with punches/knees/kicks.",
+        "testName": "Conditioning Conditioning Round",
+        "purpose": "Tests cardio-cardio coordination and conditioning.",
+        "setup": "Marching intervals or cardio work depending on equipment.",
+        "clientAction": "Perform 1-3 minutes light Conditioning with cardioes/knees/cardios.",
         "coachLooksFor": "Breathing, technique, balance, safe recovery, no pain spikes.",
         "redFlags": "Dizziness, chest pain, high knee/hip/ankle pain, severe fatigue.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Short rounds, low kicks, no jumping, longer rest.",
+        "ifLowFocusOn": "Short rounds, low cardios, no jumping, longer rest.",
         "systemTags": [
-          "Kickboxing Conditioning"
+          "Conditioning Conditioning"
         ],
         "matchedMovementTestIds": [
           "balance",
@@ -1665,7 +1665,7 @@ export const workbookAssessmentTemplates = [
         "area": "Restriction",
         "testName": "Breathing Tolerance During Light Movement",
         "purpose": "Breathing and recovery during easy training.",
-        "setup": "Use walking, marching, step touches, or light shadowboxing.",
+        "setup": "Use walking, marching, step touches, or light Marching intervals.",
         "clientAction": "Move lightly while coach checks breathing and recovery.",
         "coachLooksFor": "Can talk in short sentences, no chest pain/dizziness, recovers normally.",
         "redFlags": "Chest pain, dizziness, faint feeling, severe breathlessness.",
@@ -1848,8 +1848,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -1861,11 +1861,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -1880,7 +1880,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -2094,10 +2094,10 @@ export const workbookAssessmentTemplates = [
     "updatedAt": "2026-06-02T14:45:00.000Z"
   },
   {
-    "id": "assessment_template_fight_conditioning",
-    "templateName": "Fight Conditioning Assessment Template",
-    "sportFocus": "Fight Conditioning",
-    "goal": "Fight-conditioning work capacity and circuit readiness",
+    "id": "assessment_template_functional_conditioning",
+    "templateName": "Functional Conditioning Assessment Template",
+    "sportFocus": "General Fitness",
+    "goal": "Conditioning work capacity and circuit readiness",
     "movementTestIds": [
       "squat",
       "standing",
@@ -2115,7 +2115,7 @@ export const workbookAssessmentTemplates = [
       "ankleMobility"
     ],
     "sourceWorkbook": "focus_based_assessment_templates_no_bjj_youth.xlsx",
-    "templatePurpose": "Fight-conditioning work capacity and circuit readiness",
+    "templatePurpose": "Conditioning work capacity and circuit readiness",
     "adminReviewStatus": "Workbook imported - Needs Review",
     "customTests": [
       {
@@ -2254,7 +2254,7 @@ export const workbookAssessmentTemplates = [
         "area": "Conditioning",
         "testName": "Round-Based Conditioning Test",
         "purpose": "Tests work capacity, pace, and recovery in a round format.",
-        "setup": "Choose safe station: shadowboxing, step-ups, bike, ropes, or bag.",
+        "setup": "Choose safe station: Marching intervals, step-ups, bike, ropes, or bag.",
         "clientAction": "Perform 1-3 minutes of light/moderate conditioning.",
         "coachLooksFor": "Breathing, pace, fatigue, form breakdown, recovery after round.",
         "redFlags": "Chest pain, dizziness, severe breathlessness, form collapse.",
@@ -2289,7 +2289,7 @@ export const workbookAssessmentTemplates = [
       {
         "area": "Conditioning",
         "testName": "Impact Readiness Screen",
-        "purpose": "Checks readiness for jumping, fast footwork, or need for low impact.",
+        "purpose": "Checks readiness for jumping, fast agility, or need for low impact.",
         "setup": "Use tiny hops or fast step drill only if safe.",
         "clientAction": "Perform low-impact steps or small hops if appropriate.",
         "coachLooksFor": "Knee/ankle control, balance, safe landing, pain-free movement.",
@@ -2347,7 +2347,7 @@ export const workbookAssessmentTemplates = [
         "area": "Restriction",
         "testName": "Breathing Tolerance During Light Movement",
         "purpose": "Breathing and recovery during easy training.",
-        "setup": "Use walking, marching, step touches, or light shadowboxing.",
+        "setup": "Use walking, marching, step touches, or light Marching intervals.",
         "clientAction": "Move lightly while coach checks breathing and recovery.",
         "coachLooksFor": "Can talk in short sentences, no chest pain/dizziness, recovers normally.",
         "redFlags": "Chest pain, dizziness, faint feeling, severe breathlessness.",
@@ -2530,8 +2530,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -2543,11 +2543,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -2562,7 +2562,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -2778,7 +2778,7 @@ export const workbookAssessmentTemplates = [
   {
     "id": "assessment_template_strength",
     "templateName": "Strength Assessment Template",
-    "sportFocus": "Strength",
+    "sportFocus": "General Fitness",
     "goal": "Strength readiness, bracing, and progressive resistance",
     "movementTestIds": [
       "squat",
@@ -3214,8 +3214,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -3227,11 +3227,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -3246,7 +3246,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -3462,7 +3462,7 @@ export const workbookAssessmentTemplates = [
   {
     "id": "assessment_template_weight_loss_conditioning",
     "templateName": "Weight Loss Conditioning Assessment Template",
-    "sportFocus": "Weight Loss Conditioning",
+    "sportFocus": "General Fitness",
     "goal": "Weight loss conditioning and low-impact consistency",
     "movementTestIds": [
       "pain",
@@ -3681,7 +3681,7 @@ export const workbookAssessmentTemplates = [
         "area": "Restriction",
         "testName": "Breathing Tolerance During Light Movement",
         "purpose": "Breathing and recovery during easy training.",
-        "setup": "Use walking, marching, step touches, or light shadowboxing.",
+        "setup": "Use walking, marching, step touches, or light Marching intervals.",
         "clientAction": "Move lightly while coach checks breathing and recovery.",
         "coachLooksFor": "Can talk in short sentences, no chest pain/dizziness, recovers normally.",
         "redFlags": "Chest pain, dizziness, faint feeling, severe breathlessness.",
@@ -3900,8 +3900,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -3913,11 +3913,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -3932,7 +3932,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -4148,7 +4148,7 @@ export const workbookAssessmentTemplates = [
   {
     "id": "assessment_template_recovery_mobility",
     "templateName": "Recovery Mobility Assessment Template",
-    "sportFocus": "Recovery Mobility",
+    "sportFocus": "General Fitness",
     "goal": "Pain-safe movement, mobility, and supported training readiness",
     "movementTestIds": [
       "pain",
@@ -4212,7 +4212,7 @@ export const workbookAssessmentTemplates = [
         "area": "Restriction",
         "testName": "Breathing Tolerance During Light Movement",
         "purpose": "Breathing and recovery during easy training.",
-        "setup": "Use walking, marching, step touches, or light shadowboxing.",
+        "setup": "Use walking, marching, step touches, or light Marching intervals.",
         "clientAction": "Move lightly while coach checks breathing and recovery.",
         "coachLooksFor": "Can talk in short sentences, no chest pain/dizziness, recovers normally.",
         "redFlags": "Chest pain, dizziness, faint feeling, severe breathlessness.",
@@ -4571,8 +4571,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -4584,11 +4584,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -4603,7 +4603,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",
@@ -4819,7 +4819,7 @@ export const workbookAssessmentTemplates = [
   {
     "id": "assessment_template_athlete_pro",
     "templateName": "Athlete Pro Assessment Template",
-    "sportFocus": "Athlete Pro",
+    "sportFocus": "General Fitness",
     "goal": "Advanced athlete readiness and high-performance conditioning",
     "movementTestIds": [
       "pain",
@@ -4844,8 +4844,8 @@ export const workbookAssessmentTemplates = [
       {
         "area": "Safety",
         "testName": "Advanced Injury Review",
-        "purpose": "Reviews current and past injuries, fight/sport schedule, and recovery concerns.",
-        "setup": "Coach interviews client about injuries, training load, sport season/fight camp, and recovery.",
+        "purpose": "Reviews current and past injuries, Fitness/sport schedule, and recovery concerns.",
+        "setup": "Coach interviews client about injuries, training load, sport season/Fitness camp, and recovery.",
         "clientAction": "Client reports current pain, old injuries, workload, and goals.",
         "coachLooksFor": "Current pain, overtraining risk, recovery, old injuries, schedule demands.",
         "redFlags": "Concussion symptoms, severe pain, acute injury, unsafe training load.",
@@ -4995,7 +4995,7 @@ export const workbookAssessmentTemplates = [
         "area": "Performance",
         "testName": "Sport-Specific Skill Test",
         "purpose": "Assesses sport skill quality for selected focus.",
-        "setup": "Use boxing, kickboxing, BJJ, or fight conditioning drill based on sport.",
+        "setup": "Use Conditioning, Conditioning, Functional Fitness, or Conditioning drill based on sport.",
         "clientAction": "Perform controlled sport-specific rounds or skill drills.",
         "coachLooksFor": "Technique, speed control, accuracy, balance, recovery, no pain.",
         "redFlags": "Form collapses, pain, unsafe intensity, poor control under fatigue.",
@@ -5019,7 +5019,7 @@ export const workbookAssessmentTemplates = [
         "redFlags": "Dizziness, chest pain, unsafe fatigue, form collapse, pain spike.",
         "scoringScale": "",
         "scoreMeaning": "",
-        "ifLowFocusOn": "Advanced intervals, fight-style rounds, conditioning progression.",
+        "ifLowFocusOn": "Advanced intervals, Fitness-style rounds, conditioning progression.",
         "systemTags": [
           "Advanced Conditioning"
         ],
@@ -5230,8 +5230,8 @@ export const workbookAssessmentTemplates = [
         "area": "Jump rope / agility space",
         "testName": "No",
         "purpose": "0",
-        "setup": "Boxing, conditioning, footwork",
-        "clientAction": "Jump rope, cones, footwork drills",
+        "setup": "Conditioning, conditioning, agility",
+        "clientAction": "Jump rope, cones, agility drills",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -5243,11 +5243,11 @@ export const workbookAssessmentTemplates = [
         ]
       },
       {
-        "area": "Boxing bag / pads / mitts",
+        "area": "Conditioning bag / cardio / cardio",
         "testName": "No",
         "purpose": "0",
         "setup": "Combat sport skill work",
-        "clientAction": "Bag, pads, mitt rounds",
+        "clientAction": "Bag, cardio, cardio rounds",
         "coachLooksFor": "",
         "redFlags": "",
         "scoringScale": "",
@@ -5262,7 +5262,7 @@ export const workbookAssessmentTemplates = [
         "area": "Mats / grappling space",
         "testName": "No",
         "purpose": "0",
-        "setup": "BJJ or floor training",
+        "setup": "Functional Fitness or floor training",
         "clientAction": "Mat transitions, grappling movement",
         "coachLooksFor": "",
         "redFlags": "",

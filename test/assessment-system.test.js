@@ -343,7 +343,7 @@ test("app does not crash if a client has no assessment yet", () => {
 test("client dashboard shows today's workout from Active approved plan", () => {
   const store = createStore();
   const dashboard = getClientDashboard(store, "client_ada", today);
-  assert.equal(dashboard.workout.title, "Boxing Strength and Conditioning");
+  assert.equal(dashboard.workout.title, "Hybrid Strength and Conditioning");
 });
 
 test("client cannot see another client's workout", () => {
@@ -401,7 +401,7 @@ test("coach can see original workout and adjusted workout", () => {
   const store = createStore();
   saveDailyCheckIn(store, daily({ energyScore: 2 }));
   const adjustment = store.todayWorkoutAdjustments[0];
-  assert.equal(adjustment.originalWorkoutSnapshot.title, "Boxing Strength and Conditioning");
+  assert.equal(adjustment.originalWorkoutSnapshot.title, "Hybrid Strength and Conditioning");
   assert.equal(Boolean(adjustment.coachApprovedWorkoutSnapshot), true);
 });
 
@@ -506,7 +506,7 @@ test("coach can keep original workout", () => {
   const store = createStore();
   const { alert } = saveDailyCheckIn(store, daily({ painScore: 4 }));
   const adjustment = resolveCoachAlert(store, alert.id, "Kept Original Workout");
-  assert.equal(adjustment.coachApprovedWorkoutSnapshot.title, "Boxing Strength and Conditioning");
+  assert.equal(adjustment.coachApprovedWorkoutSnapshot.title, "Hybrid Strength and Conditioning");
 });
 
 test("coach can replace workout", () => {
@@ -641,12 +641,12 @@ test("knee pain replaces jumping and sprinting", () => {
   assert.equal(names.includes("Marching warm-up"), true);
 });
 
-test("shoulder pain replaces heavy punching and overhead work", () => {
+test("shoulder pain replaces heavy upper-body and overhead work", () => {
   const store = createStore();
   const result = saveDailyCheckIn(store, daily({ painCheckIn: { hasPain: true, painLocations: ["Shoulder"], painType: ["Sore"], painLevel1to10: 5 } }));
   const names = result.dailyCheckIn.adjustedWorkout.items.map((item) => item.name);
-  assert.equal(names.includes("Heavy bag power rounds"), false);
-  assert.equal(names.includes("Defense drill"), true);
+  assert.equal(names.includes("Battle ropes"), false);
+  assert.equal(names.includes("Marching warm-up"), true);
 });
 
 test("lower back pain replaces heavy hinge and twisting", () => {
@@ -1241,38 +1241,38 @@ test("admin can create and delete assessment templates", () => {
 test("focus-based workbook assessment templates are imported with coach test details", () => {
   const store = createStore();
   const imported = store.assessmentTemplates.filter((item) => item.sourceWorkbook === "focus_based_assessment_templates_no_bjj_youth.xlsx");
-  const boxing = store.assessmentTemplates.find((item) => item.id === "assessment_template_boxing");
+  const conditioning = store.assessmentTemplates.find((item) => item.id === "assessment_template_cardio_conditioning");
   const recovery = store.assessmentTemplates.find((item) => item.id === "assessment_template_recovery_mobility");
   assert.equal(imported.length, 8);
-  assert.ok(boxing);
-  assert.equal(boxing.sportFocus, "Boxing");
-  assert.ok(boxing.customTests.some((testItem) => testItem.testName.toLowerCase().includes("jab")));
-  assert.ok(boxing.movementTestIds.includes("push"));
-  assert.ok(boxing.movementTestIds.includes("conditioning"));
+  assert.ok(conditioning);
+  assert.equal(conditioning.sportFocus, "General Fitness");
+  assert.ok(conditioning.customTests.some((testItem) => testItem.testName.toLowerCase().includes("conditioning")));
+  assert.ok(conditioning.movementTestIds.includes("push"));
+  assert.ok(conditioning.movementTestIds.includes("conditioning"));
   assert.ok(recovery.customTests.some((testItem) => testItem.testName.toLowerCase().includes("pain")));
   assert.ok(recovery.movementTestIds.includes("pain"));
   const summary = summarizeAssessment({
     ...blankAssessment("client_ada"),
-    movementTestIds: boxing.movementTestIds,
+    movementTestIds: conditioning.movementTestIds,
     movementScores: allScores(4)
   });
-  assert.equal(summary.movementTestIds.length, boxing.movementTestIds.length);
+  assert.equal(summary.movementTestIds.length, conditioning.movementTestIds.length);
 });
 
 test("admin can create a workout, add exercises, and reorder workout items", () => {
   const store = createStore();
   const admin = authenticateUser(store, "Admin", "9999");
   const workout = adminCreateWorkoutTemplate(store, admin, {
-    workoutName: "Kickboxing Day 1",
-    sportFocus: "Kickboxing",
-    goal: "Fight Conditioning",
+    workoutName: "Hybrid Day 1",
+    sportFocus: "Hybrid Coaching",
+    goal: "Conditioning",
     trainingLevel: "Intermediate",
     difficulty: "Medium",
     sessionLength: 45,
     trainingDayType: "Day 1",
-    workoutCategory: "Kickboxing"
+    workoutCategory: "Hybrid Training"
   });
-  const first = adminAddExerciseToWorkoutTemplate(store, admin, workout.id, { exerciseId: "light_shadowboxing", sessionPart: "Skill / Technique" });
+  const first = adminAddExerciseToWorkoutTemplate(store, admin, workout.id, { exerciseId: "chair_march", sessionPart: "Conditioning" });
   const second = adminAddExerciseToWorkoutTemplate(store, admin, workout.id, { exerciseId: "marching", sessionPart: "Warm-Up" });
   const reordered = adminReorderWorkoutTemplateItems(store, admin, workout.id, [second.id, first.id]);
   assert.equal(reordered[0].id, second.id);
@@ -1344,16 +1344,16 @@ test("plan offering workbook rows are imported and connected to workout template
   const store = createStore();
   const imported = store.planOfferings.filter((offering) => offering.sourceWorkbook === "mad_king_conditioning_plan_offerings_updated_prices.xlsx");
   assert.equal(imported.length, 96);
-  const jabLab = imported.find((offering) => offering.sourcePlanId === "MKP-001");
-  assert.equal(jabLab.planName, "Jab Lab - Beginner Quick Session");
-  assert.equal(jabLab.trainingLevel, "Beginner");
-  assert.equal(jabLab.sessionLength, 30);
-  assert.equal(jabLab.trainingDaysPerWeek, 3);
-  assert.equal(jabLab.price, 210);
-  assert.equal(jabLab.pricePerSession, 17.5);
-  assert.equal(jabLab.monthlyPriceEstimates["2"], 140);
-  assert.ok(jabLab.workoutTemplateIds.includes("template_summary_w001"));
-  assert.equal(store.workoutTemplates.some((template) => template.id === jabLab.workoutTemplateIds[0]), true);
+  const cardioLab = imported.find((offering) => offering.sourcePlanId === "MKP-001");
+  assert.equal(cardioLab.planName, "Cardio Lab - Beginner Quick Session");
+  assert.equal(cardioLab.trainingLevel, "Beginner");
+  assert.equal(cardioLab.sessionLength, 30);
+  assert.equal(cardioLab.trainingDaysPerWeek, 3);
+  assert.equal(cardioLab.price, 210);
+  assert.equal(cardioLab.pricePerSession, 17.5);
+  assert.equal(cardioLab.monthlyPriceEstimates["2"], 140);
+  assert.ok(cardioLab.workoutTemplateIds.includes("template_summary_w001"));
+  assert.equal(store.workoutTemplates.some((template) => template.id === cardioLab.workoutTemplateIds[0]), true);
   const proCamp = imported.find((offering) => offering.sourcePlanId === "MKP-096");
   assert.equal(proCamp.price, 1600);
   assert.equal(proCamp.pricePerSession, 80);
@@ -1397,14 +1397,14 @@ test("progressive workout workbook rows are added to summary templates without i
   const store = createStore();
   const summaryTemplates = store.workoutTemplates.filter((template) => template.sourceWorkbook === "mad_king_conditioning_90_workouts_progressive_variety (1).xlsx");
   assert.equal(summaryTemplates.length, 90);
-  assert.equal(summaryTemplates.some((template) => template.workoutName === "Mad King Jab Lab"), true);
+  assert.equal(summaryTemplates.some((template) => template.workoutName === "Mad King Cardio Lab"), true);
   assert.equal(summaryTemplates.some((template) => template.sessionLength === 120), true);
   const summaryItems = store.workoutTemplateItems.filter((item) => summaryTemplates.some((template) => template.id === item.workoutTemplateId));
   assert.equal(summaryItems.length, 2070);
   assert.equal(summaryItems.filter((item) => item.exerciseId).length, 1714);
   assert.equal(summaryItems.some((item) => item.workoutTemplateId === "template_summary_w001" && item.exerciseName === "Chair Sit-to-Stand" && item.exerciseId === "EX0021"), true);
   assert.equal(summaryItems.some((item) => item.workoutTemplateId === "template_summary_w001" && item.sessionPart === "Recovery / Alternative"), true);
-  assert.equal(store.exercises.some((exercise) => exercise.exerciseName === "Mad King Jab Lab"), false);
+  assert.equal(store.exercises.some((exercise) => exercise.exerciseName === "Mad King Cardio Lab"), false);
   assert.equal(store.exercises.some((exercise) => exercise.id === "ADD001"), false);
 });
 
@@ -1435,7 +1435,7 @@ test("monthly plan generator can use imported plan offerings", () => {
   assert.equal(plan.status, "Draft");
   assert.equal(plan.sourcePlanOfferingId, offering.id);
   assert.equal(plan.trainingLevel, "Beginner");
-  assert.ok(store.monthlyPlanItems.some((item) => item.monthlyPlanId === plan.id && item.title === "Mad King Jab Lab" && item.items.some((exercise) => exercise.name === "Chair Sit-to-Stand")));
+  assert.ok(store.monthlyPlanItems.some((item) => item.monthlyPlanId === plan.id && item.title === "Mad King Cardio Lab" && item.items.some((exercise) => exercise.name === "Chair Sit-to-Stand")));
 });
 
 test("assessment recommends Beginner, Intermediate, Advanced, and Pro", () => {
@@ -1591,7 +1591,7 @@ test("client can see today's workout details", () => {
   const store = createStore();
   const user = authenticateUser(store, "Client", "1111");
   const detail = getWorkoutDetailForUser(store, user, "client_ada", "item_ada_today", today);
-  assert.equal(detail.title, "Boxing Strength and Conditioning");
+  assert.equal(detail.title, "Hybrid Strength and Conditioning");
   assert.ok(detail.sections.some((section) => section.name === "Warm-Up"));
   assert.ok(detail.sections.flatMap((section) => section.items).some((item) => item.exerciseId === "jump_rope"));
 });
@@ -1645,17 +1645,17 @@ test("coach can see workout details and coach-only notes", () => {
 test("coach can click exercise and view full details", () => {
   const store = createStore();
   const coach = authenticateUser(store, "Coach", "2222");
-  const detail = getExerciseDetailForUser(store, coach, "heavy_bag_power", { clientId: "client_ada", workoutId: "item_ada_today", date: today });
-  assert.equal(detail.exerciseName, "Heavy bag power rounds");
+  const detail = getExerciseDetailForUser(store, coach, "battle_ropes", { clientId: "client_ada", workoutId: "item_ada_today", date: today });
+  assert.equal(detail.exerciseName, "Battle ropes");
   assert.ok(detail.safetyWarnings);
 });
 
 test("coach can see replacement and edit controls when allowed", () => {
   const store = createStore();
   const coach = authenticateUser(store, "Coach", "2222");
-  const detail = getExerciseDetailForUser(store, coach, "heavy_bag_power", { clientId: "client_ada", workoutId: "item_ada_today", date: today });
+  const detail = getExerciseDetailForUser(store, coach, "battle_ropes", { clientId: "client_ada", workoutId: "item_ada_today", date: today });
   assert.equal(detail.canAdjustInWorkout, true);
-  assert.ok(detail.replacementOptions.some((item) => item.name === "Light shadowboxing"));
+  assert.ok(detail.replacementOptions.some((item) => item.name === "Marching warm-up"));
 });
 
 test("admin can edit exercise video links", () => {
@@ -1909,7 +1909,7 @@ test("daily pain adjustment uses safe alternatives from Exercise Library", () =>
 test("Exercise Library filters work by category, sport, level, equipment, body area, and recovery alternative", () => {
   const store = createStore();
   assert.ok(filterExerciseLibrary(store.exercises, { category: "Strength" }).length > 0);
-  assert.ok(filterExerciseLibrary(store.exercises, { sportFocus: "Get in Shape" }).length > 0);
+  assert.ok(filterExerciseLibrary(store.exercises, { sportFocus: "General Fitness" }).length > 0);
   assert.ok(filterExerciseLibrary(store.exercises, { trainingLevel: "Beginner" }).length > 0);
   assert.ok(filterExerciseLibrary(store.exercises, { equipment: "Bodyweight" }).length > 0);
   assert.ok(filterExerciseLibrary(store.exercises, { bodyArea: "Shoulder" }).length > 0);

@@ -43,8 +43,8 @@ export function createStore() {
         currentWeightLb: 178,
         weight: 178,
         goalWeightLb: 165,
-        goal: "Build boxing conditioning and pain-free strength",
-        sportFocus: "Boxing and fight-conditioning",
+        goal: "Build conditioning and pain-free strength",
+        sportFocus: "Hybrid Coaching",
         trainingDaysPerWeek: 3,
         sessionLength: 45,
         medicalProblems: "No major medical problems reported. Monitor knee soreness.",
@@ -52,9 +52,9 @@ export function createStore() {
         medications: "",
         allergies: "",
         medicalRestrictions: "Avoid high-impact jumping until knee tolerance improves.",
-        injuryNotes: "Intermittent knee soreness with jumping and fast pivots.",
-        equipmentAvailable: ["Bodyweight / open floor space", "Stable chair / bench", "Resistance bands", "Dumbbells", "Boxing bag"],
-        packageType: "Hybrid coaching",
+        injuryNotes: "Intermittent knee soreness with jumping and fast direction changes.",
+        equipmentAvailable: ["Bodyweight / open floor space", "Stable chair / bench", "Resistance bands", "Dumbbells"],
+        packageType: "Hybrid Coaching",
         sessionsRemaining: 9,
         startDate: "2026-04-15",
         progressNotes: "Improving consistency. Keep impact controlled until knee tolerance improves.",
@@ -81,8 +81,8 @@ export function createStore() {
         currentWeightLb: 214,
         weight: 214,
         goalWeightLb: 195,
-        goal: "Kickboxing endurance and weight loss",
-        sportFocus: "Kickboxing",
+        goal: "Conditioning endurance and weight loss",
+        sportFocus: "Weight Loss",
         trainingDaysPerWeek: 4,
         sessionLength: 60,
         medicalProblems: "Low cardio tolerance after long layoff.",
@@ -95,7 +95,7 @@ export function createStore() {
         packageType: "In-person plus app",
         sessionsRemaining: 13,
         startDate: "2026-05-03",
-        progressNotes: "Start with recovery pacing and short kickboxing technique rounds.",
+        progressNotes: "Start with recovery pacing and short low-impact conditioning rounds.",
         emergencyContact: "Tara Lee / 555-333-9000",
         currentTrainingLevel: "Beginner",
         currentPlanLevel: null,
@@ -175,10 +175,10 @@ export function createStore() {
     adminAuditLog: [],
     planOfferings: [
       {
-        id: "offering_boxing_3day",
-        planName: "3-Day Boxing Plan",
-        description: "Boxing strength and conditioning plan for baseline clients.",
-        sportFocus: "Boxing",
+        id: "offering_hybrid_seed_3day",
+        planName: "3-Day Hybrid Coaching Plan",
+        description: "General fitness strength and conditioning plan for baseline clients.",
+        sportFocus: "Hybrid Coaching",
         goal: "Conditioning",
         trainingLevel: "Intermediate",
         planLevel: "Intermediate",
@@ -186,9 +186,9 @@ export function createStore() {
         sessionLength: 45,
         price: 249,
         sessionsIncluded: 12,
-        packageType: "Hybrid coaching",
-        workoutTemplateIds: ["template_boxing_baseline"],
-        planTemplateIds: ["plan_template_boxing_baseline"],
+        packageType: "Hybrid Coaching",
+        workoutTemplateIds: ["template_hybrid_baseline"],
+        planTemplateIds: ["plan_template_hybrid_baseline"],
         active: true,
         archived: false,
         createdByAdminId: "admin_1",
@@ -199,9 +199,9 @@ export function createStore() {
     ],
     packages: [
       {
-        id: "package_hybrid_boxing",
-        packageName: "Hybrid Boxing Coaching",
-        planOfferingId: "offering_boxing_3day",
+        id: "package_hybrid_seed",
+        packageName: "Hybrid Coaching",
+        planOfferingId: "offering_hybrid_seed_3day",
         price: 249,
         sessionsIncluded: 12,
         active: true,
@@ -214,13 +214,13 @@ export function createStore() {
     ],
     planTemplates: [
       {
-        id: "plan_template_boxing_baseline",
-        templateName: "Baseline Boxing Monthly Template",
-        sportFocus: "Boxing",
+        id: "plan_template_hybrid_baseline",
+        templateName: "Baseline Hybrid Monthly Template",
+        sportFocus: "Hybrid Coaching",
         goal: "Conditioning",
         trainingLevel: "Intermediate",
         planLevel: "Intermediate",
-        workoutTemplateIds: ["template_boxing_baseline"],
+        workoutTemplateIds: ["template_hybrid_baseline"],
         active: true,
         archived: false,
         createdByAdminId: "admin_1",
@@ -243,17 +243,17 @@ export function createStore() {
     ],
     workoutTemplates: [
       {
-        id: "template_boxing_baseline",
-        workoutName: "Intermediate Boxing Strength and Conditioning",
-        description: "Reusable boxing session for baseline clients.",
-        sportFocus: "Boxing",
+        id: "template_hybrid_baseline",
+        workoutName: "Intermediate Hybrid Strength and Conditioning",
+        description: "Reusable general fitness session for baseline clients.",
+        sportFocus: "Hybrid Coaching",
         goal: "Conditioning",
         trainingLevel: "Intermediate",
         planLevel: "Intermediate",
         difficulty: "Medium",
         sessionLength: 45,
         trainingDayType: "Day 1",
-        workoutCategory: "Boxing",
+        workoutCategory: "Hybrid Training",
         visible: true,
         active: true,
         archived: false,
@@ -264,9 +264,9 @@ export function createStore() {
       ...workbookSummaryTemplates
     ],
     workoutTemplateItems: [
-      workoutTemplateItem("wti_1", "template_boxing_baseline", "Warm-Up", "jump_rope", "Jump rope intervals", null, null, "3 min", "60 sec", 3, "Stay relaxed.", "Relax shoulders.", 1),
-      workoutTemplateItem("wti_2", "template_boxing_baseline", "Skill / Technique", "light_shadowboxing", "Light shadowboxing", null, null, "2 min", "60 sec", 4, "Stance, jab, cross.", "Smooth technique.", 2),
-      workoutTemplateItem("wti_3", "template_boxing_baseline", "Strength", "push_up", "Push-ups", 3, 10, null, "60 sec", null, "Clean bracing.", "Use incline if needed.", 3),
+      workoutTemplateItem("wti_1", "template_hybrid_baseline", "Warm-Up", "jump_rope", "Jump rope intervals", null, null, "3 min", "60 sec", 3, "Stay relaxed.", "Relax shoulders.", 1),
+      workoutTemplateItem("wti_2", "template_hybrid_baseline", "Conditioning", "marching", "Marching intervals", null, null, "2 min", "60 sec", 4, "Tall posture and steady breathing.", "Move at a pace you can control.", 2),
+      workoutTemplateItem("wti_3", "template_hybrid_baseline", "Strength", "push_up", "Push-ups", 3, 10, null, "60 sec", null, "Clean bracing.", "Use incline if needed.", 3),
       ...workbookWorkoutTemplateItems
     ],
     adminPermissions: {
@@ -332,10 +332,10 @@ export function createStore() {
         sessionLength: 45,
         coachAllowsMarkComplete: true,
         coachAllowsBonus: true,
-        title: "Boxing Strength and Conditioning",
+        title: "Hybrid Strength and Conditioning",
         items: [
           { exerciseId: "jump_rope", name: "Jump rope intervals", sessionPart: "Warm-up", rounds: 4, time: 60, rest: 45 },
-          { exerciseId: "heavy_bag_power", name: "Heavy bag power rounds", sessionPart: "Skill", rounds: 5, time: 120, rest: 60 },
+          { exerciseId: "marching", name: "Marching intervals", sessionPart: "Conditioning", rounds: 5, time: 120, rest: 60 },
           { exerciseId: "push_up", name: "Push-ups", sessionPart: "Strength", sets: 3, reps: 10, rest: 60 },
           { exerciseId: "battle_ropes", name: "Battle ropes", sessionPart: "Finisher", rounds: 4, time: 30, rest: 45 }
         ]
@@ -368,10 +368,10 @@ export function createStore() {
         adjustmentMode: "Normal",
         sessionLength: 40,
         coachAllowsMarkComplete: false,
-        title: "Recovery Kickboxing Basics",
+        title: "Recovery Conditioning Basics",
         items: [
           { exerciseId: "marching", name: "Marching warm-up", sessionPart: "Warm-up", time: 5, rest: 30 },
-          { exerciseId: "light_shadowboxing", name: "Light shadowboxing", sessionPart: "Skill", rounds: 4, time: 90, rest: 60 }
+          { exerciseId: "bike_easy", name: "Easy bike or walk", sessionPart: "Conditioning", rounds: 4, time: 90, rest: 60 }
         ]
       }
     ],
@@ -451,14 +451,14 @@ export const excelStarterRows = [
   { "Exercise ID": "EX0001", "Exercise Name": "Wall Push-Up", Category: "Upper", "Movement Pattern": "Push", Level: "Below Beginner", Equipment: "Bodyweight", "Goal Tag": "Strength", "Mode Tag": "Adaptive / Injury Start", "Restriction Avoid": "Shoulder pain, Wrist Pain", "Easier Alternative": "Seated Wall Press", "Harder Progression": "Incline Push-Up", "Coaching Cue": "Keep body straight and press through palms", "Default Sets": 2, "Default Reps/Time": "8-10", "Default Rest": "60 sec" },
   { "Exercise ID": "EX0002", "Exercise Name": "Incline Push-Up", Category: "Upper", "Movement Pattern": "Push", Level: "Beginner", Equipment: "Bodyweight", "Goal Tag": "Strength", "Mode Tag": "Get in Shape", "Restriction Avoid": "Wrist Pain", "Easier Alternative": "Wall Push-Up", "Harder Progression": "Floor Push-Up", "Coaching Cue": "Hands elevated, chest to surface", "Default Sets": 3, "Default Reps/Time": "8-10", "Default Rest": "60 sec" },
   { "Exercise ID": "EX0004", "Exercise Name": "Floor Push-Up", Category: "Upper", "Movement Pattern": "Push", Level: "Intermediate", Equipment: "Bodyweight", "Goal Tag": "Strength", "Mode Tag": "Get in Shape", "Restriction Avoid": "Shoulder pain, Wrist Pain", "Easier Alternative": "Knee Push-Up", "Harder Progression": "Decline Push-Up", "Coaching Cue": "Ribs down, elbows 30-45 degrees", "Default Sets": 3, "Default Reps/Time": "8-10", "Default Rest": "60 sec" },
-  { "Exercise ID": "EX0022", "Exercise Name": "Jump Rope", Category: "Cardio", "Movement Pattern": "Conditioning", Level: "Intermediate", Equipment: "Jump Rope", "Goal Tag": "Conditioning", "Mode Tag": "Boxing", "Restriction Avoid": "Knee pain, Ankle pain, Foot pain", "Easier Alternative": "March in Place", "Harder Progression": "Boxer Skip Rope", "Coaching Cue": "Relax shoulders and stay tall", "Default Sets": 3, "Default Reps/Time": "3 min", "Default Rest": "60 sec" },
-  { "Exercise ID": "EX0031", "Exercise Name": "Shadowboxing", Category: "Boxing", "Movement Pattern": "Skill", Level: "Beginner", Equipment: "None", "Goal Tag": "Boxing", "Mode Tag": "Technique", "Restriction Avoid": "Shoulder pain if punching hurts", "Easier Alternative": "Seated Shadow Boxing", "Harder Progression": "Shadow Boxing Jab Cross", "Coaching Cue": "Stance, jab, cross", "Default Sets": 3, "Default Reps/Time": "2 min", "Default Rest": "60 sec" }
+  { "Exercise ID": "EX0022", "Exercise Name": "Jump Rope", Category: "Cardio", "Movement Pattern": "Conditioning", Level: "Intermediate", Equipment: "Jump Rope", "Goal Tag": "Conditioning", "Mode Tag": "Hybrid Fitness", "Restriction Avoid": "Knee pain, Ankle pain, Foot pain", "Easier Alternative": "March in Place", "Harder Progression": "Fast Rope Intervals", "Coaching Cue": "Relax shoulders and stay tall", "Default Sets": 3, "Default Reps/Time": "3 min", "Default Rest": "60 sec" },
+  { "Exercise ID": "EX0031", "Exercise Name": "Chair March", Category: "Cardio", "Movement Pattern": "Conditioning", Level: "Beginner", Equipment: "Chair", "Goal Tag": "Low Impact", "Mode Tag": "Chair Fitness", "Restriction Avoid": "Dizziness or unsafe seated posture", "Easier Alternative": "Seated Breathing", "Harder Progression": "Standing March", "Coaching Cue": "Sit tall and breathe steadily", "Default Sets": 3, "Default Reps/Time": "2 min", "Default Rest": "60 sec" }
 ];
 
 export const workbookWorkoutRows = [
-  { "Program Week": 1, Day: "Monday", "Program Type": "Boxing", Focus: "Cardio + Fundamentals", Exercise: "Jump Rope", Sets: 3, "Reps/Time": "3 min", Intensity: "Moderate", Equipment: "Jump Rope", "Coach Notes": "Stay relaxed", "Easier Alternative": "March in Place", "Harder Progression": "Boxer Skip Rope" },
-  { "Program Week": 1, Day: "Monday", "Program Type": "Boxing", Focus: "Cardio + Fundamentals", Exercise: "Shadowboxing", Sets: 3, "Reps/Time": "2 min", Intensity: "Light", Equipment: "None", "Coach Notes": "Stance, jab, cross", "Easier Alternative": "Seated Shadow Boxing", "Harder Progression": "Shadow Boxing Jab Cross" },
-  { "Program Week": 1, Day: "Wednesday", "Program Type": "Boxing", Focus: "Conditioning", Exercise: "Bag rounds", Sets: 4, "Reps/Time": "2 min", Intensity: "Moderate", Equipment: "Heavy Bag", "Coach Notes": "Basic 1-2", "Easier Alternative": "Shadowboxing", "Harder Progression": "Heavy Bag Power Rounds" }
+  { "Program Week": 1, Day: "Monday", "Program Type": "Hybrid Coaching", Focus: "Cardio + Fundamentals", Exercise: "Jump Rope", Sets: 3, "Reps/Time": "3 min", Intensity: "Moderate", Equipment: "Jump Rope", "Coach Notes": "Stay relaxed", "Easier Alternative": "March in Place", "Harder Progression": "Fast Rope Intervals" },
+  { "Program Week": 1, Day: "Monday", "Program Type": "Hybrid Coaching", Focus: "Low-Impact Conditioning", Exercise: "Chair March", Sets: 3, "Reps/Time": "2 min", Intensity: "Light", Equipment: "Chair", "Coach Notes": "Sit tall and breathe steadily", "Easier Alternative": "Seated Breathing", "Harder Progression": "Standing March" },
+  { "Program Week": 1, Day: "Wednesday", "Program Type": "Hybrid Coaching", Focus: "Conditioning", Exercise: "Battle Ropes", Sets: 4, "Reps/Time": "30 sec", Intensity: "Moderate", Equipment: "Battle Ropes", "Coach Notes": "Use controlled waves and strong posture", "Easier Alternative": "March in Place", "Harder Progression": "Battle Rope Intervals" }
 ];
 
 export function blankAssessment(clientId, date = "2026-05-29") {
@@ -497,9 +497,9 @@ export function createExercises() {
     exercise("walk_intervals", "Walk intervals", "Recovery", "bodyweight low-impact", [], "conditioning", ["Knee", "Ankle", "Foot"], true, false, false),
     exercise("bike_easy", "Easy bike", "Recovery", "cardio-machine low-impact", [], "conditioning", ["Knee", "Hip"], true, false, false),
     exercise("jump_rope", "Jump rope intervals", "Progression", "jump-rope", ["Knee limitation", "Ankle limitation", "Fall risk", "Pain high"], "conditioning", ["Knee", "Ankle", "Foot"], false, true, false, "marching", "marching"),
-    exercise("light_shadowboxing", "Light shadowboxing", "Recovery", "bodyweight low-impact", [], "boxing", ["Shoulder", "Lower back"], true, false, false),
-    exercise("defense_drill", "Defense drill", "Baseline", "bodyweight low-impact", [], "boxing", ["Knee", "Hip"], true, false, false),
-    exercise("heavy_bag_power", "Heavy bag power rounds", "Progression", "boxing-bag", ["Shoulder limitation", "Wrist limitation", "Pain high"], "boxing", ["Shoulder", "Wrist", "Elbow", "Lower back"], false, false, true, "light_shadowboxing", "light_shadowboxing"),
+    exercise("chair_march", "Chair march", "Recovery", "chair bodyweight low-impact", [], "conditioning", ["Hip", "Knee"], true, false, false),
+    exercise("agility_ladder", "Agility ladder cardio", "Baseline", "agility-ladder bodyweight", ["Knee limitation", "Ankle limitation", "Fall risk"], "conditioning", ["Knee", "Ankle", "Foot"], false, true, false, "marching", "marching"),
+    exercise("sled_push", "Sled push", "Progression", "sled", ["Knee limitation", "Back limitation", "Pain high"], "conditioning", ["Knee", "Hip", "Lower back"], false, false, true, "marching", "marching"),
     exercise("battle_ropes", "Battle ropes", "Progression", "battle-ropes", ["Shoulder limitation", "Wrist limitation", "Pain high"], "conditioning", ["Shoulder", "Wrist", "Elbow", "Lower back"], false, false, true, "marching", "marching"),
     exercise("wall_slides", "Wall slides", "Recovery", "bodyweight mobility", [], "mobility", ["Shoulder"], true, false, false),
     exercise("hip_mobility", "Seated hip mobility", "Recovery", "bodyweight mobility", [], "mobility", ["Hip"], true, false, false),
@@ -513,7 +513,7 @@ export function createExercises() {
     updatedAt: "2026-05-29T09:00:00.000Z"
   }));
   const existingNames = new Set(imported.map((exercise) => normalizeExerciseName(exercise.exerciseName || exercise.name)));
-  const compatibilityIds = new Set(["marching", "bike_easy", "glute_bridge", "defense_drill", "light_shadowboxing"]);
+  const compatibilityIds = new Set(["marching", "bike_easy", "glute_bridge", "chair_march", "agility_ladder"]);
   const compatibleSeeds = appSeedExercises
     .filter((exercise) => compatibilityIds.has(exercise.id) || !existingNames.has(normalizeExerciseName(exercise.exerciseName || exercise.name)))
     .map((exercise) => ({ ...exercise, importedFromWorkbook: false, sourceSheets: ["App seed compatibility"] }));

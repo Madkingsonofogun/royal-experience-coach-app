@@ -104,7 +104,7 @@ export const movementTests = [
     clientDoes: "Balance for 10-20 seconds or perform controlled low step-ups.",
     lookFor: ["Foot and ankle control", "Knee stays aligned", "Hip stays level", "Can recover balance", "No dizziness", "No unsafe wobbling"],
     redFlags: ["Grabbing support suddenly", "Dizziness", "Fear of falling", "Knee caves", "Hip drops", "Cannot step down safely"],
-    scoring: ["Cannot balance safely", "Major difficulty or unsafe wobble", "Can balance briefly with support", "Solid baseline balance", "Good control", "Excellent balance and ready for dynamic footwork"],
+    scoring: ["Cannot balance safely", "Major difficulty or unsafe wobble", "Can balance briefly with support", "Solid baseline balance", "Good control", "Excellent balance and ready for dynamic agility"],
     ifLow: "Supported balance, step-ups, ankle control, hip stability, and no jumping or fast direction changes yet.",
     tag: "Balance"
   },
@@ -113,7 +113,7 @@ export const movementTests = [
     name: "March Test / 3-Minute Low-Impact Cardio",
     section: "Conditioning Readiness",
     purpose: "Test basic conditioning, breathing tolerance, and ability to recover.",
-    setup: "Use marching, walking, step touches, shadowboxing, bike, or another low-impact option.",
+    setup: "Use marching, walking, step touches, bike, rowing, elliptical, or another low-impact cardio option.",
     clientDoes: "Move at an easy to moderate pace for up to 3 minutes.",
     lookFor: ["Can keep moving", "Breathes normally", "Can talk in short sentences", "No chest pain", "No dizziness", "Recovers after stopping"],
     redFlags: ["Chest pain", "Dizziness", "Severe breathlessness", "Cannot recover", "Pain spikes", "Feels faint"],
@@ -191,7 +191,7 @@ export const movementTests = [
     name: "Breathing Tolerance During Light Movement",
     section: "Conditioning Readiness",
     purpose: "Check if the client can breathe and recover during easy training.",
-    setup: "Use light marching, walking, shadowboxing, or step touches.",
+    setup: "Use light marching, walking, step touches, bike, or other easy cardio.",
     clientDoes: "Move lightly while coach checks breathing and recovery.",
     lookFor: ["Can talk in short sentences", "No chest pain", "No dizziness", "Recovers after stopping", "No panic or over-breathing"],
     redFlags: ["Chest pain", "Dizziness", "Faint feeling", "Severe breathlessness", "Cannot recover"],
@@ -224,9 +224,7 @@ export const equipmentOptions = [
   ["machines", "Gym machines / cable station", "machines"],
   ["cardioMachine", "Cardio machine", "cardio-machine"],
   ["pool", "Pool access", "pool"],
-  ["jumpRope", "Jump rope / agility space", "jump-rope"],
-  ["bag", "Boxing bag", "boxing-bag"],
-  ["pads", "Pads / mitts", "pads"],
+  ["jumpRope", "Jump rope / agility ladder space", "jump-rope"],
   ["pullup", "Pull-up bar", "pull-up"],
   ["medicineBall", "Medicine ball", "medicine-ball"],
   ["ropes", "Battle ropes", "battle-ropes"]
@@ -234,6 +232,76 @@ export const equipmentOptions = [
 
 export const trainingLevels = ["Beginner", "Intermediate", "Advanced", "Pro"];
 export const adjustmentModes = ["Normal", "Lower Intensity", "Recovery", "Mobility Only", "Coach Review Needed", "Optional Progression"];
+
+export const generalFitnessFocusOptions = [
+  "Weight Loss",
+  "Strength",
+  "Muscle Building",
+  "Conditioning",
+  "Mobility",
+  "Low-Impact Fitness",
+  "General Fitness",
+  "Hybrid Coaching",
+  "Advanced Hybrid Fitness"
+];
+
+export const generalWorkoutCategories = [
+  "Strength",
+  "Conditioning",
+  "Cardio",
+  "Mobility",
+  "Core",
+  "Recovery",
+  "Low Impact",
+  "Functional Fitness",
+  "Hybrid Training"
+];
+
+const combatSpecificPattern = /\b(boxing|kickboxing|bjj|mma|fight|fighter|combat|shadowboxing|shadow boxing|combo|combos|mitt|mitts|pad|pads|spar|sparring|punch|punching|kick|kicking|defense|defensive|heavy bag|bag round|bag rounds|footwork)\b/i;
+const allowedGeneralCardioPattern = /\b(jump rope|battle rope|battle ropes|agility ladder|ladder drill|running ladder|cardio ladder|running|walk|walking|bike|row|rowing|elliptical|march|marching|step-up|step up|sled|conditioning circuit)\b/i;
+
+export function isCombatSpecificText(value = "") {
+  const text = String(value || "");
+  return combatSpecificPattern.test(text) && !allowedGeneralCardioPattern.test(text);
+}
+
+function isCombatSpecificExercise(exercise = {}) {
+  const text = [
+    exercise.exerciseName,
+    exercise.name,
+    exercise.category,
+    exercise.sportFocus,
+    exercise.goal,
+    exercise.sessionPart,
+    exercise.replacementCategory,
+    exercise.description,
+    exercise.coachingCues
+  ].join(" ");
+  return isCombatSpecificText(text);
+}
+
+function isCombatSpecificWorkoutTemplate(template = {}) {
+  const text = [
+    template.workoutName,
+    template.description,
+    template.sportFocus,
+    template.goal,
+    template.workoutCategory,
+    template.trainingDayType
+  ].join(" ");
+  return isCombatSpecificText(text);
+}
+
+function isCombatSpecificPlanOffering(offering = {}) {
+  const text = [
+    offering.planName,
+    offering.description,
+    offering.sportFocus,
+    offering.goal,
+    offering.packageType
+  ].join(" ");
+  return isCombatSpecificText(text);
+}
 
 export function scoreColor(score) {
   if (score <= 1) return "red";
@@ -395,6 +463,7 @@ function buildAvoidList(restrictions) {
 
 export function filterExercisesForAssessment(exercises, assessment) {
   return exercises.filter((exercise) => {
+    if (isCombatSpecificExercise(exercise)) return false;
     const equipment = toArray(exercise.equipment).map((item) => item.toLowerCase());
     const contraindications = toArray(exercise.contraindications);
     if (assessment.equipmentLevel === "Minimal Equipment" && !["bodyweight", "chair", "mobility", "low-impact"].some((tag) => equipment.includes(tag))) return false;
@@ -406,6 +475,7 @@ export function searchExerciseLibrary(exercises, query) {
   const q = String(query || "").trim().toLowerCase();
   return exercises.filter((exercise) => {
     if (exercise.active === false || exercise.archived) return false;
+    if (isCombatSpecificExercise(exercise)) return false;
     if (!q) return true;
     return [
       exercise.exerciseName,
@@ -424,6 +494,7 @@ export function searchExerciseLibrary(exercises, query) {
 export function filterExerciseLibrary(exercises, filters = {}) {
   return exercises.filter((exercise) => {
     if (exercise.active === false || exercise.archived) return false;
+    if (isCombatSpecificExercise(exercise)) return false;
     if (filters.category && !sameText(exercise.category, filters.category)) return false;
     if (filters.sportFocus && !String(exercise.sportFocus || "").toLowerCase().includes(String(filters.sportFocus).toLowerCase())) return false;
     if (filters.trainingLevel && exercise.trainingLevel !== filters.trainingLevel) return false;
@@ -578,7 +649,7 @@ function buildWorkoutDetail(store, workout, role, meta = {}) {
       detail
     };
   });
-  const sectionOrder = ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Finisher", "Cooldown", "Recovery / Mobility"];
+  const sectionOrder = ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Finisher", "Cooldown", "Recovery / Mobility"];
   const sections = sectionOrder.map((section) => ({
     name: section,
     items: items.filter((item) => sectionMatches(item.sessionPart, section))
@@ -645,7 +716,7 @@ function sectionMatches(itemPart, section) {
 function normalizeSessionPart(part) {
   const value = String(part || "").toLowerCase();
   if (value.includes("warm")) return "Warm-Up";
-  if (value.includes("skill") || value.includes("technique")) return "Skill / Technique";
+  if (value.includes("skill") || value.includes("technique")) return "Conditioning";
   if (value.includes("strength")) return "Strength";
   if (value.includes("condition")) return "Conditioning";
   if (value.includes("core")) return "Core";
@@ -990,6 +1061,7 @@ function chooseSmartPlanOfferingForAssessment(store, client, assessment) {
   const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery" || toArray(assessment.restrictions).includes("Pain high");
   const scored = (store.planOfferings || [])
     .filter((offering) => !offering.archived && offering.active !== false)
+    .filter((offering) => !isCombatSpecificPlanOffering(offering))
     .map((offering) => {
       const offeringLevel = normalizeTrainingLevel(offering.trainingLevel || offering.planLevel);
       const offeringIndex = trainingLevelIndex(offeringLevel);
@@ -1037,8 +1109,8 @@ function createAssessmentDrivenMonthlyPlanItems(store, plan, assessment, startAt
   const trainingDays = Math.max(1, Math.min(7, Number(client.trainingDaysPerWeek || 3)));
   const recoveryMode = assessment.recoveryRecommended || assessment.adjustmentMode === "Recovery" || toArray(assessment.restrictions).includes("Pain high");
   const sections = recoveryMode
-    ? ["Warm-Up", "Recovery", "Skill / Technique", "Core", "Cooldown"]
-    : ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Cooldown"];
+    ? ["Warm-Up", "Recovery", "Mobility", "Core", "Cooldown"]
+    : ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Cooldown"];
   const startDate = nextPlanStartDate();
   const created = [];
   const usedExerciseIds = new Set(
@@ -1115,6 +1187,7 @@ function matchingWorkoutTemplatesForAssessment(store, client, plan, assessment, 
   ].filter(Boolean));
   return store.workoutTemplates
     .filter((template) => !template.archived && template.active !== false)
+    .filter((template) => !isCombatSpecificWorkoutTemplate(template))
     .map((template) => {
       const templateLevel = normalizeTrainingLevel(template.trainingLevel || template.planLevel);
       const templateIndex = trainingLevelIndex(templateLevel);
@@ -1175,6 +1248,7 @@ function workoutTemplateItemsForAssessment(store, template, client, plan, assess
 
 function exerciseIsTooHardOrRestricted(exercise, trainingLevel, restrictions, recoveryMode) {
   if (!exercise || exercise.active === false || exercise.archived) return true;
+  if (isCombatSpecificExercise(exercise)) return true;
   if (trainingLevelIndex(exercise.trainingLevel || exercise.planLevel) > trainingLevelIndex(trainingLevel)) return true;
   if (recoveryMode && !exercise.lowImpact && !exercise.recoveryAlternative) return true;
   const contraindications = toArray(exercise.contraindications).map((item) => item.toLowerCase());
@@ -1190,6 +1264,7 @@ function chooseAssessmentExercise(exercises, context) {
   const goalText = String(context.goal || "").toLowerCase();
   const candidates = exercises.filter((exercise) => {
     if (exercise.active === false || exercise.archived) return false;
+    if (isCombatSpecificExercise(exercise)) return false;
     if (levelOrder.indexOf(normalizeTrainingLevel(exercise.trainingLevel || exercise.planLevel)) > targetIndex) return false;
     if (context.recoveryMode && !exercise.lowImpact && !exercise.recoveryAlternative) return false;
     if (context.restrictions.some((restriction) => toArray(exercise.contraindications).includes(restriction))) return false;
@@ -2577,14 +2652,14 @@ export function adminReorderWorkoutTemplateItems(store, adminUser, workoutTempla
 export function adminImportWorkoutTemplatesFromRows(store, adminUser, rows) {
   requireAdmin(adminUser);
   const template = adminCreateWorkoutTemplate(store, adminUser, {
-    workoutName: "Imported Workbook Boxing Template",
-    sportFocus: rows?.[0]?.["Program Type"] || "Boxing",
+    workoutName: "Imported Workbook Fitness Template",
+    sportFocus: rows?.[0]?.["Program Type"] || "General Fitness",
     goal: rows?.[0]?.Focus || "Conditioning",
     trainingLevel: "Intermediate",
-    workoutCategory: rows?.[0]?.["Program Type"] || "Boxing"
+    workoutCategory: rows?.[0]?.["Program Type"] || "Hybrid Training"
   });
   (rows || []).forEach((row, index) => adminAddExerciseToWorkoutTemplate(store, adminUser, template.id, {
-    sessionPart: row.Focus || "Skill / Technique",
+    sessionPart: categoryToSessionPart(row.Focus || row.Category || "Conditioning"),
     exerciseName: row.Exercise,
     sets: row.Sets,
     time: row["Reps/Time"],
@@ -2894,7 +2969,7 @@ export function adminAssignWorkoutTemplateToClientPlan(store, adminUser, clientI
 }
 
 function exerciseLibraryItemsForTemplate(store, client, offering, template) {
-  const sections = ["Warm-Up", "Skill / Technique", "Strength", "Conditioning", "Core", "Cooldown"];
+  const sections = ["Warm-Up", "Strength", "Conditioning", "Core", "Mobility", "Cooldown"];
   const restrictions = latestRestrictions(store, client.id);
   return sections.map((section, index) => {
     const exercise = chooseExerciseForSection(store.exercises, {
@@ -3279,9 +3354,9 @@ function categoryToSessionPart(category) {
   if (text.includes("cardio") || text.includes("conditioning")) return "Conditioning";
   if (text.includes("mobility") || text.includes("recovery")) return "Recovery";
   if (text.includes("core")) return "Core";
-  if (text.includes("boxing") || text.includes("skill")) return "Skill / Technique";
+  if (text.includes("boxing") || text.includes("skill")) return "Conditioning";
   if (text.includes("upper") || text.includes("lower") || text.includes("strength")) return "Strength";
-  return "Skill / Technique";
+  return "Conditioning";
 }
 
 function toArray(value) {
@@ -3345,7 +3420,7 @@ function findMatchingClientProfile(store, { email, phone, invite }) {
 
 function purposeForExercise(exercise) {
   const category = String(exercise.replacementCategory || exercise.category || "").toLowerCase();
-  if (category.includes("boxing")) return "Build clean striking mechanics, timing, rhythm, and conditioning without losing form.";
+  if (category.includes("boxing")) return "Build general cardio conditioning with controlled, non-combat movement.";
   if (category.includes("conditioning")) return "Improve work capacity while matching impact and intensity to today's readiness.";
   if (category.includes("core")) return "Train trunk control, bracing, and breathing so the client can move safely under fatigue.";
   if (category.includes("mobility")) return "Restore comfortable range of motion and prepare the body for pain-free movement.";
