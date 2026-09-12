@@ -398856,8 +398856,10 @@ const WORKOUT_CATEGORY_OPTIONS = ["Strength", "Conditioning", "Cardio", "Mobilit
 const EXERCISE_CATEGORY_OPTIONS = ["Strength", "Cardio", "Mobility", "Core", "Recovery", "Low Impact", "Functional Fitness"];
 const TRAINING_TYPE_OPTIONS = ["Strength training", "Conditioning", "General fitness", "Weight loss training", "Muscle gain training", "Recovery", "Mobility", "Low-impact fitness", "Hybrid coaching"];
 
-const STORE_STORAGE_KEY = "madKingSmartCoachStoreV1";
-const LIVE_BACKUP_ID = "identity_live_v2";
+const APP_DATA_VERSION = "fitness_clean_v1";
+const STORE_STORAGE_KEY = "royalExperienceFitnessStoreV2";
+const LIVE_BACKUP_ID = "fitness_live_v1";
+const LATEST_BACKUP_POINTER_ID = `${APP_DATA_VERSION}_latest`;
 const LIVE_SNAPSHOT_IDS = {
   users: 900000001,
   clients: 900000002,
@@ -400006,7 +400008,7 @@ async function upsertLiveSupabaseRecord(collectionName, recordId, data) {
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
   const row = {
-    backup_id: "live",
+    backup_id: LIVE_BACKUP_ID,
     collection_name: collectionName,
     record_id: backupRecordId(data, recordId),
     data: cleanBackupValue(data)
@@ -400143,7 +400145,7 @@ async function deleteLiveChatRowsForClient(clientId) {
 
 async function deleteLiveChatRowsForClientFromTable(projectUrl, key, tableName, clientId, allowFallback = false) {
   const params = new URLSearchParams({
-    backup_id: "eq.live",
+    backup_id: `eq.${LIVE_BACKUP_ID}`,
     collection_name: "eq.chat_messages"
   });
   params.append("data->>clientId", `eq.${clientId}`);
@@ -400168,7 +400170,7 @@ async function deleteLiveSupabaseRecord(collectionName, recordId) {
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
   const cleanRecordId = String(recordId).replace(/[^A-Za-z0-9_-]/g, "_");
-  const endpoint = `${projectUrl}/rest/v1/smart_coach_live_records?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&record_id=eq.${encodeURIComponent(cleanRecordId)}`;
+  const endpoint = `${projectUrl}/rest/v1/smart_coach_live_records?backup_id=eq.${encodeURIComponent(LIVE_BACKUP_ID)}&collection_name=eq.${encodeURIComponent(collectionName)}&record_id=eq.${encodeURIComponent(cleanRecordId)}`;
   try {
     const response = await supabaseFetchWithTimeout(endpoint, {
       method: "DELETE",
@@ -400302,7 +400304,7 @@ async function pushLiveSnapshotCollection(collectionName) {
   const key = String(store.settings.supabaseAnonKey || "").trim();
   const snapshot = liveSnapshotDataFor(collectionName);
   const row = {
-    backup_id: "live",
+    backup_id: LIVE_BACKUP_ID,
     collection_name: collectionName,
     record_id: `${collectionName}_snapshot`,
     data: cleanBackupValue(snapshot)
@@ -400447,7 +400449,7 @@ async function fetchLiveSupabaseRows(projectUrl, key, collectionName) {
 }
 
 async function fetchLiveSupabaseRowsFromTable(projectUrl, key, tableName, collectionName) {
-  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.live&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data,created_at&order=created_at.asc`;
+  const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.${encodeURIComponent(LIVE_BACKUP_ID)}&collection_name=eq.${encodeURIComponent(collectionName)}&select=record_id,data,created_at&order=created_at.asc`;
   const response = await supabaseFetchWithTimeout(endpoint, { headers: supabaseHeaders(key) }, 4500);
   if (!response.ok) {
     const errorText = await response.text();
@@ -400577,7 +400579,7 @@ async function getLatestSupabaseBackupId({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) return "";
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const response = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
+  const response = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.${encodeURIComponent(LATEST_BACKUP_POINTER_ID)}&collection_name=eq._backup_metadata&record_id=eq.${encodeURIComponent(LATEST_BACKUP_POINTER_ID)}&select=data&limit=1`, {
     headers: supabaseHeaders(key)
   }, 8000);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
@@ -400649,7 +400651,8 @@ function supabaseBackupRows() {
     record_id: backupId,
     data: {
       backupId,
-      appName: "Mad King Conditioning Smart Coach",
+      appName: "Royal Experience Fitness Coach",
+      appDataVersion: APP_DATA_VERSION,
       createdAt: new Date().toISOString(),
       summary
     }
@@ -400672,7 +400675,7 @@ function supabaseBackupRows() {
     (payload[key] || []).forEach((record, index) => {
       const item = cleanBackupValue(record);
       rows.push({
-        backup_id: "live",
+        backup_id: LIVE_BACKUP_ID,
         collection_name: collectionName,
         record_id: backupRecordId(item, `${key}_${index}`),
         data: item
@@ -400680,11 +400683,12 @@ function supabaseBackupRows() {
     });
   });
   rows.push({
-    backup_id: "latest",
+    backup_id: LATEST_BACKUP_POINTER_ID,
     collection_name: "_backup_metadata",
-    record_id: "latest",
+    record_id: LATEST_BACKUP_POINTER_ID,
     data: {
       backupId,
+      appDataVersion: APP_DATA_VERSION,
       updatedAt: new Date().toISOString(),
       summary
     }
@@ -400754,7 +400758,7 @@ async function checkSupabaseBackupStatus({ url, anonKey, table }) {
   const key = (anonKey || "").trim();
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
-  const response = await supabaseFetchWithTimeout(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=backup_id,collection_name,created_at,data&limit=1`, {
+  const response = await supabaseFetchWithTimeout(`${projectUrl}/rest/v1/${encodeURIComponent(tableName)}?backup_id=eq.${encodeURIComponent(LATEST_BACKUP_POINTER_ID)}&collection_name=eq._backup_metadata&record_id=eq.${encodeURIComponent(LATEST_BACKUP_POINTER_ID)}&select=backup_id,collection_name,created_at,data&limit=1`, {
     headers: supabaseHeaders(key)
   }, 8000);
   if (!response.ok) throw new Error(await response.text() || `Supabase returned ${response.status}`);
@@ -400828,7 +400832,7 @@ async function restoreLatestFromSupabase({ url, anonKey, table }) {
   const tableName = (table || "smart_coach_backups").trim();
   if (!projectUrl || !key) throw new Error("Supabase URL and publishable key are required.");
   const endpoint = `${projectUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const latestResponse = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.latest&collection_name=eq._backup_metadata&record_id=eq.latest&select=data&limit=1`, {
+  const latestResponse = await supabaseFetchWithTimeout(`${endpoint}?backup_id=eq.${encodeURIComponent(LATEST_BACKUP_POINTER_ID)}&collection_name=eq._backup_metadata&record_id=eq.${encodeURIComponent(LATEST_BACKUP_POINTER_ID)}&select=data&limit=1`, {
     headers: supabaseHeaders(key)
   }, 8000);
   if (!latestResponse.ok) throw new Error(await latestResponse.text() || `Supabase returned ${latestResponse.status}`);
