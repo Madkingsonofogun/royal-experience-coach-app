@@ -5217,13 +5217,35 @@ function nowIso() {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateIso(new Date());
+}
+
+function localDateIso(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function refreshTodayIfNeeded() {
+  const current = todayIso();
+  if (current === today) return false;
+  today = current;
+  state.adminDrafts.client.startDate = current;
+  state.assessment.assessmentDate = current;
+  state.weekly.checkInDate = current;
+  state.daily.workoutDate = current;
+  state.progressDraft.imageDate = current;
+  rollPastActivePlanDatesToToday(store);
+  saveStoreLocalOnly();
+  render();
+  return true;
 }
 
 function nextMonthLabel() {
   const date = new Date();
   date.setMonth(date.getMonth() + 1);
-  return date.toISOString().slice(0, 7);
+  return localDateIso(date).slice(0, 7);
 }
 
 function clone(value) {
@@ -97643,7 +97665,7 @@ const workbookWorkoutRows = [
   { "Program Week": 1, Day: "Wednesday", "Program Type": "Hybrid Coaching", Focus: "Conditioning", Exercise: "Battle Ropes", Sets: 4, "Reps/Time": "30 sec", Intensity: "Moderate", Equipment: "Battle Ropes", "Coach Notes": "Use controlled waves and strong posture", "Easier Alternative": "March in Place", "Harder Progression": "Battle Rope Intervals" }
 ];
 
-function blankAssessment(clientId, date = "2026-05-29") {
+function blankAssessment(clientId, date = todayIso()) {
   return {
     clientId,
     assessmentDate: date,
@@ -398850,7 +398872,7 @@ const LIVE_SNAPSHOT_IDS = {
   workout_completions: 900000011
 };
 const store = loadSavedStore(createStore());
-const today = "2026-05-29";
+let today = todayIso();
 const nutritionDemoMealPool = buildExpandedNutritionDemoMealPool(mealDemoLibrary);
 const nutritionMealCounts = nutritionDemoMealPool.reduce((counts, meal) => {
   counts[meal.mealType] = (counts[meal.mealType] || 0) + 1;
@@ -399407,7 +399429,37 @@ function migrateGeneralFitnessStore(targetStore) {
   (targetStore.coachAlerts || []).forEach((alert) => {
     sanitizeWorkoutSnapshot(alert.suggestedWorkoutSnapshot);
   });
+  rollPastActivePlanDatesToToday(targetStore);
   return targetStore;
+}
+
+function rollPastActivePlanDatesToToday(targetStore) {
+  const current = todayIso();
+  const activePlans = (targetStore.monthlyPlans || []).filter((plan) => String(plan.planStatus || "").toLowerCase() === "active");
+  activePlans.forEach((plan) => {
+    const items = (targetStore.monthlyPlanItems || [])
+      .filter((item) => item.monthlyPlanId === plan.id && item.workoutDate)
+      .sort((a, b) => String(a.workoutDate).localeCompare(String(b.workoutDate)) || Number(a.trainingDayNumber || 0) - Number(b.trainingDayNumber || 0));
+    if (!items.length) return;
+    const latestDate = items[items.length - 1].workoutDate;
+    if (String(latestDate) >= current) return;
+    const firstDate = items[0].workoutDate;
+    const offsetDays = isoDateDifferenceInDays(firstDate, current);
+    if (!Number.isFinite(offsetDays) || offsetDays <= 0) return;
+    items.forEach((item) => {
+      item.workoutDate = addDaysIso(item.workoutDate, offsetDays);
+      item.updatedAt = nowIso();
+    });
+    plan.month = current.slice(0, 7);
+    plan.startDate = items[0].workoutDate;
+    plan.updatedAt = nowIso();
+  });
+}
+
+function isoDateDifferenceInDays(fromIso, toIso) {
+  const from = new Date(`${fromIso}T12:00:00`);
+  const to = new Date(`${toIso}T12:00:00`);
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
 }
 
 function sanitizeWorkoutSnapshot(workout) {
