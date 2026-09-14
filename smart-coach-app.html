@@ -399180,6 +399180,14 @@ function isTextEntryActive() {
   return element.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(tagName);
 }
 
+function hasUnsavedLocalEdits() {
+  return Boolean(state.editModalDirty || isTextEntryActive());
+}
+
+function shouldPauseBackgroundSync() {
+  return Boolean(state.currentUser && hasUnsavedLocalEdits());
+}
+
 function renderWhenNotTyping() {
   if (!isTextEntryActive()) {
     render();
@@ -400403,6 +400411,7 @@ function mergeLiveRecordIntoStore(storeKey, record) {
 }
 
 async function syncLiveIdentityRecords() {
+  if (shouldPauseBackgroundSync()) return false;
   if (!canUseSupabaseBackup() || state.supabaseRestoreBusy) return false;
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
   const key = String(store.settings.supabaseAnonKey || "").trim();
@@ -400538,6 +400547,7 @@ function ensureLiveChatNotification(message) {
 }
 
 async function syncLiveChatRecords() {
+  if (shouldPauseBackgroundSync()) return false;
   if (!canUseSupabaseBackup() || state.supabaseRestoreBusy || liveChatSyncRunning) return false;
   liveChatSyncRunning = true;
   const projectUrl = normalizeSupabaseUrl(store.settings.supabaseUrl);
@@ -400615,6 +400625,7 @@ async function getLatestSupabaseBackupId({ url, anonKey, table }) {
 }
 
 async function checkCloudDataUpdates() {
+  if (shouldPauseBackgroundSync()) return;
   if (!state.currentUser || cloudDataMonitorRunning || autoCloudBackupRunning || state.supabaseBackupBusy || state.supabaseRestoreBusy || !canUseSupabaseBackup()) return;
   cloudDataMonitorRunning = true;
   try {
@@ -400646,6 +400657,7 @@ async function checkCloudDataUpdates() {
 }
 
 async function checkLiveIdentityUpdates() {
+  if (shouldPauseBackgroundSync()) return;
   if (
     !state.currentUser ||
     liveIdentityMonitorRunning ||
