@@ -4154,7 +4154,8 @@ function adminCreateExercise(store, actorUser, input) {
 function adminUpdateExercise(store, adminUser, exerciseId, patch) {
   requireAdmin(adminUser);
   const exercise = findById(store.exercises, exerciseId, "Exercise");
-  Object.assign(exercise, normalizeExerciseInput({ ...exercise, ...patch }, exercise.createdByAdminId || adminUser.id, exercise.id), { updatedAt: nowIso() });
+  const updated = Object.assign(exercise, normalizeExerciseInput({ ...exercise, ...patch }, exercise.createdByAdminId || adminUser.id, exercise.id), { updatedAt: nowIso() });
+  saveExerciseOverride(store, exerciseId, updated);
   logAdminAction(store, adminUser, `Updated exercise ${exercise.exerciseName || exercise.name}`);
   return exercise;
 }
@@ -398870,8 +398871,9 @@ const LIVE_SNAPSHOT_IDS = {
   monthly_plans: 900000007,
   monthly_plan_items: 900000008,
   meal_plans: 900000009,
-  today_workout_adjustments: 900000010,
-  workout_completions: 900000011
+  exercise_overrides: 900000010,
+  today_workout_adjustments: 900000011,
+  workout_completions: 900000012
 };
 const store = loadSavedStore(createStore());
 let today = todayIso();
@@ -399393,6 +399395,46 @@ function mergeStore(defaultStore, savedStore) {
   return merged;
 }
 
+function applyExerciseOverrides(targetStore) {
+  const overrides = Array.isArray(targetStore.exerciseOverrides) ? targetStore.exerciseOverrides : [];
+  if (!Array.isArray(targetStore.exercises) || !overrides.length) return targetStore;
+  overrides.forEach((override) => {
+    const exerciseId = override?.id || override?.exerciseId;
+    if (!exerciseId) return;
+    const exercise = targetStore.exercises.find((item) => item.id === exerciseId);
+    if (!exercise) return;
+    Object.entries(override).forEach(([key, value]) => {
+      if (["id", "exerciseId", "createdAt"].includes(key)) return;
+      exercise[key] = value;
+    });
+  });
+  return targetStore;
+}
+
+function saveExerciseOverride(targetStore, exerciseId, patch) {
+  if (!exerciseId || !patch) return null;
+  targetStore.exerciseOverrides = targetStore.exerciseOverrides || [];
+  const now = nowIso();
+  const keepKeys = [
+    "exerciseName", "name", "description", "purpose", "videoUrl", "youtubeUrl", "imageUrl",
+    "setupInstructions", "howToPerform", "stepByStepInstructions", "breathingInstructions", "coachingCues",
+    "commonMistakes", "safetyWarnings", "painWarnings", "coachNotes", "clientNotes", "tempo", "pace",
+    "regressionExerciseId", "progressionExerciseId", "safeAlternativeExerciseId", "lowImpactOption",
+    "replacementCategory", "contraindications", "updatedAt"
+  ];
+  const cleanPatch = {};
+  keepKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(patch, key)) cleanPatch[key] = patch[key];
+  });
+  cleanPatch.updatedAt = patch.updatedAt || now;
+  let override = targetStore.exerciseOverrides.find((item) => (item.exerciseId || item.id) === exerciseId);
+  if (!override) {
+    override = { id: `exercise_override_${exerciseId}`, exerciseId, createdAt: now };
+    targetStore.exerciseOverrides.push(override);
+  }
+  Object.assign(override, cleanPatch);
+  return override;
+}
 function migrateGeneralFitnessStore(targetStore) {
   ensureStoreListShape(targetStore);
   ensureDefaultHybridContent(targetStore);
@@ -399466,6 +399508,7 @@ function migrateGeneralFitnessStore(targetStore) {
   (targetStore.coachAlerts || []).forEach((alert) => {
     sanitizeWorkoutSnapshot(alert.suggestedWorkoutSnapshot);
   });
+  applyExerciseOverrides(targetStore);
   rollPastActivePlanDatesToToday(targetStore);
   return targetStore;
 }
@@ -399698,7 +399741,7 @@ function ensureStoreListShape(targetStore = store) {
     "mealPlans", "todayWorkoutAdjustments", "workoutCompletions", "chatMessages", "chatResets",
     "notifications", "inviteCodes", "adminAuditLog", "planOfferings", "packages",
     "workoutTemplates", "workoutTemplateItems", "monthlyPlans", "monthlyPlanItems",
-    "exercises", "assessmentTemplates"
+    "exercises", "exerciseOverrides", "assessmentTemplates"
   ].forEach((key) => {
     if (!Array.isArray(targetStore[key])) targetStore[key] = [];
   });
@@ -399917,6 +399960,7 @@ function backupPayload() {
     pinResetRequests: store.pinResetRequests || [],
     coachAlerts: store.coachAlerts || [],
     mealPlans: store.mealPlans || [],
+    exerciseOverrides: store.exerciseOverrides || [],
     adminAuditLog: store.adminAuditLog || []
   };
   Object.keys(payload).forEach((key) => {
@@ -400127,6 +400171,7 @@ function liveSnapshotDataFor(collectionName, latestRecord = null) {
     monthly_plans: "monthlyPlans",
     monthly_plan_items: "monthlyPlanItems",
     meal_plans: "mealPlans",
+    exercise_overrides: "exerciseOverrides",
     today_workout_adjustments: "todayWorkoutAdjustments",
     workout_completions: "workoutCompletions"
   };
@@ -400237,6 +400282,7 @@ function liveIdentityCollections() {
     { storeKey: "monthlyPlans", collectionName: "monthly_plans" },
     { storeKey: "monthlyPlanItems", collectionName: "monthly_plan_items" },
     { storeKey: "mealPlans", collectionName: "meal_plans" },
+    { storeKey: "exerciseOverrides", collectionName: "exercise_overrides" },
     { storeKey: "todayWorkoutAdjustments", collectionName: "today_workout_adjustments" },
     { storeKey: "workoutCompletions", collectionName: "workout_completions" }
   ];
@@ -400839,6 +400885,7 @@ function storeKeyForBackupCollection(collectionName) {
     settings: "settings",
     admin_permissions: "adminPermissions",
     exercises: "exercises",
+    exercise_overrides: "exerciseOverrides",
     workout_templates: "workoutTemplates",
     workout_template_items: "workoutTemplateItems",
     plan_offerings: "planOfferings",
@@ -402741,10 +402788,10 @@ function adminView() {
             "Chats", "Notifications", "Assessments and reassessments", "Assessment schedules",
             "Daily check-ins", "Weekly check-ins", "Pain check-ins", "Coach alerts", "Assigned meal plans",
             "Today workout adjustments", "Workout completions", "Client monthly plans", "Progress image records",
-            "PIN reset requests", "Admin audit log"
+            "PIN reset requests", "Exercise video/detail edits", "Admin audit log"
           ].map((label) => `<span class="chip">${label}</span>`).join("")}
         </div>
-        <p class="muted">Not included in Supabase: exercise library, workout templates and items, plan offerings, packages, plan templates, and assessment templates. Those stay built into the app and can be changed here in the app files when needed.</p>
+        <p class="muted">Not included in Supabase: the full exercise library, workout templates and items, plan offerings, packages, plan templates, and assessment templates. Exercise video/detail edits are saved as small override records.</p>
         <div class="result-band warning-band">
           <strong>Built-in workout content</strong>
           <span>Workouts, exercises, packages, and plan offerings are fixed app content for now. They will load the same on every device from the app files, while client-specific coaching records come from Supabase.</span>
@@ -405539,10 +405586,15 @@ function bindGlobal() {
     patch.active = document.querySelector("#editExerciseActive")?.checked || false;
     patch.archived = !patch.active;
     adminUpdateExercise(store, state.currentUser, exerciseId, patch);
+    const exerciseOverride = store.exerciseOverrides.find((item) => item.exerciseId === exerciseId || item.id === `exercise_override_${exerciseId}`);
     store.adminAuditLog.push({ id: `audit_${Date.now()}`, adminUserId: state.currentUser.id, action: `Edited exercise from popup ${exerciseId}`, createdAt: new Date().toISOString() });
     if (patch.youtubeUrl || patch.videoUrl) store.adminAuditLog.push({ id: `audit_${Date.now()}_video`, adminUserId: state.currentUser.id, action: `Added or updated video link from popup ${exerciseId}`, createdAt: new Date().toISOString() });
     state.exercisePopupMode = "view";
     state.editModalDirty = false;
+    saveStore();
+    pushLiveIdentityRecord("exercise_overrides", exerciseOverride).catch((error) => {
+      state.syncStatus = `Exercise video saved on this device, but Supabase sync failed: ${error.message}`;
+    });
     window.alert("Exercise changes saved.");
     render();
   });
