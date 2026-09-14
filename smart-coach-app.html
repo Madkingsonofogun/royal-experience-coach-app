@@ -402394,7 +402394,7 @@ function exerciseDetailPage() {
         </div>
         <div class="actions">
           <button class="ghost" data-view="workoutDetail">Back to Workout</button>
-          ${detail.canEdit ? `<button class="success">Edit Video Links</button>` : ""}
+          ${detail.canEdit ? `<button class="success" data-edit-exercise-video="${detail.id}">Edit Video Links</button>` : ""}
         </div>
       </div>
       <div class="exercise-detail-layout">
@@ -403387,8 +403387,8 @@ function openExercisePopup(exerciseId, options = {}) {
     workoutItemId: options.workoutItemId || null,
     returnWorkoutId: options.returnWorkoutId || null
   };
-  state.exercisePopupMode = "view";
-  state.exercisePopupTab = "Overview";
+  state.exercisePopupMode = options.mode || "view";
+  state.exercisePopupTab = options.tab || "Overview";
   state.editModalDirty = false;
   store.adminAuditLog.push({
     id: `audit_${Date.now()}`,
@@ -404326,6 +404326,10 @@ function bindGlobal() {
     openClientMealPlanView();
     render();
   }));
+  document.querySelector("#openDaily")?.addEventListener("click", () => {
+    document.querySelector("#dailyForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector("#submitDaily")?.focus?.();
+  });
   document.querySelectorAll("[data-workout-detail]").forEach((button) => button.addEventListener("click", () => {
     state.selectedWorkoutId = button.dataset.workoutDetail;
     state.view = "workoutDetail";
@@ -404335,6 +404339,10 @@ function bindGlobal() {
     const [workoutId, itemIndex] = String(event.currentTarget.dataset.markExerciseComplete || "").split(":");
     const record = markClientWorkoutExerciseComplete(workoutId, Number(itemIndex));
     if (record) window.alert("Exercise marked complete. Your coach can now see it.");
+    render();
+  }));
+  document.querySelectorAll("[data-edit-exercise-video]").forEach((button) => button.addEventListener("click", () => {
+    openExercisePopup(button.dataset.editExerciseVideo, { mode: "edit", tab: "Video" });
     render();
   }));
   document.querySelectorAll("[data-exercise-detail]").forEach((button) => button.addEventListener("click", () => {
