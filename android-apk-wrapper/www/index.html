@@ -5238,7 +5238,7 @@ function refreshTodayIfNeeded() {
   state.progressDraft.imageDate = current;
   rollPastActivePlanDatesToToday(store);
   saveStoreLocalOnly();
-  render();
+  renderWhenNotTyping();
   return true;
 }
 
@@ -399158,7 +399158,7 @@ let liveIdentityMonitorRunning = false;
 let loginAccountRefreshTimer = null;
 let loginInitialSyncStarted = false;
 let lastShoppingListPrintAt = 0;
-
+let deferredRenderTimer = null;
 scheduleLegacyMealPlanCleanup();
 saveStoreLocalOnly();
 const app = document.querySelector("#app");
@@ -399172,6 +399172,33 @@ document.addEventListener("keydown", (event) => {
   closeOpenPopups();
   render();
 });
+
+function isTextEntryActive() {
+  const element = document.activeElement;
+  if (!element) return false;
+  const tagName = String(element.tagName || "").toUpperCase();
+  return element.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(tagName);
+}
+
+function renderWhenNotTyping() {
+  if (!isTextEntryActive()) {
+    render();
+    return true;
+  }
+  const focusedElement = document.activeElement;
+  clearTimeout(deferredRenderTimer);
+  const runDeferredRender = () => {
+    clearTimeout(deferredRenderTimer);
+    if (isTextEntryActive()) {
+      deferredRenderTimer = setTimeout(runDeferredRender, 700);
+      return;
+    }
+    render();
+  };
+  deferredRenderTimer = setTimeout(runDeferredRender, 700);
+  focusedElement?.addEventListener?.("blur", runDeferredRender, { once: true });
+  return false;
+}
 
 function render() {
   saveStore();
@@ -400593,8 +400620,8 @@ async function checkCloudDataUpdates() {
   try {
     const liveIdentityChanged = await syncLiveIdentityRecords();
     const liveChatChanged = await syncLiveChatRecords();
-    if (liveChatChanged && state.view === "chat") render();
-    if (liveIdentityChanged && ["profile", "admin"].includes(state.view)) render();
+    if (liveChatChanged && state.view === "chat") renderWhenNotTyping();
+    if (liveIdentityChanged && ["profile", "admin"].includes(state.view)) renderWhenNotTyping();
     const currentFingerprint = cloudBackupFingerprint();
     if (currentFingerprint !== lastCloudBackupFingerprint) {
       const currentNonChatFingerprint = cloudBackupFingerprintWithoutChat();
@@ -400630,7 +400657,7 @@ async function checkLiveIdentityUpdates() {
     const changed = await syncLiveIdentityRecords();
     if (changed) {
       state.syncStatus = `Account/profile updates loaded from Supabase at ${new Date().toLocaleTimeString()}.`;
-      if (state.currentUser.role === "Admin" || ["profile", "admin"].includes(state.view)) render();
+      if (state.currentUser.role === "Admin" || ["profile", "admin"].includes(state.view)) renderWhenNotTyping();
     }
   } catch (error) {
     if (state.currentUser?.role === "Admin" && state.view === "admin") {
@@ -404711,7 +404738,7 @@ function bindGlobal() {
     syncLiveChatRecords()
       .then((changed) => {
         if (changed) markCurrentStoreAsCloudFresh();
-        if (changed && state.view === "chat") render();
+        if (changed && state.view === "chat") renderWhenNotTyping();
       })
       .catch((error) => {
         state.syncStatus = `Live chat sync failed: ${error.message}`;
