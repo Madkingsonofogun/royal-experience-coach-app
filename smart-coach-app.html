@@ -399399,7 +399399,7 @@ function applyExerciseOverrides(targetStore) {
   const overrides = Array.isArray(targetStore.exerciseOverrides) ? targetStore.exerciseOverrides : [];
   if (!Array.isArray(targetStore.exercises) || !overrides.length) return targetStore;
   overrides.forEach((override) => {
-    const exerciseId = override?.id || override?.exerciseId;
+    const exerciseId = override?.exerciseId || override?.id;
     if (!exerciseId) return;
     const exercise = targetStore.exercises.find((item) => item.id === exerciseId);
     if (!exercise) return;
